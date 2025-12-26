@@ -1,233 +1,25 @@
 // Configuração do Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyDummyKeyForDemoOnly123456789",
-    authDomain: "mathkids-demo.firebaseapp.com",
-    projectId: "mathkids-demo",
-    storageBucket: "mathkids-demo.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890abcdef"
+  apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
+  authDomain: "mathkids-de4a0.firebaseapp.com",
+  projectId: "mathkids-de4a0",
+  storageBucket: "mathkids-de4a0.firebasestorage.app",
+  messagingSenderId: "463966125316",
+  appId: "1:463966125316:web:6656af016d1c5a44da6451"
 };
 
-
-
-
-// Verificador de configuração
-function validateFirebaseConfig() {
-    const missingFields = [];
-    
-    if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('SUA_API_KEY')) {
-        missingFields.push('apiKey');
-    }
-    if (!firebaseConfig.authDomain || firebaseConfig.authDomain.includes('SEU_PROJETO')) {
-        missingFields.push('authDomain');
-    }
-    if (!firebaseConfig.projectId || firebaseConfig.projectId.includes('SEU_PROJETO')) {
-        missingFields.push('projectId');
-    }
-    
-    if (missingFields.length > 0) {
-        console.error('❌ Configuração do Firebase incompleta. Campos faltando:', missingFields);
-        console.log('⚠️ Aplicação rodando em modo de demonstração');
-        return false;
-    }
-    
-    return true;
-}
-
-// ============ INICIALIZAÇÃO DO FIREBASE ============
-let app, db, auth;
+// Inicializar Firebase
+let app, db, auth, analytics;
 let currentUser = null;
 let userData = {};
 let adminExists = false;
-let firebaseAvailable = false;
 
-// Inicializar Firebase com tratamento de erro
-function initializeFirebase() {
-    try {
-        // Validar configuração primeiro
-        if (!validateFirebaseConfig()) {
-            setupDemoMode();
-            return;
-        }
-        
-        // Tentar inicializar Firebase
-        app = firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        auth = firebase.auth();
-        
-        // Configurar persistência de autenticação
-        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-            .then(() => {
-                console.log('✅ Persistência de autenticação configurada');
-            })
-            .catch(error => {
-                console.warn('⚠️ Erro na persistência:', error);
-            });
-        
-        firebaseAvailable = true;
-        console.log('✅ Firebase inicializado com sucesso');
-        
-        // Configurar observador de autenticação
-        auth.onAuthStateChanged(handleAuthStateChange, handleAuthError);
-        
-        // Verificar se já existe administrador
-        checkAdminExists();
-        
-    } catch (error) {
-        console.error('❌ Erro ao inicializar Firebase:', error);
-        console.log('Código do erro:', error.code);
-        console.log('Mensagem:', error.message);
-        
-        // Configurar modo de demonstração
-        setupDemoMode();
-        
-        // Mostrar aviso ao usuário
-        showNotification('Modo de demonstração ativado. Configure o Firebase para funcionalidades completas.', 'warning');
-    }
-}
-
-// Tratamento de erros de autenticação
-function handleAuthError(error) {
-    console.error('Erro de autenticação:', error);
-    
-    // Se for erro de rede/coneção, ativar modo demo
-    if (error.code === 'auth/network-request-failed') {
-        console.log('⚠️ Problema de conexão. Ativando modo offline...');
-        if (!currentUser) {
-            setupDemoMode();
-        }
-    }
-}
-
-// ============ FUNÇÕES DE DIAGNÓSTICO ============
-function showConnectionStatus() {
-    const statusDiv = document.createElement('div');
-    statusDiv.id = 'connectionStatus';
-    statusDiv.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-size: 12px;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        backdrop-filter: blur(10px);
-    `;
-    
-    if (firebaseAvailable) {
-        statusDiv.innerHTML = `
-            <i class="fas fa-wifi" style="color: #10b981;"></i>
-            <span>Conectado ao Firebase</span>
-        `;
-        statusDiv.style.background = 'rgba(16, 185, 129, 0.1)';
-        statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-        statusDiv.style.color = '#10b981';
-    } else {
-        statusDiv.innerHTML = `
-            <i class="fas fa-wifi-slash" style="color: #ef4444;"></i>
-            <span>Modo Demonstração (Offline)</span>
-        `;
-        statusDiv.style.background = 'rgba(239, 68, 68, 0.1)';
-        statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-        statusDiv.style.color = '#ef4444';
-    }
-    
-    document.body.appendChild(statusDiv);
-    
-    // Remover após 5 segundos
-    setTimeout(() => {
-        statusDiv.style.opacity = '0';
-        statusDiv.style.transition = 'opacity 0.5s';
-        setTimeout(() => statusDiv.remove(), 500);
-    }, 5000);
-}
-
-// ============ INICIALIZAÇÃO DA APLICAÇÃO ============
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 MathKids Pro iniciando...');
-    
-    // Mostrar status de carregamento
-    showLoading(true, 'Inicializando aplicação...');
-    
-    // Inicializar Firebase
-    initializeFirebase();
-    
-    // Configurar eventos
-    setTimeout(() => {
-        setupEventListeners();
-        checkAuthState();
-        initializeComponents();
-        showConnectionStatus();
-        showLoading(false);
-    }, 1000);
-});
-
-// Função de loading melhorada
-function showLoading(show, message = 'Processando...') {
-    if (show) {
-        let loadingOverlay = document.getElementById('loadingOverlay');
-        
-        if (!loadingOverlay) {
-            loadingOverlay = document.createElement('div');
-            loadingOverlay.id = 'loadingOverlay';
-            loadingOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.7);
-                backdrop-filter: blur(4px);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                z-index: 9999;
-                color: white;
-            `;
-            
-            loadingOverlay.innerHTML = `
-                <div class="loading-spinner" style="
-                    width: 60px;
-                    height: 60px;
-                    border: 4px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 50%;
-                    border-top-color: #4f46e5;
-                    animation: spin 1s linear infinite;
-                    margin-bottom: 20px;
-                "></div>
-                <p style="font-size: 16px; margin-top: 10px;">${message}</p>
-                <style>
-                    @keyframes spin {
-                        to { transform: rotate(360deg); }
-                    }
-                </style>
-            `;
-            
-            document.body.appendChild(loadingOverlay);
-        }
-    } else {
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-            loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.3s';
-            setTimeout(() => {
-                if (loadingOverlay.parentNode) {
-                    loadingOverlay.remove();
-                }
-            }, 300);
-        }
-    }
-}
-
-
-
-
-
-    
+// Inicialização do Firebase
+try {
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    analytics = firebase.analytics();
     
     // Verificar se há administrador
     checkAdminExists();
@@ -2469,4 +2261,3 @@ window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 
 console.log('MathKids Pro v2.0 carregado com sucesso!');
-
