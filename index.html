@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathKids - Aprenda Matemática Divertida</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <!-- Cabeçalho -->
+    <header>
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-calculator"></i>
+                <h1>Math<span>Kids</span></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#home" class="active">Início</a></li>
+                    <li><a href="#operations">Operações</a></li>
+                    <li><a href="#games">Jogos</a></li>
+                    <li><a href="#progress">Progresso</a></li>
+                    <li><a href="#about">Sobre</a></li>
+                </ul>
+            </nav>
+            <div class="user-section">
+                <button id="loginBtn" class="btn-login">
+                    <i class="fas fa-user"></i> Entrar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main>
+        <!-- Seção Inicial -->
+        <section id="home" class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h2>Aprenda Matemática de Forma <span>Divertida</span></h2>
+                    <p>Descubra o mundo das quatro operações básicas com atividades interativas, jogos educativos e desafios para alunos do 4º ao 9º ano do ensino fundamental.</p>
+                    <div class="hero-buttons">
+                        <button id="startLearning" class="btn-primary">Começar a Aprender</button>
+                        <button id="exploreGames" class="btn-secondary">Explorar Jogos</button>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="math-symbols">
+                        <div class="symbol">+</div>
+                        <div class="symbol">-</div>
+                        <div class="symbol">×</div>
+                        <div class="symbol">÷</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Operações -->
+        <section id="operations" class="operations-section">
+            <div class="container">
+                <h2>Operações Matemáticas</h2>
+                <p class="section-description">Clique em uma operação para aprender e praticar</p>
+                
+                <div class="operations-grid">
+                    <div class="operation-card" data-operation="addition">
+                        <div class="operation-icon">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <h3>Adição</h3>
+                        <p>Some números e encontre o total. A operação mais básica da matemática.</p>
+                        <button class="btn-operation">Aprender Adição</button>
+                    </div>
+                    
+                    <div class="operation-card" data-operation="subtraction">
+                        <div class="operation-icon">
+                            <i class="fas fa-minus"></i>
+                        </div>
+                        <h3>Subtração</h3>
+                        <p>Descubra a diferença entre números. O oposto da adição.</p>
+                        <button class="btn-operation">Aprender Subtração</button>
+                    </div>
+                    
+                    <div class="operation-card" data-operation="multiplication">
+                        <div class="operation-icon">
+                            <i class="fas fa-times"></i>
+                        </div>
+                        <h3>Multiplicação</h3>
+                        <p>Adição repetida. Aprenda tabuadas de forma divertida e rápida.</p>
+                        <button class="btn-operation">Aprender Multiplicação</button>
+                    </div>
+                    
+                    <div class="operation-card" data-operation="division">
+                        <div class="operation-icon">
+                            <i class="fas fa-divide"></i>
+                        </div>
+                        <h3>Divisão</h3>
+                        <p>Distribuição igualitária. Aprenda a dividir de forma simples.</p>
+                        <button class="btn-operation">Aprender Divisão</button>
+                    </div>
+                </div>
+                
+                <!-- Área de Prática -->
+                <div class="practice-area" id="practiceArea">
+                    <h3 id="practiceTitle">Selecione uma operação para praticar</h3>
+                    <div class="practice-content">
+                        <div class="explanation" id="explanation">
+                            <p>Escolha uma das operações acima para ver uma explicação e começar a praticar.</p>
+                        </div>
+                        
+                        <div class="exercise" id="exercise">
+                            <div class="exercise-display" id="exerciseDisplay">
+                                <div class="numbers" id="numbersDisplay">?</div>
+                                <div class="operation-symbol" id="operationSymbol">?</div>
+                                <div class="numbers" id="numbersDisplay2">?</div>
+                                <div class="equals">=</div>
+                                <input type="number" id="answerInput" placeholder="?" disabled>
+                            </div>
+                            
+                            <div class="exercise-controls">
+                                <button id="newExercise" class="btn-control" disabled>Novo Exercício</button>
+                                <button id="checkAnswer" class="btn-control" disabled>Verificar Resposta</button>
+                                <button id="showHint" class="btn-control" disabled>Dica</button>
+                            </div>
+                            
+                            <div class="feedback" id="feedback"></div>
+                            
+                            <div class="difficulty-selector">
+                                <p>Nível de Dificuldade:</p>
+                                <div class="difficulty-buttons">
+                                    <button class="btn-difficulty active" data-level="easy">Fácil</button>
+                                    <button class="btn-difficulty" data-level="medium">Médio</button>
+                                    <button class="btn-difficulty" data-level="hard">Difícil</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Jogos -->
+        <section id="games" class="games-section">
+            <div class="container">
+                <h2>Jogos Educativos</h2>
+                <p class="section-description">Aprenda matemática jogando! Divirta-se enquanto pratica.</p>
+                
+                <div class="games-grid">
+                    <div class="game-card" id="multiplicationGame">
+                        <div class="game-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3>Desafio Relâmpago</h3>
+                        <p>Resolva o máximo de multiplicações em 60 segundos!</p>
+                        <button class="btn-game">Jogar</button>
+                    </div>
+                    
+                    <div class="game-card" id="divisionGame">
+                        <div class="game-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <h3>Quebra-cabeça da Divisão</h3>
+                        <p>Complete o quebra-cabeça dividindo números corretamente.</p>
+                        <button class="btn-game">Jogar</button>
+                    </div>
+                    
+                    <div class="game-card" id="mixedGame">
+                        <div class="game-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <h3>Campeonato MathKids</h3>
+                        <p>Enfrente operações mistas e suba no ranking de pontuação.</p>
+                        <button class="btn-game">Jogar</button>
+                    </div>
+                </div>
+                
+                <!-- Jogo em execução -->
+                <div class="game-container" id="gameContainer">
+                    <div class="game-header">
+                        <h3 id="gameTitle">Selecione um jogo para começar</h3>
+                        <div class="game-stats">
+                            <div class="stat" id="timer">Tempo: <span>60</span>s</div>
+                            <div class="stat" id="score">Pontuação: <span>0</span></div>
+                            <div class="stat" id="highScore">Recorde: <span>0</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="game-content" id="gameContent">
+                        <div class="game-welcome">
+                            <p>Escolha um dos jogos acima para começar a diversão matemática!</p>
+                            <p>Os jogos ajudam a fixar o conhecimento de forma divertida e desafiadora.</p>
+                        </div>
+                        
+                        <div class="game-exercise" id="gameExercise">
+                            <!-- Conteúdo do jogo será inserido aqui -->
+                        </div>
+                        
+                        <div class="game-controls">
+                            <button id="startGame" class="btn-game-control" disabled>Iniciar Jogo</button>
+                            <button id="endGame" class="btn-game-control" disabled>Parar Jogo</button>
+                            <button id="nextGame" class="btn-game-control" disabled>Próximo Desafio</button>
+                        </div>
+                        
+                        <div class="game-feedback" id="gameFeedback"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Progresso -->
+        <section id="progress" class="progress-section">
+            <div class="container">
+                <h2>Seu Progresso</h2>
+                <p class="section-description">Acompanhe seu aprendizado e veja sua evolução</p>
+                
+                <div class="progress-container">
+                    <div class="progress-login" id="progressLogin">
+                        <p>Faça login para salvar seu progresso e acessar recursos exclusivos!</p>
+                        <button id="progressLoginBtn" class="btn-primary">Fazer Login</button>
+                    </div>
+                    
+                    <div class="progress-content" id="progressContent">
+                        <div class="progress-stats">
+                            <div class="progress-stat">
+                                <h4>Exercícios Concluídos</h4>
+                                <div class="stat-value" id="exercisesCompleted">0</div>
+                            </div>
+                            <div class="progress-stat">
+                                <h4>Acertos</h4>
+                                <div class="stat-value" id="correctAnswers">0%</div>
+                            </div>
+                            <div class="progress-stat">
+                                <h4>Tempo de Prática</h4>
+                                <div class="stat-value" id="practiceTime">0 min</div>
+                            </div>
+                            <div class="progress-stat">
+                                <h4>Nível Alcançado</h4>
+                                <div class="stat-value" id="userLevel">Iniciante</div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-chart">
+                            <h4>Desempenho por Operação</h4>
+                            <div class="chart-container">
+                                <canvas id="progressChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção Sobre -->
+        <section id="about" class="about-section">
+            <div class="container">
+                <h2>Sobre o MathKids</h2>
+                <div class="about-content">
+                    <div class="about-text">
+                        <p>O <strong>MathKids</strong> é uma aplicação web educativa desenvolvida para ajudar crianças e adolescentes a aprenderem as quatro operações matemáticas básicas de forma divertida e interativa.</p>
+                        <p>Nosso objetivo é tornar o aprendizado da matemática acessível, interessante e eficaz para estudantes do 4º ao 9º ano do ensino fundamental, utilizando jogos, desafios e atividades dinâmicas.</p>
+                        <p>A aplicação é totalmente gratuita e funciona com banco de dados no Firebase, garantindo que qualquer pessoa possa acessar e aprender sem custos.</p>
+                        <div class="features">
+                            <div class="feature">
+                                <i class="fas fa-gamepad"></i>
+                                <h4>Jogos Educativos</h4>
+                                <p>Diversão garantida enquanto aprende</p>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-chart-line"></i>
+                                <h4>Acompanhamento de Progresso</h4>
+                                <p>Veja sua evolução no aprendizado</p>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-mobile-alt"></i>
+                                <h4>Totalmente Responsivo</h4>
+                                <p>Acesse de qualquer dispositivo</p>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-graduation-cap"></i>
+                                <h4>Conteúdo Pedagógico</h4>
+                                <p>Desenvolvido por especialistas em educação</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Rodapé -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fas fa-calculator"></i>
+                    <h3>Math<span>Kids</span></h3>
+                    <p>Aprendizado divertido da matemática</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Links Rápidos</h4>
+                    <ul>
+                        <li><a href="#home">Início</a></li>
+                        <li><a href="#operations">Operações</a></li>
+                        <li><a href="#games">Jogos</a></li>
+                        <li><a href="#progress">Progresso</a></li>
+                    </ul>
+                </div>
+                <div class="footer-tech">
+                    <h4>Tecnologias</h4>
+                    <div class="tech-icons">
+                        <i class="fab fa-html5" title="HTML5"></i>
+                        <i class="fab fa-css3-alt" title="CSS3"></i>
+                        <i class="fab fa-js" title="JavaScript"></i>
+                        <i class="fas fa-database" title="Firebase"></i>
+                    </div>
+                    <p>Esta aplicação é hospedada no GitHub Pages e utiliza Firebase para armazenamento de dados.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2023 MathKids - Projeto Educacional Gratuito</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal de Login -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Entrar no MathKids</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Faça login para salvar seu progresso e competir com outros jogadores!</p>
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="username">Nome de usuário:</label>
+                        <input type="text" id="username" placeholder="Digite seu nome">
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email (opcional):</label>
+                        <input type="email" id="userEmail" placeholder="seu@email.com">
+                    </div>
+                    <p class="note">Não requer senha! Basta um nome para começar.</p>
+                    <button id="confirmLogin" class="btn-primary">Entrar</button>
+                </div>
+                <div class="login-status" id="loginStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
