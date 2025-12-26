@@ -8,34 +8,13 @@ const firebaseConfig = {
     appId: "1:123456789012:web:abcdef1234567890abcdef"
 };
 
-// Inicializar Firebase
-try {
-    app = firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    
-    // Configurar persistência de autenticação
-    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-        .catch(error => {
-            console.error("Erro ao configurar persistência:", error);
-        });
-    
-    // Monitorar estado da autenticação
-    auth.onAuthStateChanged(async (firebaseUser) => {
-        if (firebaseUser) {
-            user = firebaseUser;
-            await loadUserData();
-            showMainContent();
-            updateUIForLoggedInUser();
-        } else {
-            user = null;
-            showWelcomeScreen();
-        }
-    });
-} catch (error) {
-    console.log("Firebase não configurado ou erro na inicialização:", error);
-    showWelcomeScreen();
-}
+// ============================================
+// INICIALIZAÇÃO E VARIÁVEIS GLOBAIS
+// ============================================
+let app, db, auth;
+let user = null;
+let userData = {};
+let userProgress = {};
 
 // Estado da aplicação
 let currentOperation = null;
@@ -47,6 +26,7 @@ let gameTimer = null;
 let gameTimeLeft = 60;
 let gameScore = 0;
 let gameHighScore = 0;
+let dailyChallengeActive = false;
 
 // Dados iniciais de progresso
 const initialProgressData = {
@@ -61,6 +41,7 @@ const initialProgressData = {
     practiceTime: 0,
     loginStreak: 0,
     lastLoginDate: null,
+    currentLevel: 'Iniciante',
     addition: { correct: 0, total: 0 },
     subtraction: { correct: 0, total: 0 },
     multiplication: { correct: 0, total: 0 },
@@ -69,19 +50,24 @@ const initialProgressData = {
         firstLogin: false,
         firstExercise: false,
         perfectScore: false,
-        dailyStreak3: false,
-        dailyStreak7: false,
+        streak3: false,
+        streak7: false,
         multiplicationMaster: false,
-        divisionExpert: false
+        divisionExpert: false,
+        practice10: false,
+        practice50: false,
+        practice100: false
     },
     gameScores: {
         lightning: 0,
-        puzzle: 0,
+        puzzle: null,
         championship: 0
     }
 };
 
-// Elementos DOM
+// ============================================
+// ELEMENTOS DOM - AUTENTICAÇÃO
+// ============================================
 const welcomeScreen = document.getElementById('welcomeScreen');
 const mainContent = document.getElementById('mainContent');
 const loginBtn = document.getElementById('loginBtn');
@@ -94,6 +80,8 @@ const authForms = document.querySelectorAll('.auth-form');
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
 const recoverForm = document.getElementById('recoverForm');
+
+// Campos de formulário
 const loginEmail = document.getElementById('loginEmail');
 const loginPassword = document.getElementById('loginPassword');
 const registerName = document.getElementById('registerName');
@@ -101,25 +89,36 @@ const registerEmail = document.getElementById('registerEmail');
 const registerPassword = document.getElementById('registerPassword');
 const registerConfirmPassword = document.getElementById('registerConfirmPassword');
 const recoverEmail = document.getElementById('recoverEmail');
+
+// Botões de ação
 const submitLogin = document.getElementById('submitLogin');
 const submitRegister = document.getElementById('submitRegister');
 const submitRecover = document.getElementById('submitRecover');
 const googleLogin = document.getElementById('googleLogin');
 const googleRegister = document.getElementById('googleRegister');
+
+// Status e loading
 const authStatus = document.getElementById('authStatus');
 const loadingModal = document.getElementById('loadingModal');
 const loadingText = document.getElementById('loadingText');
+
+// Informações do usuário
 const logoutBtn = document.getElementById('logoutBtn');
 const userInfo = document.getElementById('userInfo');
 const userName = document.getElementById('userName');
 const userAvatar = document.getElementById('userAvatar');
 const userGreeting = document.getElementById('userGreeting');
 
-// Elementos de progresso
+// ============================================
+// ELEMENTOS DOM - PROGRESSO E ESTATÍSTICAS
+// ============================================
+// Dashboard principal
 const statExercises = document.getElementById('statExercises');
 const statAccuracy = document.getElementById('statAccuracy');
 const statLevel = document.getElementById('statLevel');
 const statStreak = document.getElementById('statStreak');
+
+// Seção de progresso
 const exercisesCompletedElement = document.getElementById('exercisesCompleted');
 const correctAnswersElement = document.getElementById('correctAnswers');
 const practiceTimeElement = document.getElementById('practiceTime');
@@ -136,215 +135,162 @@ const subtractionScore = document.getElementById('subtractionScore');
 const multiplicationScore = document.getElementById('multiplicationScore');
 const divisionScore = document.getElementById('divisionScore');
 
-// Elementos do jogo
+// Recordes dos jogos
 const lightningHighscore = document.getElementById('lightningHighscore');
 const puzzleHighscore = document.getElementById('puzzleHighscore');
 const championshipRank = document.getElementById('championshipRank');
 
-// Gráfico
+// Conquistas
+const achievementsGrid = document.getElementById('achievementsGrid');
+
+// ============================================
+// ELEMENTOS DOM - EXERCÍCIOS E JOGOS
+// ============================================
+// Elementos da prática
+const practiceTitle = document.getElementById('practiceTitle');
+const explanation = document.getElementById('explanation');
+const numbersDisplay = document.getElementById('numbersDisplay');
+const numbersDisplay2 = document.getElementById('numbersDisplay2');
+const operationSymbol = document.getElementById('operationSymbol');
+const answerInput = document.getElementById('answerInput');
+const newExerciseBtn = document.getElementById('newExercise');
+const checkAnswerBtn = document.getElementById('checkAnswer');
+const showHintBtn = document.getElementById('showHint');
+const feedback = document.getElementById('feedback');
+const difficultyButtons = document.querySelectorAll('.btn-difficulty');
+
+// Elementos dos jogos
+const gameTitle = document.getElementById('gameTitle');
+const gameExercise = document.getElementById('gameExercise');
+const startGameBtn = document.getElementById('startGame');
+const endGameBtn = document.getElementById('endGame');
+const nextGameBtn = document.getElementById('nextGame');
+const gameFeedback = document.getElementById('gameFeedback');
+const timerElement = document.getElementById('timer');
+const scoreElement = document.getElementById('score');
+const highScoreElement = document.getElementById('highScore');
+
+// ============================================
+// GRÁFICO DE PROGRESSO
+// ============================================
 let progressChart = null;
 
-// Inicialização quando o DOM estiver carregado
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar eventos
-    setupEventListeners();
-    
-    // Inicializar gráfico (será atualizado quando houver dados)
-    initializeProgressChart();
-    
-    // Carregar recordes locais
-    loadLocalHighScores();
-});
-
-// Configurar todos os event listeners
-function setupEventListeners() {
-    // Botões de autenticação
-    loginBtn.addEventListener('click', openAuthModal);
-    showLoginBtn.addEventListener('click', openAuthModal);
-    showRegisterBtn.addEventListener('click', () => {
-        openAuthModal();
-        switchAuthTab('register');
-    });
-    
-    closeModal.addEventListener('click', closeAuthModal);
-    
-    // Fechar modal ao clicar fora
-    authModal.addEventListener('click', function(e) {
-        if (e.target === authModal) {
-            closeAuthModal();
-        }
-    });
-    
-    // Trocar abas de autenticação
-    authTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            const tabName = this.getAttribute('data-tab');
-            switchAuthTab(tabName);
-        });
-    });
-    
-    // Links para trocar entre formulários
-    document.querySelectorAll('[data-tab]').forEach(link => {
-        if (link.tagName === 'A') {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const tabName = this.getAttribute('data-tab');
-                switchAuthTab(tabName);
+// ============================================
+// INICIALIZAÇÃO DO FIREBASE
+// ============================================
+function initializeFirebase() {
+    try {
+        app = firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        
+        console.log('Firebase inicializado com sucesso!');
+        
+        // Configurar persistência de autenticação
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+            .catch(error => {
+                console.error("Erro ao configurar persistência:", error);
             });
-        }
-    });
-    
-    // Botões de login/cadastro
-    submitLogin.addEventListener('click', handleEmailLogin);
-    submitRegister.addEventListener('click', handleEmailRegister);
-    submitRecover.addEventListener('click', handlePasswordRecovery);
-    googleLogin.addEventListener('click', handleGoogleLogin);
-    googleRegister.addEventListener('click', handleGoogleLogin);
-    
-    // Logout
-    logoutBtn.addEventListener('click', handleLogout);
-    
-    // Alternar visibilidade da senha
-    document.getElementById('toggleLoginPassword').addEventListener('click', function() {
-        togglePasswordVisibility('loginPassword', this);
-    });
-    
-    document.getElementById('toggleRegisterPassword').addEventListener('click', function() {
-        togglePasswordVisibility('registerPassword', this);
-    });
-    
-    document.getElementById('toggleConfirmPassword').addEventListener('click', function() {
-        togglePasswordVisibility('registerConfirmPassword', this);
-    });
-    
-    // Navegação suave
-    document.querySelectorAll('nav a').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            const targetSection = document.querySelector(targetId);
-            
-            // Atualizar navegação ativa
-            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Rolar para a seção
-            targetSection.scrollIntoView({ behavior: 'smooth' });
-        });
-    });
-    
-    // Botões da hero section
-    document.getElementById('quickPractice')?.addEventListener('click', function() {
-        document.querySelector('#operations').scrollIntoView({ behavior: 'smooth' });
-    });
-    
-    document.getElementById('continueLearning')?.addEventListener('click', function() {
-        // Continuar da última operação praticada
-        if (currentOperation) {
-            selectOperation(currentOperation);
-        } else {
-            selectOperation('multiplication');
-        }
-        document.querySelector('#operations').scrollIntoView({ behavior: 'smooth' });
-    });
-    
-    // Cartões de operação
-    document.querySelectorAll('.operation-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const operation = this.getAttribute('data-operation');
-            selectOperation(operation);
-            
-            // Atualizar navegação
-            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-            document.querySelector('nav a[href="#operations"]').classList.add('active');
-            
-            // Rolar para a área de prática
-            document.querySelector('#practiceArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    });
-    
-    // Botões de dificuldade
-    document.querySelectorAll('.btn-difficulty').forEach(button => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.btn-difficulty').forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            currentDifficulty = this.getAttribute('data-level');
-            
-            // Gerar novo exercício se uma operação estiver selecionada
-            if (currentOperation) {
-                generateExercise();
-            }
-        });
-    });
-    
-    // Controles de exercício
-    document.getElementById('newExercise')?.addEventListener('click', generateExercise);
-    document.getElementById('checkAnswer')?.addEventListener('click', checkAnswer);
-    document.getElementById('showHint')?.addEventListener('click', showHint);
-    
-    // Entrada de resposta
-    document.getElementById('answerInput')?.addEventListener('keyup', function(e) {
-        if (e.key === 'Enter') {
-            checkAnswer();
-        }
-    });
-    
-    // Cartões de jogo
-    document.querySelectorAll('.game-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const gameId = this.id;
-            selectGame(gameId);
-            
-            // Atualizar navegação
-            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-            document.querySelector('nav a[href="#games"]').classList.add('active');
-            
-            // Rolar para o container do jogo
-            document.querySelector('#gameContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    });
-    
-    // Controles do jogo
-    document.getElementById('startGame')?.addEventListener('click', startGame);
-    document.getElementById('endGame')?.addEventListener('click', endGame);
-    document.getElementById('nextGame')?.addEventListener('click', generateGameExercise);
+        
+        // Monitorar estado da autenticação
+        auth.onAuthStateChanged(handleAuthStateChanged);
+        
+    } catch (error) {
+        console.error('Erro ao inicializar Firebase:', error);
+        showNotification('Firebase não configurado. Modo offline ativado.', 'warning');
+        showWelcomeScreen();
+    }
 }
+
+// ============================================
+// MANIPULADOR DE ESTADO DE AUTENTICAÇÃO
+// ============================================
+async function handleAuthStateChanged(firebaseUser) {
+    if (firebaseUser) {
+        user = firebaseUser;
+        showLoading('Carregando seus dados...');
+        try {
+            await loadUserData();
+            await updateLastLogin(user.uid);
+            showMainContent();
+            updateUIForLoggedInUser();
+            hideLoading();
+            showNotification(`Bem-vindo de volta, ${userData.username || 'Estudante'}!`, 'success');
+        } catch (error) {
+            console.error('Erro ao carregar dados do usuário:', error);
+            hideLoading();
+            showNotification('Erro ao carregar dados. Tente novamente.', 'error');
+        }
+    } else {
+        user = null;
+        userData = {};
+        userProgress = {};
+        showWelcomeScreen();
+    }
+}
+
+// ============================================
+// FUNÇÕES DE AUTENTICAÇÃO
+// ============================================
 
 // Mostrar tela de boas-vindas
 function showWelcomeScreen() {
     welcomeScreen.style.display = 'flex';
     mainContent.style.display = 'none';
-    userInfo.style.display = 'none';
-    loginBtn.style.display = 'flex';
+    if (userInfo) userInfo.style.display = 'none';
+    if (loginBtn) loginBtn.style.display = 'flex';
 }
 
 // Mostrar conteúdo principal
 function showMainContent() {
-    welcomeScreen.style.display = 'none';
-    mainContent.style.display = 'block';
-    userInfo.style.display = 'flex';
-    loginBtn.style.display = 'none';
+    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'block';
+    if (userInfo) userInfo.style.display = 'flex';
+    if (loginBtn) loginBtn.style.display = 'none';
 }
 
 // Abrir modal de autenticação
 function openAuthModal() {
-    authModal.style.display = 'flex';
-    authStatus.style.display = 'none';
-    authStatus.className = 'auth-status';
-    
-    // Limpar formulários
-    loginEmail.value = '';
-    loginPassword.value = '';
-    registerName.value = '';
-    registerEmail.value = '';
-    registerPassword.value = '';
-    registerConfirmPassword.value = '';
-    recoverEmail.value = '';
+    if (authModal) {
+        authModal.style.display = 'flex';
+        resetAuthForms();
+        switchAuthTab('login');
+    }
 }
 
 // Fechar modal de autenticação
 function closeAuthModal() {
-    authModal.style.display = 'none';
+    if (authModal) {
+        authModal.style.display = 'none';
+        resetAuthStatus();
+    }
+}
+
+// Resetar formulários de autenticação
+function resetAuthForms() {
+    if (loginEmail) loginEmail.value = '';
+    if (loginPassword) loginPassword.value = '';
+    if (registerName) registerName.value = '';
+    if (registerEmail) registerEmail.value = '';
+    if (registerPassword) registerPassword.value = '';
+    if (registerConfirmPassword) registerConfirmPassword.value = '';
+    if (recoverEmail) recoverEmail.value = '';
+    
+    // Resetar checkboxes
+    const rememberMe = document.getElementById('rememberMe');
+    if (rememberMe) rememberMe.checked = false;
+    
+    const acceptTerms = document.getElementById('acceptTerms');
+    if (acceptTerms) acceptTerms.checked = false;
+}
+
+// Resetar status de autenticação
+function resetAuthStatus() {
+    if (authStatus) {
+        authStatus.textContent = '';
+        authStatus.className = 'auth-status';
+        authStatus.style.display = 'none';
+    }
 }
 
 // Alternar entre abas de autenticação
@@ -371,7 +317,10 @@ function switchAuthTab(tabName) {
         'register': 'Criar Nova Conta',
         'recover': 'Recuperar Senha'
     };
-    document.getElementById('authModalTitle').textContent = titles[tabName];
+    const authModalTitle = document.getElementById('authModalTitle');
+    if (authModalTitle) {
+        authModalTitle.textContent = titles[tabName];
+    }
 }
 
 // Alternar visibilidade da senha
@@ -388,31 +337,6 @@ function togglePasswordVisibility(passwordFieldId, toggleIcon) {
     }
 }
 
-// Mostrar carregamento
-function showLoading(message = 'Carregando...') {
-    loadingText.textContent = message;
-    loadingModal.style.display = 'flex';
-}
-
-// Esconder carregamento
-function hideLoading() {
-    loadingModal.style.display = 'none';
-}
-
-// Mostrar status de autenticação
-function showAuthStatus(message, type = 'info') {
-    authStatus.textContent = message;
-    authStatus.className = `auth-status ${type}`;
-    authStatus.style.display = 'block';
-    
-    // Limpar após alguns segundos para mensagens de sucesso
-    if (type === 'success') {
-        setTimeout(() => {
-            authStatus.style.display = 'none';
-        }, 3000);
-    }
-}
-
 // Login com email/senha
 async function handleEmailLogin() {
     const email = loginEmail.value.trim();
@@ -421,6 +345,11 @@ async function handleEmailLogin() {
     
     if (!email || !password) {
         showAuthStatus('Por favor, preencha todos os campos.', 'error');
+        return;
+    }
+    
+    if (!validateEmail(email)) {
+        showAuthStatus('Por favor, insira um email válido.', 'error');
         return;
     }
     
@@ -437,11 +366,12 @@ async function handleEmailLogin() {
         // Fazer login
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         
-        // Atualizar último login
-        await updateLastLogin(userCredential.user.uid);
-        
         showAuthStatus('Login realizado com sucesso!', 'success');
-        setTimeout(closeAuthModal, 1500);
+        
+        // Fechar modal após 1.5 segundos
+        setTimeout(() => {
+            closeAuthModal();
+        }, 1500);
         
     } catch (error) {
         console.error('Erro no login:', error);
@@ -449,19 +379,22 @@ async function handleEmailLogin() {
         let errorMessage = 'Erro ao fazer login. ';
         switch (error.code) {
             case 'auth/user-not-found':
-                errorMessage += 'Usuário não encontrado.';
+                errorMessage = 'Usuário não encontrado. Verifique seu email.';
                 break;
             case 'auth/wrong-password':
-                errorMessage += 'Senha incorreta.';
+                errorMessage = 'Senha incorreta. Tente novamente.';
                 break;
             case 'auth/invalid-email':
-                errorMessage += 'Email inválido.';
+                errorMessage = 'Email inválido. Verifique o formato.';
                 break;
             case 'auth/user-disabled':
-                errorMessage += 'Esta conta foi desativada.';
+                errorMessage = 'Esta conta foi desativada.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Muitas tentativas. Tente novamente mais tarde.';
                 break;
             default:
-                errorMessage += 'Tente novamente.';
+                errorMessage = 'Ocorreu um erro. Tente novamente.';
         }
         
         showAuthStatus(errorMessage, 'error');
@@ -484,6 +417,16 @@ async function handleEmailRegister() {
         return;
     }
     
+    if (name.length < 3) {
+        showAuthStatus('O nome deve ter pelo menos 3 caracteres.', 'error');
+        return;
+    }
+    
+    if (!validateEmail(email)) {
+        showAuthStatus('Por favor, insira um email válido.', 'error');
+        return;
+    }
+    
     if (password.length < 6) {
         showAuthStatus('A senha deve ter pelo menos 6 caracteres.', 'error');
         return;
@@ -496,11 +439,6 @@ async function handleEmailRegister() {
     
     if (!acceptTerms) {
         showAuthStatus('Você deve aceitar os termos de uso.', 'error');
-        return;
-    }
-    
-    if (!validateEmail(email)) {
-        showAuthStatus('Por favor, insira um email válido.', 'error');
         return;
     }
     
@@ -517,7 +455,7 @@ async function handleEmailRegister() {
             email: email,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-            lastLoginDate: new Date().toISOString().split('T')[0],
+            lastLoginDate: getTodayDateString(),
             loginStreak: 1,
             achievements: {
                 ...initialProgressData.achievements,
@@ -533,7 +471,6 @@ async function handleEmailRegister() {
         // Fechar modal após 2 segundos
         setTimeout(() => {
             closeAuthModal();
-            showMainContent();
         }, 2000);
         
     } catch (error) {
@@ -542,19 +479,19 @@ async function handleEmailRegister() {
         let errorMessage = 'Erro ao criar conta. ';
         switch (error.code) {
             case 'auth/email-already-in-use':
-                errorMessage += 'Este email já está em uso.';
+                errorMessage = 'Este email já está em uso. Tente fazer login.';
                 break;
             case 'auth/invalid-email':
-                errorMessage += 'Email inválido.';
+                errorMessage = 'Email inválido. Verifique o formato.';
                 break;
             case 'auth/operation-not-allowed':
-                errorMessage += 'Operação não permitida.';
+                errorMessage = 'Operação não permitida.';
                 break;
             case 'auth/weak-password':
-                errorMessage += 'Senha muito fraca.';
+                errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres.';
                 break;
             default:
-                errorMessage += 'Tente novamente.';
+                errorMessage = 'Ocorreu um erro. Tente novamente.';
         }
         
         showAuthStatus(errorMessage, 'error');
@@ -565,9 +502,21 @@ async function handleEmailRegister() {
 
 // Login com Google
 async function handleGoogleLogin() {
+    if (!auth) {
+        showAuthStatus('Firebase não configurado. Modo offline ativado.', 'warning');
+        setTimeout(() => {
+            userData = { username: 'Usuário Demo', email: 'demo@mathkids.com' };
+            userProgress = { ...initialProgressData, ...userData };
+            showMainContent();
+            updateUIForLoggedInUser();
+            closeAuthModal();
+        }, 1500);
+        return;
+    }
+    
     const provider = new firebase.auth.GoogleAuthProvider();
     
-    // Adicionar escopos se necessário
+    // Adicionar escopos
     provider.addScope('profile');
     provider.addScope('email');
     
@@ -577,33 +526,12 @@ async function handleGoogleLogin() {
         const result = await auth.signInWithPopup(provider);
         const user = result.user;
         
-        // Verificar se é um novo usuário
-        const isNewUser = result.additionalUserInfo.isNewUser;
-        
-        if (isNewUser) {
-            // Criar perfil para novo usuário do Google
-            const userProfile = {
-                ...initialProgressData,
-                username: user.displayName || user.email.split('@')[0],
-                email: user.email,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLoginDate: new Date().toISOString().split('T')[0],
-                loginStreak: 1,
-                achievements: {
-                    ...initialProgressData.achievements,
-                    firstLogin: true
-                }
-            };
-            
-            await db.collection('users').doc(user.uid).set(userProfile);
-        } else {
-            // Atualizar último login para usuário existente
-            await updateLastLogin(user.uid);
-        }
-        
         showAuthStatus('Login com Google realizado com sucesso!', 'success');
-        setTimeout(closeAuthModal, 1500);
+        
+        // Fechar modal após 1.5 segundos
+        setTimeout(() => {
+            closeAuthModal();
+        }, 1500);
         
     } catch (error) {
         console.error('Erro no login com Google:', error);
@@ -613,6 +541,8 @@ async function handleGoogleLogin() {
             errorMessage = 'Login cancelado pelo usuário.';
         } else if (error.code === 'auth/cancelled-popup-request') {
             errorMessage = 'Solicitação de login cancelada.';
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            errorMessage = 'Email já registrado com outro método.';
         } else {
             errorMessage += 'Tente novamente.';
         }
@@ -640,7 +570,11 @@ async function handlePasswordRecovery() {
     showLoading('Enviando link de recuperação...');
     
     try {
-        await auth.sendPasswordResetEmail(email);
+        await auth.sendPasswordResetEmail(email, {
+            url: window.location.href,
+            handleCodeInApp: false
+        });
+        
         showAuthStatus('Email de recuperação enviado! Verifique sua caixa de entrada.', 'success');
         
         // Limpar campo e voltar para login após 5 segundos
@@ -655,13 +589,16 @@ async function handlePasswordRecovery() {
         let errorMessage = 'Erro ao enviar email de recuperação. ';
         switch (error.code) {
             case 'auth/user-not-found':
-                errorMessage += 'Usuário não encontrado.';
+                errorMessage = 'Usuário não encontrado. Verifique o email.';
                 break;
             case 'auth/invalid-email':
-                errorMessage += 'Email inválido.';
+                errorMessage = 'Email inválido. Verifique o formato.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Muitas tentativas. Tente novamente mais tarde.';
                 break;
             default:
-                errorMessage += 'Tente novamente.';
+                errorMessage = 'Ocorreu um erro. Tente novamente.';
         }
         
         showAuthStatus(errorMessage, 'error');
@@ -672,23 +609,112 @@ async function handlePasswordRecovery() {
 
 // Logout
 async function handleLogout() {
+    if (!auth || !user) {
+        user = null;
+        userData = {};
+        userProgress = {};
+        showWelcomeScreen();
+        return;
+    }
+    
     showLoading('Saindo...');
     
     try {
         await auth.signOut();
-        showWelcomeScreen();
+        showNotification('Logout realizado com sucesso!', 'success');
     } catch (error) {
         console.error('Erro ao fazer logout:', error);
-        alert('Erro ao fazer logout. Tente novamente.');
+        showNotification('Erro ao fazer logout. Tente novamente.', 'error');
     } finally {
         hideLoading();
     }
 }
 
+// ============================================
+// FUNÇÕES DE GERENCIAMENTO DE USUÁRIO
+// ============================================
+
+// Carregar dados do usuário
+async function loadUserData() {
+    if (!user || !db) {
+        // Modo offline/demo
+        const demoData = localStorage.getItem('mathkids_demo_data');
+        if (demoData) {
+            userProgress = JSON.parse(demoData);
+        } else {
+            userProgress = {
+                ...initialProgressData,
+                username: 'Estudante Demo',
+                email: 'demo@mathkids.com',
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            };
+        }
+        userData = { ...userProgress };
+        return;
+    }
+    
+    try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (userDoc.exists) {
+            userProgress = userDoc.data();
+            userData = { ...userProgress };
+            
+            // Garantir que todas as propriedades existam
+            userProgress = {
+                ...initialProgressData,
+                ...userProgress
+            };
+            
+            // Salvar localmente para modo offline
+            localStorage.setItem('mathkids_user_data', JSON.stringify(userProgress));
+        } else {
+            // Criar documento se não existir (para usuários antigos)
+            const userProfile = {
+                ...initialProgressData,
+                username: user.displayName || user.email.split('@')[0],
+                email: user.email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLoginDate: getTodayDateString(),
+                loginStreak: 1,
+                achievements: {
+                    ...initialProgressData.achievements,
+                    firstLogin: true
+                }
+            };
+            
+            await db.collection('users').doc(user.uid).set(userProfile);
+            userProgress = userProfile;
+            userData = { ...userProgress };
+        }
+    } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error);
+        
+        // Tentar carregar do localStorage
+        const savedData = localStorage.getItem('mathkids_user_data');
+        if (savedData) {
+            userProgress = JSON.parse(savedData);
+            userData = { ...userProgress };
+        } else {
+            // Dados demo
+            userProgress = {
+                ...initialProgressData,
+                username: user.displayName || user.email.split('@')[0] || 'Estudante',
+                email: user.email || 'estudante@mathkids.com'
+            };
+            userData = { ...userProgress };
+        }
+    }
+}
+
 // Atualizar último login
 async function updateLastLogin(userId) {
+    if (!db || !userId) return;
+    
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayDateString();
         const userDoc = await db.collection('users').doc(userId).get();
         
         if (userDoc.exists) {
@@ -720,15 +746,16 @@ async function updateLastLogin(userId) {
             await db.collection('users').doc(userId).update({
                 lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
                 lastLoginDate: today,
-                loginStreak: loginStreak
+                loginStreak: loginStreak,
+                currentLevel: calculateUserLevel(userData)
             });
             
             // Verificar conquistas de sequência
-            if (loginStreak >= 3) {
-                await unlockAchievement(userId, 'dailyStreak3');
+            if (loginStreak >= 3 && !userData.achievements?.streak3) {
+                await unlockAchievement(userId, 'streak3');
             }
-            if (loginStreak >= 7) {
-                await unlockAchievement(userId, 'dailyStreak7');
+            if (loginStreak >= 7 && !userData.achievements?.streak7) {
+                await unlockAchievement(userId, 'streak7');
             }
         }
     } catch (error) {
@@ -736,28 +763,18 @@ async function updateLastLogin(userId) {
     }
 }
 
-// Carregar dados do usuário
-async function loadUserData() {
-    if (!user || !db) return;
+// Calcular nível do usuário
+function calculateUserLevel(userData) {
+    const totalExercises = userData.exercisesCompleted || 0;
+    const accuracy = userData.totalAnswers > 0 
+        ? (userData.correctAnswers || 0) / (userData.totalAnswers || 1) 
+        : 0;
     
-    try {
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (userDoc.exists) {
-            userProgress = userDoc.data();
-            
-            // Garantir que todas as propriedades existam
-            userProgress = {
-                ...initialProgressData,
-                ...userProgress
-            };
-            
-            // Atualizar UI com dados do usuário
-            updateUIForLoggedInUser();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
-    }
+    if (totalExercises >= 200 && accuracy >= 0.9) return 'Mestre Supremo';
+    if (totalExercises >= 100 && accuracy >= 0.8) return 'Mestre';
+    if (totalExercises >= 50 && accuracy >= 0.7) return 'Avançado';
+    if (totalExercises >= 20 && accuracy >= 0.6) return 'Intermediário';
+    return 'Iniciante';
 }
 
 // Atualizar UI para usuário logado
@@ -765,60 +782,90 @@ function updateUIForLoggedInUser() {
     if (!userProgress.username) return;
     
     // Informações do usuário
-    userName.textContent = userProgress.username;
-    userGreeting.textContent = userProgress.username;
+    if (userName) userName.textContent = userProgress.username;
+    if (userGreeting) userGreeting.textContent = userProgress.username;
     
     // Atualizar avatar
-    if (user.photoURL) {
-        userAvatar.innerHTML = `<img src="${user.photoURL}" alt="${userProgress.username}" style="width:100%;height:100%;border-radius:50%;">`;
-    } else {
-        // Usar inicial do nome
-        const initial = userProgress.username.charAt(0).toUpperCase();
-        userAvatar.innerHTML = `<span style="font-size:1.5rem;">${initial}</span>`;
+    if (userAvatar) {
+        if (user && user.photoURL) {
+            userAvatar.innerHTML = `<img src="${user.photoURL}" alt="${userProgress.username}" style="width:100%;height:100%;border-radius:50%;">`;
+        } else {
+            // Usar inicial do nome
+            const initial = userProgress.username.charAt(0).toUpperCase();
+            userAvatar.innerHTML = `<span style="font-size:1.5rem;">${initial}</span>`;
+        }
     }
     
-    // Estatísticas
-    statExercises.textContent = userProgress.exercisesCompleted || 0;
-    
-    const accuracy = userProgress.totalAnswers > 0 
-        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
-        : 0;
-    statAccuracy.textContent = `${accuracy}%`;
-    
-    // Determinar nível
-    let level = 'Iniciante';
-    const totalExercises = userProgress.exercisesCompleted || 0;
-    if (totalExercises >= 50) level = 'Intermediário';
-    if (totalExercises >= 100) level = 'Avançado';
-    if (totalExercises >= 200) level = 'Mestre';
-    statLevel.textContent = level;
-    userLevelElement.textContent = level;
-    
-    // Sequência de logins
-    statStreak.textContent = `${userProgress.loginStreak || 0} dias`;
+    // Estatísticas do dashboard
+    updateDashboardStats();
     
     // Estatísticas detalhadas
-    exercisesCompletedElement.textContent = userProgress.exercisesCompleted || 0;
-    correctAnswersElement.textContent = `${accuracy}%`;
-    practiceTimeElement.textContent = `${Math.floor((userProgress.practiceTime || 0) / 60)} min`;
-    currentPoints.textContent = userProgress.totalPoints || 0;
+    updateDetailedStats();
     
     // Barras de progresso das operações
     updateOperationProgress();
     
     // Atualizar recordes dos jogos
-    if (userProgress.gameScores) {
-        lightningHighscore.textContent = userProgress.gameScores.lightning || 0;
-        puzzleHighscore.textContent = userProgress.gameScores.puzzle || '00:00';
-        championshipRank.textContent = userProgress.gameScores.championship || '-';
-    }
+    updateGameHighscores();
     
     // Atualizar conquistas
-    updateAchievements();
+    updateAchievementsDisplay();
     
     // Atualizar gráfico
-    if (progressChart) {
-        updateProgressChart();
+    updateProgressChart();
+}
+
+// Atualizar estatísticas do dashboard
+function updateDashboardStats() {
+    if (!userProgress) return;
+    
+    if (statExercises) {
+        statExercises.textContent = userProgress.exercisesCompleted || 0;
+    }
+    
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
+        : 0;
+    
+    if (statAccuracy) {
+        statAccuracy.textContent = `${accuracy}%`;
+    }
+    
+    const level = userProgress.currentLevel || calculateUserLevel(userProgress);
+    if (statLevel) {
+        statLevel.textContent = level;
+    }
+    if (userLevelElement) {
+        userLevelElement.textContent = level;
+    }
+    
+    if (statStreak) {
+        statStreak.textContent = `${userProgress.loginStreak || 0} dias`;
+    }
+}
+
+// Atualizar estatísticas detalhadas
+function updateDetailedStats() {
+    if (!userProgress) return;
+    
+    if (exercisesCompletedElement) {
+        exercisesCompletedElement.textContent = userProgress.exercisesCompleted || 0;
+    }
+    
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
+        : 0;
+    
+    if (correctAnswersElement) {
+        correctAnswersElement.textContent = `${accuracy}%`;
+    }
+    
+    if (practiceTimeElement) {
+        practiceTimeElement.textContent = `${Math.floor((userProgress.practiceTime || 0) / 60)} min`;
+    }
+    
+    if (currentPoints) {
+        currentPoints.textContent = userProgress.totalPoints || 0;
     }
 }
 
@@ -846,25 +893,49 @@ function updateOperationProgress() {
     });
 }
 
-// Atualizar conquistas
-function updateAchievements() {
-    const achievementsGrid = document.getElementById('achievementsGrid');
-    if (!achievementsGrid) return;
+// Atualizar recordes dos jogos
+function updateGameHighscores() {
+    if (!userProgress.gameScores) return;
+    
+    if (lightningHighscore) {
+        lightningHighscore.textContent = userProgress.gameScores.lightning || 0;
+    }
+    
+    if (puzzleHighscore) {
+        const puzzleScore = userProgress.gameScores.puzzle;
+        puzzleHighscore.textContent = puzzleScore ? `${puzzleScore}s` : '-';
+    }
+    
+    if (championshipRank) {
+        championshipRank.textContent = userProgress.gameScores.championship || '-';
+    }
+}
+
+// ============================================
+// SISTEMA DE CONQUISTAS
+// ============================================
+
+// Atualizar exibição de conquistas
+function updateAchievementsDisplay() {
+    if (!achievementsGrid || !userProgress.achievements) return;
     
     const achievements = [
-        { id: 'firstLogin', icon: 'fa-user-plus', name: 'Primeiro Login', desc: 'Criou uma conta' },
-        { id: 'firstExercise', icon: 'fa-check-circle', name: 'Primeiro Exercício', desc: 'Completou um exercício' },
+        { id: 'firstLogin', icon: 'fa-user-plus', name: 'Primeiro Login', desc: 'Criou uma conta no MathKids' },
+        { id: 'firstExercise', icon: 'fa-check-circle', name: 'Primeiro Exercício', desc: 'Completou o primeiro exercício' },
         { id: 'perfectScore', icon: 'fa-star', name: 'Nota Perfeita', desc: 'Acertou 10 exercícios seguidos' },
-        { id: 'dailyStreak3', icon: 'fa-fire', name: 'Sequência de 3 Dias', desc: 'Logou por 3 dias consecutivos' },
-        { id: 'dailyStreak7', icon: 'fa-fire', name: 'Sequência de 7 Dias', desc: 'Logou por 7 dias consecutivos' },
+        { id: 'streak3', icon: 'fa-fire', name: 'Sequência Bronze', desc: 'Logou por 3 dias consecutivos' },
+        { id: 'streak7', icon: 'fa-fire', name: 'Sequência Prata', desc: 'Logou por 7 dias consecutivos' },
         { id: 'multiplicationMaster', icon: 'fa-times', name: 'Mestre da Multiplicação', desc: 'Acertou 50 multiplicações' },
-        { id: 'divisionExpert', icon: 'fa-divide', name: 'Especialista em Divisão', desc: 'Acertou 50 divisões' }
+        { id: 'divisionExpert', icon: 'fa-divide', name: 'Especialista em Divisão', desc: 'Acertou 50 divisões' },
+        { id: 'practice10', icon: 'fa-dumbbell', name: 'Praticante', desc: 'Completou 10 exercícios' },
+        { id: 'practice50', icon: 'fa-medal', name: 'Atleta', desc: 'Completou 50 exercícios' },
+        { id: 'practice100', icon: 'fa-trophy', name: 'Campeão', desc: 'Completou 100 exercícios' }
     ];
     
     achievementsGrid.innerHTML = '';
     
     achievements.forEach(achievement => {
-        const isUnlocked = userProgress.achievements?.[achievement.id] || false;
+        const isUnlocked = userProgress.achievements[achievement.id] || false;
         
         const achievementElement = document.createElement('div');
         achievementElement.className = `achievement ${isUnlocked ? '' : 'locked'}`;
@@ -881,7 +952,15 @@ function updateAchievements() {
 
 // Desbloquear conquista
 async function unlockAchievement(userId, achievementId) {
-    if (!db || !userId) return;
+    if (!db || !userId) {
+        // Modo offline
+        if (!userProgress.achievements[achievementId]) {
+            userProgress.achievements[achievementId] = true;
+            localStorage.setItem('mathkids_user_data', JSON.stringify(userProgress));
+            showAchievementNotification(achievementId);
+        }
+        return;
+    }
     
     try {
         // Verificar se já tem a conquista
@@ -892,11 +971,13 @@ async function unlockAchievement(userId, achievementId) {
             if (!userData.achievements?.[achievementId]) {
                 // Desbloquear conquista
                 await db.collection('users').doc(userId).update({
-                    [`achievements.${achievementId}`]: true
+                    [`achievements.${achievementId}`]: true,
+                    totalPoints: firebase.firestore.FieldValue.increment(100)
                 });
                 
-                // Adicionar pontos
-                await addPoints(userId, 50);
+                // Atualizar dados locais
+                userProgress.achievements[achievementId] = true;
+                userProgress.totalPoints = (userProgress.totalPoints || 0) + 100;
                 
                 // Mostrar notificação
                 showAchievementNotification(achievementId);
@@ -913,110 +994,775 @@ function showAchievementNotification(achievementId) {
         'firstLogin': 'Primeiro Login',
         'firstExercise': 'Primeiro Exercício',
         'perfectScore': 'Nota Perfeita',
-        'dailyStreak3': 'Sequência de 3 Dias',
-        'dailyStreak7': 'Sequência de 7 Dias',
+        'streak3': 'Sequência Bronze',
+        'streak7': 'Sequência Prata',
         'multiplicationMaster': 'Mestre da Multiplicação',
-        'divisionExpert': 'Especialista em Divisão'
+        'divisionExpert': 'Especialista em Divisão',
+        'practice10': 'Praticante',
+        'practice50': 'Atleta',
+        'practice100': 'Campeão'
     };
     
     const notification = document.createElement('div');
     notification.className = 'achievement-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        animation: slideIn 0.5s ease-out;
+        max-width: 350px;
+    `;
+    
     notification.innerHTML = `
-        <div class="notification-content">
-            <i class="fas fa-trophy"></i>
-            <div>
-                <h4>Conquista Desbloqueada!</h4>
-                <p>${achievementNames[achievementId] || 'Nova Conquista'}</p>
-            </div>
+        <i class="fas fa-trophy" style="font-size: 2rem;"></i>
+        <div>
+            <h4 style="margin: 0 0 5px 0; font-size: 1.1rem;">Conquista Desbloqueada!</h4>
+            <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">${achievementNames[achievementId] || 'Nova Conquista'}</p>
         </div>
     `;
     
     document.body.appendChild(notification);
     
+    // Adicionar animação CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
     // Remover após 5 segundos
     setTimeout(() => {
-        notification.remove();
+        notification.style.animation = 'slideOut 0.5s ease-out';
+        setTimeout(() => {
+            notification.remove();
+            style.remove();
+        }, 500);
     }, 5000);
 }
 
-// Adicionar pontos
-async function addPoints(userId, points) {
-    if (!db || !userId) return;
+// ============================================
+// SISTEMA DE EXERCÍCIOS
+// ============================================
+
+// Selecionar operação
+function selectOperation(operation) {
+    if (!user && !isDemoMode()) {
+        showNotification('Faça login para praticar exercícios!', 'warning');
+        openAuthModal();
+        return;
+    }
     
-    try {
-        await db.collection('users').doc(userId).update({
-            totalPoints: firebase.firestore.FieldValue.increment(points)
-        });
-        
-        // Atualizar dados locais
-        userProgress.totalPoints = (userProgress.totalPoints || 0) + points;
-        currentPoints.textContent = userProgress.totalPoints;
-    } catch (error) {
-        console.error('Erro ao adicionar pontos:', error);
+    currentOperation = operation;
+    
+    // Atualizar título
+    const operationNames = {
+        'addition': 'Adição',
+        'subtraction': 'Subtração',
+        'multiplication': 'Multiplicação',
+        'division': 'Divisão'
+    };
+    
+    if (practiceTitle) {
+        practiceTitle.textContent = `Praticando ${operationNames[operation]}`;
+    }
+    
+    // Atualizar explicação
+    updateExplanation(operation);
+    
+    // Ativar controles
+    if (newExerciseBtn) newExerciseBtn.disabled = false;
+    if (checkAnswerBtn) checkAnswerBtn.disabled = false;
+    if (showHintBtn) showHintBtn.disabled = false;
+    if (answerInput) {
+        answerInput.disabled = false;
+        answerInput.placeholder = '?';
+    }
+    
+    // Gerar primeiro exercício
+    generateExercise();
+}
+
+// Atualizar explicação
+function updateExplanation(operation) {
+    if (!explanation) return;
+    
+    const explanations = {
+        'addition': `
+            <h4>Adição</h4>
+            <p>A <strong>adição</strong> é a operação matemática que representa a combinação de dois ou mais números para obter um total.</p>
+            <p><strong>Exemplo:</strong> 3 + 5 = 8</p>
+            <p><strong>Dica:</strong> Imagine que você tem 3 maçãs e ganha mais 5. Quantas maçãs você tem agora?</p>
+            <p><strong>Pontos:</strong> +10 por acerto, +1 por tentativa</p>
+        `,
+        'subtraction': `
+            <h4>Subtração</h4>
+            <p>A <strong>subtração</strong> é a operação matemática que representa a remoção de uma quantidade de outra.</p>
+            <p><strong>Exemplo:</strong> 10 - 4 = 6</p>
+            <p><strong>Dica:</strong> Se você tinha 10 balas e comeu 4, quantas balas sobraram?</p>
+            <p><strong>Pontos:</strong> +10 por acerto, +1 por tentativa</p>
+        `,
+        'multiplication': `
+            <h4>Multiplicação</h4>
+            <p>A <strong>multiplicação</strong> é uma adição repetida. É uma forma rápida de somar o mesmo número várias vezes.</p>
+            <p><strong>Exemplo:</strong> 4 × 3 = 4 + 4 + 4 = 12</p>
+            <p><strong>Dica:</strong> Se você tem 4 pacotes com 3 bolinhas cada, quantas bolinhas você tem no total?</p>
+            <p><strong>Pontos:</strong> +15 por acerto, +1 por tentativa</p>
+        `,
+        'division': `
+            <h4>Divisão</h4>
+            <p>A <strong>divisão</strong> é a operação inversa da multiplicação. Representa a distribuição igualitária de uma quantidade.</p>
+            <p><strong>Exemplo:</strong> 12 ÷ 4 = 3</p>
+            <p><strong>Dica:</strong> Se você tem 12 chocolates para dividir igualmente entre 4 amigos, quantos chocolates cada um recebe?</p>
+            <p><strong>Pontos:</strong> +15 por acerto, +1 por tentativa</p>
+        `
+    };
+    
+    explanation.innerHTML = explanations[operation] || '<p>Selecione uma operação para ver a explicação.</p>';
+}
+
+// Gerar exercício
+function generateExercise() {
+    if (!currentOperation) return;
+    
+    let num1, num2, answer;
+    
+    // Definir faixa de números baseada na dificuldade
+    const ranges = {
+        'easy': { min: 1, max: 20 },
+        'medium': { min: 10, max: 100 },
+        'hard': { min: 50, max: 500 }
+    };
+    
+    const range = ranges[currentDifficulty] || ranges.easy;
+    
+    // Gerar números baseados na operação
+    switch(currentOperation) {
+        case 'addition':
+            num1 = getRandomInt(range.min, range.max);
+            num2 = getRandomInt(range.min, range.max);
+            answer = num1 + num2;
+            if (operationSymbol) operationSymbol.textContent = '+';
+            break;
+            
+        case 'subtraction':
+            num1 = getRandomInt(range.min, range.max);
+            num2 = getRandomInt(range.min, num1);
+            answer = num1 - num2;
+            if (operationSymbol) operationSymbol.textContent = '-';
+            break;
+            
+        case 'multiplication':
+            const multRange = {
+                'easy': { min: 1, max: 10 },
+                'medium': { min: 2, max: 12 },
+                'hard': { min: 5, max: 20 }
+            };
+            const multR = multRange[currentDifficulty] || multRange.easy;
+            num1 = getRandomInt(multR.min, multR.max);
+            num2 = getRandomInt(multR.min, multR.max);
+            answer = num1 * num2;
+            if (operationSymbol) operationSymbol.textContent = '×';
+            break;
+            
+        case 'division':
+            num2 = getRandomInt(1, currentDifficulty === 'easy' ? 10 : 12);
+            const quotient = getRandomInt(range.min, Math.floor(range.max / num2));
+            num1 = num2 * quotient;
+            answer = quotient;
+            if (operationSymbol) operationSymbol.textContent = '÷';
+            break;
+            
+        default:
+            num1 = getRandomInt(1, 10);
+            num2 = getRandomInt(1, 10);
+            answer = num1 + num2;
+            if (operationSymbol) operationSymbol.textContent = '+';
+    }
+    
+    currentExercise = {
+        num1: num1,
+        num2: num2,
+        answer: answer,
+        operation: currentOperation,
+        difficulty: currentDifficulty
+    };
+    
+    // Atualizar display
+    if (numbersDisplay) numbersDisplay.textContent = num1;
+    if (numbersDisplay2) numbersDisplay2.textContent = num2;
+    if (answerInput) {
+        answerInput.value = '';
+        answerInput.focus();
+    }
+    
+    // Limpar feedback
+    if (feedback) {
+        feedback.textContent = '';
+        feedback.className = 'feedback';
+    }
+}
+
+// Verificar resposta
+async function checkAnswer() {
+    if (!currentExercise || !answerInput) return;
+    
+    const userAnswer = parseInt(answerInput.value);
+    
+    if (isNaN(userAnswer)) {
+        if (feedback) {
+            feedback.textContent = 'Digite um número válido!';
+            feedback.className = 'feedback incorrect';
+        }
+        return;
+    }
+    
+    const isCorrect = userAnswer === currentExercise.answer;
+    
+    // Salvar progresso
+    await saveExerciseProgress(isCorrect, currentExercise.operation);
+    
+    // Atualizar feedback
+    if (feedback) {
+        if (isCorrect) {
+            feedback.textContent = `🎉 Correto! ${currentExercise.num1} ${getOperationSymbol(currentExercise.operation)} ${currentExercise.num2} = ${currentExercise.answer}`;
+            feedback.className = 'feedback correct';
+            
+            // Gerar novo exercício após 1.5 segundos
+            setTimeout(generateExercise, 1500);
+        } else {
+            feedback.textContent = `✗ Ops! Tente novamente. ${getHint()}`;
+            feedback.className = 'feedback incorrect';
+        }
+    }
+}
+
+// Mostrar dica
+function showHint() {
+    if (!feedback || !currentExercise) return;
+    
+    feedback.textContent = `💡 Dica: ${getHint()}`;
+    feedback.className = 'feedback';
+}
+
+// Obter dica
+function getHint() {
+    if (!currentExercise) return '';
+    
+    const { num1, num2, operation } = currentExercise;
+    
+    switch(operation) {
+        case 'addition':
+            return `Pense em ${num1} + ${num2}. Você pode contar: ${num1}, ${num1 + 1}, ... até ${num1 + num2}.`;
+        case 'subtraction':
+            return `Pense em ${num1} - ${num2}. Quantos você precisa tirar de ${num1} para chegar ao resultado?`;
+        case 'multiplication':
+            return `Pense em ${num1} × ${num2} como ${num1} repetido ${num2} vezes.`;
+        case 'division':
+            return `Pense em ${num1} ÷ ${num2}. Quantos grupos de ${num2} cabem em ${num1}?`;
+        default:
+            return 'Tente pensar passo a passo na operação.';
     }
 }
 
 // Salvar progresso do exercício
 async function saveExerciseProgress(isCorrect, operation) {
-    if (!user || !db) return;
+    if (!user && !isDemoMode()) return;
     
     try {
-        const updates = {
-            exercisesCompleted: firebase.firestore.FieldValue.increment(1),
-            totalAnswers: firebase.firestore.FieldValue.increment(1),
-            totalPoints: firebase.firestore.FieldValue.increment(isCorrect ? 10 : 1),
-            [`${operation}.total`]: firebase.firestore.FieldValue.increment(1)
-        };
-        
-        if (isCorrect) {
-            updates.correctAnswers = firebase.firestore.FieldValue.increment(1);
-            updates[`${operation}.correct`] = firebase.firestore.FieldValue.increment(1);
-        }
-        
-        // Verificar conquistas
-        if (userProgress.exercisesCompleted === 0) {
-            await unlockAchievement(user.uid, 'firstExercise');
-        }
-        
-        // Verificar se acertou 10 seguidos (simplificado)
-        if (isCorrect && (userProgress.correctAnswers + 1) % 10 === 0) {
-            await unlockAchievement(user.uid, 'perfectScore');
-        }
-        
-        // Verificar conquistas específicas de operações
-        if (operation === 'multiplication' && userProgress.multiplication?.correct >= 49) {
-            await unlockAchievement(user.uid, 'multiplicationMaster');
-        }
-        
-        if (operation === 'division' && userProgress.division?.correct >= 49) {
-            await unlockAchievement(user.uid, 'divisionExpert');
-        }
-        
-        await db.collection('users').doc(user.uid).update(updates);
+        const points = isCorrect ? getPointsForOperation(operation) : 1;
         
         // Atualizar dados locais
         userProgress.exercisesCompleted = (userProgress.exercisesCompleted || 0) + 1;
         userProgress.totalAnswers = (userProgress.totalAnswers || 0) + 1;
-        userProgress.totalPoints = (userProgress.totalPoints || 0) + (isCorrect ? 10 : 1);
-        
-        if (!userProgress[operation]) {
-            userProgress[operation] = { correct: 0, total: 0 };
-        }
-        
-        userProgress[operation].total = (userProgress[operation].total || 0) + 1;
+        userProgress.totalPoints = (userProgress.totalPoints || 0) + points;
         
         if (isCorrect) {
             userProgress.correctAnswers = (userProgress.correctAnswers || 0) + 1;
+        }
+        
+        // Atualizar estatísticas da operação
+        if (!userProgress[operation]) {
+            userProgress[operation] = { correct: 0, total: 0 };
+        }
+        userProgress[operation].total = (userProgress[operation].total || 0) + 1;
+        if (isCorrect) {
             userProgress[operation].correct = (userProgress[operation].correct || 0) + 1;
         }
         
+        // Atualizar nível
+        userProgress.currentLevel = calculateUserLevel(userProgress);
+        
+        // Verificar conquistas
+        checkAndUnlockAchievements();
+        
         // Atualizar UI
         updateUIForLoggedInUser();
+        
+        // Salvar no Firebase se logado
+        if (user && db) {
+            const updates = {
+                exercisesCompleted: firebase.firestore.FieldValue.increment(1),
+                totalAnswers: firebase.firestore.FieldValue.increment(1),
+                totalPoints: firebase.firestore.FieldValue.increment(points),
+                currentLevel: userProgress.currentLevel,
+                [`${operation}.total`]: firebase.firestore.FieldValue.increment(1)
+            };
+            
+            if (isCorrect) {
+                updates.correctAnswers = firebase.firestore.FieldValue.increment(1);
+                updates[`${operation}.correct`] = firebase.firestore.FieldValue.increment(1);
+            }
+            
+            await db.collection('users').doc(user.uid).update(updates);
+        }
+        
+        // Salvar localmente
+        localStorage.setItem('mathkids_user_data', JSON.stringify(userProgress));
         
     } catch (error) {
         console.error('Erro ao salvar progresso:', error);
     }
 }
+
+// Verificar e desbloquear conquistas
+function checkAndUnlockAchievements() {
+    if (!userProgress) return;
+    
+    const userId = user ? user.uid : 'demo';
+    
+    // Primeiro exercício
+    if (userProgress.exercisesCompleted === 1 && !userProgress.achievements.firstExercise) {
+        unlockAchievement(userId, 'firstExercise');
+    }
+    
+    // Praticante (10 exercícios)
+    if (userProgress.exercisesCompleted >= 10 && !userProgress.achievements.practice10) {
+        unlockAchievement(userId, 'practice10');
+    }
+    
+    // Atleta (50 exercícios)
+    if (userProgress.exercisesCompleted >= 50 && !userProgress.achievements.practice50) {
+        unlockAchievement(userId, 'practice50');
+    }
+    
+    // Campeão (100 exercícios)
+    if (userProgress.exercisesCompleted >= 100 && !userProgress.achievements.practice100) {
+        unlockAchievement(userId, 'practice100');
+    }
+    
+    // Mestre da Multiplicação
+    if (userProgress.multiplication?.correct >= 50 && !userProgress.achievements.multiplicationMaster) {
+        unlockAchievement(userId, 'multiplicationMaster');
+    }
+    
+    // Especialista em Divisão
+    if (userProgress.division?.correct >= 50 && !userProgress.achievements.divisionExpert) {
+        unlockAchievement(userId, 'divisionExpert');
+    }
+    
+    // Nota Perfeita (simplificado: 10 acertos seguidos)
+    const recentCorrect = userProgress.correctAnswers % 10;
+    if (recentCorrect === 0 && userProgress.correctAnswers > 0 && !userProgress.achievements.perfectScore) {
+        unlockAchievement(userId, 'perfectScore');
+    }
+}
+
+// Obter pontos por operação
+function getPointsForOperation(operation) {
+    switch(operation) {
+        case 'multiplication':
+        case 'division':
+            return 15;
+        default:
+            return 10;
+    }
+}
+
+// Obter símbolo da operação
+function getOperationSymbol(operation) {
+    switch(operation) {
+        case 'addition': return '+';
+        case 'subtraction': return '-';
+        case 'multiplication': return '×';
+        case 'division': return '÷';
+        default: return '+';
+    }
+}
+
+// ============================================
+// SISTEMA DE JOGOS
+// ============================================
+
+// Selecionar jogo
+function selectGame(gameId) {
+    if (!user && !isDemoMode()) {
+        showNotification('Faça login para jogar!', 'warning');
+        openAuthModal();
+        return;
+    }
+    
+    currentGame = gameId;
+    
+    const gameTitles = {
+        'multiplicationGame': 'Desafio Relâmpago de Multiplicação',
+        'divisionGame': 'Quebra-cabeça da Divisão',
+        'mixedGame': 'Campeonato MathKids'
+    };
+    
+    if (gameTitle) {
+        gameTitle.textContent = gameTitles[gameId] || 'Jogo MathKids';
+    }
+    
+    // Ativar botão de iniciar
+    if (startGameBtn) startGameBtn.disabled = false;
+    if (endGameBtn) endGameBtn.disabled = true;
+    if (nextGameBtn) nextGameBtn.disabled = true;
+    
+    // Limpar conteúdo anterior
+    if (gameExercise) {
+        gameExercise.innerHTML = '';
+    }
+    if (gameFeedback) {
+        gameFeedback.textContent = '';
+        gameFeedback.style.display = 'none';
+    }
+    
+    // Mostrar instruções do jogo
+    showGameInstructions(gameId);
+}
+
+// Mostrar instruções do jogo
+function showGameInstructions(gameId) {
+    if (!gameExercise) return;
+    
+    const instructions = {
+        'multiplicationGame': `
+            <div class="game-instructions">
+                <h4>🎯 Desafio Relâmpago</h4>
+                <p><strong>Objetivo:</strong> Resolva o máximo de multiplicações em 60 segundos!</p>
+                <p><strong>Regras:</strong></p>
+                <ul>
+                    <li>Cada resposta correta vale 10 pontos</li>
+                    <li>Respostas erradas não penalizam</li>
+                    <li>Tente bater seu recorde!</li>
+                </ul>
+                <p><strong>Pronto para o desafio?</strong></p>
+                <button class="btn-primary" id="readyToPlay">Estou Pronto!</button>
+            </div>
+        `,
+        'divisionGame': `
+            <div class="game-instructions">
+                <h4>🧩 Quebra-cabeça da Divisão</h4>
+                <p><strong>Objetivo:</strong> Complete divisões antes do tempo acabar!</p>
+                <p><strong>Regras:</strong></p>
+                <ul>
+                    <li>Cada nível tem 5 divisões</li>
+                    <li>Tempo limite por nível: 90 segundos</li>
+                    <li>Bônus por tempo restante</li>
+                </ul>
+                <p><strong>Pronto para começar?</strong></p>
+                <button class="btn-primary" id="readyToPlay">Vamos Lá!</button>
+            </div>
+        `,
+        'mixedGame': `
+            <div class="game-instructions">
+                <h4>🏆 Campeonato MathKids</h4>
+                <p><strong>Objetivo:</strong> Resolva operações mistas e suba no ranking!</p>
+                <p><strong>Regras:</strong></p>
+                <ul>
+                    <li>4 níveis de dificuldade</li>
+                    <li>Cada nível tem 10 questões</li>
+                    <li>Pontuação progressiva</li>
+                </ul>
+                <p><strong>Pronto para competir?</strong></p>
+                <button class="btn-primary" id="readyToPlay">Começar Competição!</button>
+            </div>
+        `
+    };
+    
+    gameExercise.innerHTML = instructions[gameId] || '<p>Selecione um jogo para começar.</p>';
+    
+    // Adicionar evento ao botão de pronto
+    setTimeout(() => {
+        const readyBtn = document.getElementById('readyToPlay');
+        if (readyBtn) {
+            readyBtn.addEventListener('click', () => {
+                if (startGameBtn) startGameBtn.disabled = false;
+            });
+        }
+    }, 100);
+}
+
+// Iniciar jogo
+function startGame() {
+    if (!currentGame) return;
+    
+    gameActive = true;
+    gameScore = 0;
+    gameTimeLeft = 60;
+    
+    // Atualizar UI
+    if (startGameBtn) startGameBtn.disabled = true;
+    if (endGameBtn) endGameBtn.disabled = false;
+    if (nextGameBtn) nextGameBtn.disabled = false;
+    
+    // Iniciar temporizador
+    updateGameTimer();
+    
+    // Gerar primeiro exercício do jogo
+    generateGameExercise();
+}
+
+// Atualizar temporizador do jogo
+function updateGameTimer() {
+    if (!gameActive) return;
+    
+    gameTimer = setInterval(() => {
+        gameTimeLeft--;
+        
+        if (timerElement) {
+            timerElement.textContent = gameTimeLeft;
+        }
+        
+        if (gameTimeLeft <= 0) {
+            endGame();
+        }
+    }, 1000);
+}
+
+// Gerar exercício do jogo
+function generateGameExercise() {
+    if (!gameActive || !currentGame || !gameExercise) return;
+    
+    let num1, num2, answer, operation, symbol;
+    
+    switch(currentGame) {
+        case 'multiplicationGame':
+            operation = 'multiplication';
+            num1 = getRandomInt(1, 12);
+            num2 = getRandomInt(1, 12);
+            answer = num1 * num2;
+            symbol = '×';
+            break;
+            
+        case 'divisionGame':
+            operation = 'division';
+            num2 = getRandomInt(1, 12);
+            answer = getRandomInt(1, 12);
+            num1 = num2 * answer;
+            symbol = '÷';
+            break;
+            
+        case 'mixedGame':
+            const operations = ['addition', 'subtraction', 'multiplication', 'division'];
+            operation = operations[getRandomInt(0, 3)];
+            
+            switch(operation) {
+                case 'addition':
+                    num1 = getRandomInt(10, 100);
+                    num2 = getRandomInt(10, 100);
+                    answer = num1 + num2;
+                    symbol = '+';
+                    break;
+                    
+                case 'subtraction':
+                    num1 = getRandomInt(50, 100);
+                    num2 = getRandomInt(10, 50);
+                    answer = num1 - num2;
+                    symbol = '-';
+                    break;
+                    
+                case 'multiplication':
+                    num1 = getRandomInt(2, 12);
+                    num2 = getRandomInt(2, 12);
+                    answer = num1 * num2;
+                    symbol = '×';
+                    break;
+                    
+                case 'division':
+                    num2 = getRandomInt(2, 10);
+                    answer = getRandomInt(2, 10);
+                    num1 = num2 * answer;
+                    symbol = '÷';
+                    break;
+            }
+            break;
+            
+        default:
+            return;
+    }
+    
+    currentExercise = {
+        num1: num1,
+        num2: num2,
+        answer: answer,
+        operation: operation,
+        symbol: symbol
+    };
+    
+    // Criar interface do exercício
+    gameExercise.innerHTML = `
+        <div class="game-question">
+            <div class="question-display">
+                <div class="number">${num1}</div>
+                <div class="symbol">${symbol}</div>
+                <div class="number">${num2}</div>
+                <div class="equals">=</div>
+                <input type="number" id="gameAnswer" class="game-answer" placeholder="?" autofocus>
+            </div>
+            <p class="time-remaining">Tempo restante: <span id="gameTime">${gameTimeLeft}</span>s</p>
+        </div>
+    `;
+    
+    // Adicionar evento à resposta
+    const gameAnswerInput = document.getElementById('gameAnswer');
+    if (gameAnswerInput) {
+        gameAnswerInput.focus();
+        gameAnswerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                checkGameAnswer();
+            }
+        });
+    }
+}
+
+// Verificar resposta no jogo
+function checkGameAnswer() {
+    if (!gameActive || !currentExercise) return;
+    
+    const gameAnswerInput = document.getElementById('gameAnswer');
+    if (!gameAnswerInput) return;
+    
+    const userAnswer = parseInt(gameAnswerInput.value);
+    
+    if (isNaN(userAnswer)) {
+        if (gameFeedback) {
+            gameFeedback.textContent = 'Digite um número válido!';
+            gameFeedback.style.display = 'block';
+            gameFeedback.style.color = '#f87171';
+        }
+        return;
+    }
+    
+    const isCorrect = userAnswer === currentExercise.answer;
+    
+    if (isCorrect) {
+        gameScore += 10;
+        if (scoreElement) {
+            scoreElement.textContent = gameScore;
+        }
+        
+        if (gameFeedback) {
+            gameFeedback.textContent = `🎉 Correto! +10 pontos`;
+            gameFeedback.style.display = 'block';
+            gameFeedback.style.color = '#4ade80';
+        }
+        
+        // Salvar progresso
+        saveGameProgress();
+        
+    } else {
+        if (gameFeedback) {
+            gameFeedback.textContent = `✗ Errado! A resposta era ${currentExercise.answer}`;
+            gameFeedback.style.display = 'block';
+            gameFeedback.style.color = '#f87171';
+        }
+    }
+    
+    // Gerar próximo exercício após 1 segundo
+    setTimeout(() => {
+        if (gameActive) {
+            generateGameExercise();
+        }
+    }, 1000);
+}
+
+// Salvar progresso do jogo
+async function saveGameProgress() {
+    if (!user && !isDemoMode()) return;
+    
+    try {
+        // Atualizar recorde se necessário
+        if (currentGame === 'multiplicationGame' && gameScore > (userProgress.gameScores?.lightning || 0)) {
+            userProgress.gameScores = userProgress.gameScores || {};
+            userProgress.gameScores.lightning = gameScore;
+            
+            // Salvar no Firebase se logado
+            if (user && db) {
+                await db.collection('users').doc(user.uid).update({
+                    'gameScores.lightning': gameScore
+                });
+            }
+            
+            // Salvar localmente
+            localStorage.setItem('mathkids_user_data', JSON.stringify(userProgress));
+            
+            // Atualizar UI
+            updateGameHighscores();
+        }
+    } catch (error) {
+        console.error('Erro ao salvar progresso do jogo:', error);
+    }
+}
+
+// Encerrar jogo
+function endGame() {
+    gameActive = false;
+    if (gameTimer) {
+        clearInterval(gameTimer);
+    }
+    
+    // Atualizar UI
+    if (startGameBtn) startGameBtn.disabled = false;
+    if (endGameBtn) endGameBtn.disabled = true;
+    if (nextGameBtn) nextGameBtn.disabled = true;
+    
+    // Mostrar resultado final
+    if (gameExercise) {
+        gameExercise.innerHTML = `
+            <div class="game-results">
+                <h4>🏁 Fim do Jogo!</h4>
+                <div class="result-stats">
+                    <p><strong>Pontuação Final:</strong> ${gameScore} pontos</p>
+                    <p><strong>Respostas Corretas:</strong> ${Math.floor(gameScore / 10)}</p>
+                    <p><strong>Tempo Restante:</strong> ${gameTimeLeft} segundos</p>
+                </div>
+                ${gameScore > (userProgress.gameScores?.lightning || 0) ? 
+                    '<p class="new-record">🎊 Novo Recorde! 🎊</p>' : 
+                    ''}
+                <button class="btn-primary" onclick="selectGame('${currentGame}')">Jogar Novamente</button>
+            </div>
+        `;
+    }
+    
+    if (gameFeedback) {
+        gameFeedback.textContent = 'Clique em "Iniciar Jogo" para jogar novamente!';
+        gameFeedback.style.display = 'block';
+        gameFeedback.style.color = '#4361ee';
+    }
+}
+
+// ============================================
+// GRÁFICO DE PROGRESSO
+// ============================================
 
 // Inicializar gráfico de progresso
 function initializeProgressChart() {
@@ -1078,229 +1824,429 @@ function updateProgressChart() {
     progressChart.update();
 }
 
-// Carregar recordes locais
-function loadLocalHighScores() {
-    const savedLightning = localStorage.getItem('mathkids_highscore_lightning');
-    const savedPuzzle = localStorage.getItem('mathkids_highscore_puzzle');
-    const savedChampionship = localStorage.getItem('mathkids_highscore_championship');
+// ============================================
+// FUNÇÕES UTILITÁRIAS
+// ============================================
+
+// Mostrar status de autenticação
+function showAuthStatus(message, type = 'info') {
+    if (!authStatus) return;
     
-    if (savedLightning) {
-        lightningHighscore.textContent = savedLightning;
-    }
+    authStatus.textContent = message;
+    authStatus.className = `auth-status ${type}`;
+    authStatus.style.display = 'block';
     
-    if (savedPuzzle) {
-        puzzleHighscore.textContent = savedPuzzle;
-    }
-    
-    if (savedChampionship) {
-        championshipRank.textContent = savedChampionship;
+    // Limpar após alguns segundos para mensagens de sucesso
+    if (type === 'success' || type === 'error') {
+        setTimeout(() => {
+            authStatus.style.display = 'none';
+        }, 3000);
     }
 }
 
-// Funções auxiliares
+// Mostrar carregamento
+function showLoading(message = 'Carregando...') {
+    if (!loadingModal || !loadingText) return;
+    
+    loadingText.textContent = message;
+    loadingModal.style.display = 'flex';
+}
+
+// Esconder carregamento
+function hideLoading() {
+    if (loadingModal) {
+        loadingModal.style.display = 'none';
+    }
+}
+
+// Mostrar notificação
+function showNotification(message, type = 'info') {
+    // Criar elemento de notificação
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideIn 0.3s ease-out;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    // Cor baseada no tipo
+    switch(type) {
+        case 'success':
+            notification.style.backgroundColor = '#4ade80';
+            break;
+        case 'error':
+            notification.style.backgroundColor = '#f87171';
+            break;
+        case 'warning':
+            notification.style.backgroundColor = '#fbbf24';
+            break;
+        default:
+            notification.style.backgroundColor = '#4361ee';
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Adicionar animação
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Remover após 5 segundos
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => {
+            notification.remove();
+            style.remove();
+        }, 300);
+    }, 5000);
+}
+
+// Validar email
 function validateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
 }
 
+// Gerar número aleatório
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-// Selecionar operação
-function selectOperation(operation) {
-    if (!user) {
-        openAuthModal();
-        return;
-    }
-    
-    currentOperation = operation;
-    
-    // Atualizar título
-    const operationNames = {
-        'addition': 'Adição',
-        'subtraction': 'Subtração',
-        'multiplication': 'Multiplicação',
-        'division': 'Divisão'
-    };
-    
-    document.getElementById('practiceTitle').textContent = `Praticando ${operationNames[operation]}`;
-    
-    // Atualizar explicação
-    const explanations = {
-        'addition': '<p>A <strong>adição</strong> é a operação matemática que representa a combinação de dois ou mais números para obter um total.</p><p><strong>Exemplo:</strong> 3 + 5 = 8</p><p><strong>Dica:</strong> Imagine que você tem 3 maçãs e ganha mais 5. Quantas maçãs você tem agora?</p>',
-        'subtraction': '<p>A <strong>subtração</strong> é a operação matemática que representa a remoção de uma quantidade de outra.</p><p><strong>Exemplo:</strong> 10 - 4 = 6</p><p><strong>Dica:</strong> Se você tinha 10 balas e comeu 4, quantas balas sobraram?</p>',
-        'multiplication': '<p>A <strong>multiplicação</strong> é uma adição repetida. É uma forma rápida de somar o mesmo número várias vezes.</p><p><strong>Exemplo:</strong> 4 × 3 = 4 + 4 + 4 = 12</p><p><strong>Dica:</strong> Se você tem 4 pacotes com 3 bolinhas cada, quantas bolinhas você tem no total?</p>',
-        'division': '<p>A <strong>divisão</strong> é a operação inversa da multiplicação. Representa a distribuição igualitária de uma quantidade.</p><p><strong>Exemplo:</strong> 12 ÷ 4 = 3</p><p><strong>Dica:</strong> Se você tem 12 chocolates para dividir igualmente entre 4 amigos, quantos chocolates cada um recebe?</p>'
-    };
-    
-    document.getElementById('explanation').innerHTML = explanations[operation];
-    
-    // Ativar controles
-    document.getElementById('newExercise').disabled = false;
-    document.getElementById('checkAnswer').disabled = false;
-    document.getElementById('showHint').disabled = false;
-    document.getElementById('answerInput').disabled = false;
-    
-    // Gerar primeiro exercício
-    generateExercise();
+
+// Obter data atual como string (YYYY-MM-DD)
+function getTodayDateString() {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
 }
 
-// Gerar exercício
-function generateExercise() {
-    let num1, num2, answer;
-    
-    // Definir faixa de números baseada na dificuldade
-    const ranges = {
-        'easy': { min: 1, max: 20 },
-        'medium': { min: 10, max: 100 },
-        'hard': { min: 50, max: 500 }
-    };
-    
-    const range = ranges[currentDifficulty];
-    
-    // Gerar números baseados na operação
-    switch(currentOperation) {
-        case 'addition':
-            num1 = getRandomInt(range.min, range.max);
-            num2 = getRandomInt(range.min, range.max);
-            answer = num1 + num2;
-            document.getElementById('operationSymbol').textContent = '+';
-            break;
+// Verificar modo demo
+function isDemoMode() {
+    return !user && localStorage.getItem('mathkids_accept_demo') === 'true';
+}
+
+// ============================================
+// CONFIGURAÇÃO DE EVENT LISTENERS
+// ============================================
+
+function setupEventListeners() {
+    // Navegação suave
+    document.querySelectorAll('nav a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href');
+            const targetSection = document.querySelector(targetId);
             
-        case 'subtraction':
-            num1 = getRandomInt(range.min, range.max);
-            num2 = getRandomInt(range.min, num1);
-            answer = num1 - num2;
-            document.getElementById('operationSymbol').textContent = '-';
-            break;
+            if (targetSection) {
+                // Atualizar navegação ativa
+                document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Rolar para a seção
+                targetSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+    
+    // Botões de autenticação
+    if (loginBtn) loginBtn.addEventListener('click', openAuthModal);
+    if (showLoginBtn) showLoginBtn.addEventListener('click', openAuthModal);
+    if (showRegisterBtn) showRegisterBtn.addEventListener('click', () => {
+        openAuthModal();
+        switchAuthTab('register');
+    });
+    
+    if (closeModal) closeModal.addEventListener('click', closeAuthModal);
+    
+    // Fechar modal ao clicar fora
+    if (authModal) {
+        authModal.addEventListener('click', function(e) {
+            if (e.target === authModal) {
+                closeAuthModal();
+            }
+        });
+    }
+    
+    // Trocar abas de autenticação
+    authTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchAuthTab(tabName);
+        });
+    });
+    
+    // Links para trocar entre formulários
+    document.querySelectorAll('[data-tab]').forEach(link => {
+        if (link.tagName === 'A') {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tabName = this.getAttribute('data-tab');
+                switchAuthTab(tabName);
+            });
+        }
+    });
+    
+    // Botões de login/cadastro
+    if (submitLogin) submitLogin.addEventListener('click', handleEmailLogin);
+    if (submitRegister) submitRegister.addEventListener('click', handleEmailRegister);
+    if (submitRecover) submitRecover.addEventListener('click', handlePasswordRecovery);
+    if (googleLogin) googleLogin.addEventListener('click', handleGoogleLogin);
+    if (googleRegister) googleRegister.addEventListener('click', handleGoogleLogin);
+    
+    // Logout
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    
+    // Alternar visibilidade da senha
+    const toggleLoginPassword = document.getElementById('toggleLoginPassword');
+    if (toggleLoginPassword) {
+        toggleLoginPassword.addEventListener('click', function() {
+            togglePasswordVisibility('loginPassword', this);
+        });
+    }
+    
+    const toggleRegisterPassword = document.getElementById('toggleRegisterPassword');
+    if (toggleRegisterPassword) {
+        toggleRegisterPassword.addEventListener('click', function() {
+            togglePasswordVisibility('registerPassword', this);
+        });
+    }
+    
+    const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+    if (toggleConfirmPassword) {
+        toggleConfirmPassword.addEventListener('click', function() {
+            togglePasswordVisibility('registerConfirmPassword', this);
+        });
+    }
+    
+    // Botões da hero section
+    const quickPracticeBtn = document.getElementById('quickPractice');
+    if (quickPracticeBtn) {
+        quickPracticeBtn.addEventListener('click', function() {
+            selectOperation('multiplication');
+        });
+    }
+    
+    const continueLearningBtn = document.getElementById('continueLearning');
+    if (continueLearningBtn) {
+        continueLearningBtn.addEventListener('click', function() {
+            // Continuar da última operação ou começar com multiplicação
+            if (currentOperation) {
+                selectOperation(currentOperation);
+            } else {
+                selectOperation('multiplication');
+            }
+        });
+    }
+    
+    const startDailyChallengeBtn = document.getElementById('startDailyChallenge');
+    if (startDailyChallengeBtn) {
+        startDailyChallengeBtn.addEventListener('click', function() {
+            dailyChallengeActive = true;
+            selectGame('multiplicationGame');
+            document.querySelector('#games').scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+    
+    // Cartões de operação
+    document.querySelectorAll('.operation-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            selectOperation(operation);
+        });
+    });
+    
+    // Botões de dificuldade
+    difficultyButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            difficultyButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            currentDifficulty = this.getAttribute('data-level');
             
-        case 'multiplication':
-            const multRange = {
-                'easy': { min: 1, max: 10 },
-                'medium': { min: 5, max: 15 },
-                'hard': { min: 10, max: 20 }
+            // Gerar novo exercício se uma operação estiver selecionada
+            if (currentOperation) {
+                generateExercise();
+            }
+        });
+    });
+    
+    // Controles de exercício
+    if (newExerciseBtn) newExerciseBtn.addEventListener('click', generateExercise);
+    if (checkAnswerBtn) checkAnswerBtn.addEventListener('click', checkAnswer);
+    if (showHintBtn) showHintBtn.addEventListener('click', showHint);
+    
+    // Entrada de resposta
+    if (answerInput) {
+        answerInput.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+    }
+    
+    // Cartões de jogo
+    document.querySelectorAll('.game-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const gameId = this.id;
+            selectGame(gameId);
+        });
+    });
+    
+    // Controles do jogo
+    if (startGameBtn) startGameBtn.addEventListener('click', startGame);
+    if (endGameBtn) endGameBtn.addEventListener('click', endGame);
+    if (nextGameBtn) nextGameBtn.addEventListener('click', generateGameExercise);
+    
+    // Links de rodapé
+    const contactSupport = document.getElementById('contactSupport');
+    if (contactSupport) {
+        contactSupport.addEventListener('click', function(e) {
+            e.preventDefault();
+            showNotification('Entre em contato: suporte@mathkids.com', 'info');
+        });
+    }
+    
+    const accountHelp = document.getElementById('accountHelp');
+    if (accountHelp) {
+        accountHelp.addEventListener('click', function(e) {
+            e.preventDefault();
+            openAuthModal();
+            switchAuthTab('recover');
+        });
+    }
+    
+    // Permitir modo demo
+    const demoAccept = document.getElementById('demoAccept');
+    if (demoAccept) {
+        demoAccept.addEventListener('click', function() {
+            localStorage.setItem('mathkids_accept_demo', 'true');
+            userProgress = {
+                ...initialProgressData,
+                username: 'Estudante Demo',
+                email: 'demo@mathkids.com'
             };
-            const multR = multRange[currentDifficulty];
-            num1 = getRandomInt(multR.min, multR.max);
-            num2 = getRandomInt(multR.min, multR.max);
-            answer = num1 * num2;
-            document.getElementById('operationSymbol').textContent = '×';
-            break;
-            
-        case 'division':
-            num2 = getRandomInt(1, 12);
-            const quotient = getRandomInt(range.min, range.max);
-            num1 = num2 * quotient;
-            answer = quotient;
-            document.getElementById('operationSymbol').textContent = '÷';
-            break;
-    }
-    
-    currentExercise = {
-        num1: num1,
-        num2: num2,
-        answer: answer,
-        operation: currentOperation
-    };
-    
-    // Atualizar display
-    document.getElementById('numbersDisplay').textContent = num1;
-    document.getElementById('numbersDisplay2').textContent = num2;
-    document.getElementById('answerInput').value = '';
-    document.getElementById('answerInput').focus();
-    
-    // Limpar feedback
-    const feedback = document.getElementById('feedback');
-    feedback.textContent = '';
-    feedback.className = 'feedback';
-}
-
-// Verificar resposta
-async function checkAnswer() {
-    const userAnswer = parseInt(document.getElementById('answerInput').value);
-    
-    if (isNaN(userAnswer)) {
-        const feedback = document.getElementById('feedback');
-        feedback.textContent = 'Digite um número válido!';
-        feedback.className = 'feedback incorrect';
-        return;
-    }
-    
-    const isCorrect = userAnswer === currentExercise.answer;
-    
-    // Salvar progresso no Firebase
-    if (user) {
-        await saveExerciseProgress(isCorrect, currentExercise.operation);
-    }
-    
-    const feedback = document.getElementById('feedback');
-    
-    if (isCorrect) {
-        feedback.textContent = `Correto! ${currentExercise.num1} ${document.getElementById('operationSymbol').textContent} ${currentExercise.num2} = ${currentExercise.answer}`;
-        feedback.className = 'feedback correct';
-        
-        // Gerar novo exercício após 1.5 segundos
-        setTimeout(generateExercise, 1500);
-    } else {
-        feedback.textContent = `Ops! Tente novamente. Dica: ${getHint()}`;
-        feedback.className = 'feedback incorrect';
+            showMainContent();
+            updateUIForLoggedInUser();
+            showNotification('Modo demo ativado! Seu progresso será salvo localmente.', 'success');
+        });
     }
 }
 
-// Funções restantes permanecem semelhantes às anteriores
-// Por questão de espaço, não as repito completamente aqui
-// Mas seguem a mesma lógica das versões anteriores
+// ============================================
+// INICIALIZAÇÃO DA APLICAÇÃO
+// ============================================
 
-// Função de exemplo para getHint
-function getHint() {
-    if (!currentExercise) return '';
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Firebase
+    initializeFirebase();
     
-    const { num1, num2, operation } = currentExercise;
+    // Configurar eventos
+    setupEventListeners();
     
-    switch(operation) {
-        case 'addition':
-            return `Pense em ${num1} + ${num2}. Você pode contar a partir de ${num1} mais ${num2} unidades.`;
-        case 'subtraction':
-            return `Pense em ${num1} - ${num2}. Quantos você precisa tirar de ${num1} para chegar ao resultado?`;
-        case 'multiplication':
-            return `Pense em ${num1} × ${num2} como ${num1} repetido ${num2} vezes.`;
-        case 'division':
-            return `Pense em ${num1} ÷ ${num2}. Quantos grupos de ${num2} cabem em ${num1}?`;
-        default:
-            return 'Tente pensar passo a passo na operação.';
-    }
-}
-
-// Função para mostrar dica
-function showHint() {
-    const feedback = document.getElementById('feedback');
-    feedback.textContent = `Dica: ${getHint()}`;
-    feedback.className = 'feedback';
-}
-
-// Funções de jogos (simplificadas para exemplo)
-function selectGame(gameId) {
-    if (!user) {
-        openAuthModal();
-        return;
-    }
+    // Inicializar gráfico
+    initializeProgressChart();
     
-    currentGame = gameId;
-    // ... resto do código dos jogos
-}
-
-// As funções de jogos (startGame, endGame, etc.) seguem a mesma lógica
-// das versões anteriores, mas agora verificam se o usuário está autenticado
-
-// Inicializar a aplicação
-function initApp() {
-    // Verificar se há um usuário logado
+    // Verificar se há usuário logado
     if (auth && auth.currentUser) {
-        showMainContent();
+        showLoading('Restaurando sessão...');
     } else {
-        showWelcomeScreen();
+        // Verificar modo demo
+        if (isDemoMode()) {
+            userProgress = JSON.parse(localStorage.getItem('mathkids_user_data') || '{}');
+            if (Object.keys(userProgress).length > 0) {
+                showMainContent();
+                updateUIForLoggedInUser();
+            } else {
+                showWelcomeScreen();
+            }
+        } else {
+            showWelcomeScreen();
+        }
     }
-}
+    
+    // Adicionar estilo para notificações
+    const notificationStyle = document.createElement('style');
+    notificationStyle.textContent = `
+        .achievement-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #4361ee, #3a0ca3);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            animation: slideIn 0.5s ease-out;
+            max-width: 350px;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(notificationStyle);
+});
 
-// Inicializar quando a página carregar
-window.addEventListener('load', initApp);
+// ============================================
+// FUNÇÕES GLOBAIS PARA ACESSO HTML
+// ============================================
+
+// Tornar funções acessíveis globalmente
+window.selectOperation = selectOperation;
+window.selectGame = selectGame;
+window.startGame = startGame;
+window.endGame = endGame;
+window.generateGameExercise = generateGameExercise;
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
+window.handleLogout = handleLogout;
