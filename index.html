@@ -34,7 +34,7 @@
                     <p>Uma plataforma educacional completa para alunos do 4º ao 9º ano aprenderem matemática de forma divertida e eficaz.</p>
                     
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div class="stat-card" id="statsCardStudents" onclick="location.reload()">
                             <div class="stat-icon">
                                 <i class="fas fa-users"></i>
                             </div>
@@ -43,7 +43,7 @@
                                 <p>Alunos Ativos</p>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" id="statsCardRating" onclick="switchSection('progress')">
                             <div class="stat-icon">
                                 <i class="fas fa-star"></i>
                             </div>
@@ -52,7 +52,7 @@
                                 <p>Avaliação Média</p>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" id="statsCardImprovement" onclick="switchSection('progress')">
                             <div class="stat-icon">
                                 <i class="fas fa-chart-line"></i>
                             </div>
@@ -64,22 +64,22 @@
                     </div>
                     
                     <div class="features-grid">
-                        <div class="feature">
+                        <div class="feature" id="featureGames" onclick="switchSection('games')">
                             <i class="fas fa-gamepad"></i>
                             <h4>Jogos Educativos</h4>
                             <p>Diversão garantida enquanto aprende</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" id="featureTracking" onclick="switchSection('progress')">
                             <i class="fas fa-chart-line"></i>
                             <h4>Acompanhamento</h4>
                             <p>Veja sua evolução no aprendizado</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" id="featureChallenges" onclick="switchSection('progress')">
                             <i class="fas fa-trophy"></i>
                             <h4>Desafios</h4>
                             <p>Conquiste medalhas e reconhecimento</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" id="featureCommunity" onclick="location.reload()">
                             <i class="fas fa-users"></i>
                             <h4>Comunidade</h4>
                             <p>Aprenda com outros estudantes</p>
@@ -245,7 +245,7 @@
                         <a href="#" id="privacyLinkFooter">Privacidade</a>
                         <a href="#" id="contactLink">Contato</a>
                     </div>
-                    <p class="version">Versão 2.1.0</p>
+                    <p class="version">Versão 3.1.0</p>
                 </div>
             </div>
         </div>
@@ -499,7 +499,7 @@
                             <div class="card recent-activities">
                                 <div class="card-header">
                                     <h3><i class="fas fa-history"></i> Atividades Recentes</h3>
-                                    <a href="#" class="view-all">Ver todas</a>
+                                    <a href="#progress" class="view-all">Ver todas</a>
                                 </div>
                                 <div class="card-body">
                                     <div class="activities-list" id="activitiesList">
@@ -548,7 +548,7 @@
                             <div class="card next-challenges">
                                 <div class="card-header">
                                     <h3><i class="fas fa-flag-checkered"></i> Seus Desafios</h3>
-                                    <a href="#" class="view-all">Ver mais</a>
+                                    <a href="#progress" class="view-all">Ver mais</a>
                                 </div>
                                 <div class="card-body">
                                     <div class="challenges-list" id="challengesList">
@@ -765,6 +765,48 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Adicionar/Editar Usuário (Admin) -->
+        <div class="modal" id="userModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-plus"></i> <span id="userModalTitle">Adicionar Usuário</span></h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="userForm">
+                        <div class="form-group">
+                            <label for="modalUserName">Nome Completo</label>
+                            <input type="text" id="modalUserName" placeholder="Nome do usuário" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalUserEmail">E-mail</label>
+                            <input type="email" id="modalUserEmail" placeholder="email@exemplo.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalUserPassword">Senha</label>
+                            <input type="password" id="modalUserPassword" placeholder="Mínimo 6 caracteres" minlength="6">
+                            <small class="form-hint">Deixe em branco para manter a senha atual (ao editar)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalUserRole">Tipo de Conta</label>
+                            <select id="modalUserRole" required>
+                                <option value="student">Aluno</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        <div class="form-group checkbox">
+                            <input type="checkbox" id="modalUserVerified">
+                            <label for="modalUserVerified">Conta verificada</label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-admin" id="cancelUserModal">Cancelar</button>
+                            <button type="submit" class="btn-admin primary" id="saveUserModal">Salvar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
