@@ -6,6 +6,7 @@
     <title>MathKids Pro - Aprendizado Interativo de Matemática</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -19,7 +20,10 @@
             <div class="auth-header">
                 <div class="logo">
                     <i class="fas fa-calculator"></i>
-                    <h1>Math<span>Kids</span> <span class="pro">Pro</span></h1>
+                    <div class="logo-text">
+                        <h1>Math<span>Kids</span></h1>
+                        <span class="pro-badge">PRO</span>
+                    </div>
                 </div>
                 <p class="tagline">Aprenda matemática de forma divertida e interativa</p>
             </div>
@@ -29,37 +33,56 @@
                     <h2>Bem-vindo ao MathKids Pro!</h2>
                     <p>Uma plataforma educacional completa para alunos do 4º ao 9º ano aprenderem matemática de forma divertida e eficaz.</p>
                     
-                    <div class="features">
-                        <div class="feature">
-                            <i class="fas fa-gamepad"></i>
-                            <span>Jogos educativos</span>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsStudents">0</h3>
+                                <p>Alunos Ativos</p>
+                            </div>
                         </div>
-                        <div class="feature">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Acompanhamento de progresso</span>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsRating">0.0</h3>
+                                <p>Avaliação Média</p>
+                            </div>
                         </div>
-                        <div class="feature">
-                            <i class="fas fa-trophy"></i>
-                            <span>Desafios e conquistas</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-users"></i>
-                            <span>Comunidade de aprendizes</span>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsImprovement">0%</h3>
+                                <p>Melhoria no Aprendizado</p>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="user-stats">
-                        <div class="stat">
-                            <h3>1,250+</h3>
-                            <p>Alunos ativos</p>
+                    <div class="features-grid">
+                        <div class="feature">
+                            <i class="fas fa-gamepad"></i>
+                            <h4>Jogos Educativos</h4>
+                            <p>Diversão garantida enquanto aprende</p>
                         </div>
-                        <div class="stat">
-                            <h3>4.8</h3>
-                            <p>Avaliação média</p>
+                        <div class="feature">
+                            <i class="fas fa-chart-line"></i>
+                            <h4>Acompanhamento</h4>
+                            <p>Veja sua evolução no aprendizado</p>
                         </div>
-                        <div class="stat">
-                            <h3>98%</h3>
-                            <p>Melhoria no aprendizado</p>
+                        <div class="feature">
+                            <i class="fas fa-trophy"></i>
+                            <h4>Desafios</h4>
+                            <p>Conquiste medalhas e reconhecimento</p>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-users"></i>
+                            <h4>Comunidade</h4>
+                            <p>Aprenda com outros estudantes</p>
                         </div>
                     </div>
                 </div>
@@ -67,14 +90,23 @@
                 <div class="auth-forms">
                     <!-- Formulário de Login -->
                     <div id="loginForm" class="auth-form active">
-                        <h3><i class="fas fa-sign-in-alt"></i> Fazer Login</h3>
+                        <div class="form-header">
+                            <h3><i class="fas fa-sign-in-alt"></i> Fazer Login</h3>
+                            <p>Acesse sua conta para continuar aprendendo</p>
+                        </div>
                         <form id="loginFormElement">
                             <div class="form-group">
-                                <label for="loginEmail"><i class="fas fa-envelope"></i> E-mail</label>
+                                <label for="loginEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
                                 <input type="email" id="loginEmail" placeholder="seu@email.com" required>
                             </div>
                             <div class="form-group">
-                                <label for="loginPassword"><i class="fas fa-lock"></i> Senha</label>
+                                <label for="loginPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Senha</span>
+                                </label>
                                 <div class="password-input">
                                     <input type="password" id="loginPassword" placeholder="Sua senha" required>
                                     <button type="button" class="toggle-password" id="toggleLoginPassword">
@@ -85,33 +117,47 @@
                             <div class="form-options">
                                 <label class="checkbox">
                                     <input type="checkbox" id="rememberMe">
-                                    <span>Lembrar-me</span>
+                                    <span class="checkmark"></span>
+                                    Lembrar-me
                                 </label>
-                                <a href="#" id="forgotPasswordLink">Esqueci a senha</a>
+                                <a href="#" id="forgotPasswordLink" class="forgot-link">Esqueci a senha</a>
                             </div>
                             <button type="submit" class="btn-auth btn-primary">
-                                <i class="fas fa-sign-in-alt"></i> Entrar
+                                <i class="fas fa-sign-in-alt"></i>
+                                <span>Entrar na Conta</span>
                             </button>
                         </form>
                         <div class="auth-switch">
-                            <p>Não tem uma conta? <a href="#" id="showRegister">Cadastre-se</a></p>
+                            <p>Não tem uma conta? <a href="#" id="showRegister" class="switch-link">Cadastre-se agora</a></p>
                         </div>
                     </div>
                     
                     <!-- Formulário de Cadastro -->
                     <div id="registerForm" class="auth-form">
-                        <h3><i class="fas fa-user-plus"></i> Criar Conta</h3>
+                        <div class="form-header">
+                            <h3><i class="fas fa-user-plus"></i> Criar Conta</h3>
+                            <p>Junte-se a nossa comunidade de aprendizes</p>
+                        </div>
                         <form id="registerFormElement">
                             <div class="form-group">
-                                <label for="registerName"><i class="fas fa-user"></i> Nome Completo</label>
-                                <input type="text" id="registerName" placeholder="Seu nome" required>
+                                <label for="registerName">
+                                    <i class="fas fa-user"></i>
+                                    <span>Nome Completo</span>
+                                </label>
+                                <input type="text" id="registerName" placeholder="Seu nome completo" required>
                             </div>
                             <div class="form-group">
-                                <label for="registerEmail"><i class="fas fa-envelope"></i> E-mail</label>
+                                <label for="registerEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
                                 <input type="email" id="registerEmail" placeholder="seu@email.com" required>
                             </div>
                             <div class="form-group">
-                                <label for="registerPassword"><i class="fas fa-lock"></i> Senha</label>
+                                <label for="registerPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Senha</span>
+                                </label>
                                 <div class="password-input">
                                     <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
                                     <button type="button" class="toggle-password" id="toggleRegisterPassword">
@@ -121,7 +167,10 @@
                                 <small class="password-hint">A senha deve ter pelo menos 6 caracteres</small>
                             </div>
                             <div class="form-group">
-                                <label for="registerConfirmPassword"><i class="fas fa-lock"></i> Confirmar Senha</label>
+                                <label for="registerConfirmPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Confirmar Senha</span>
+                                </label>
                                 <div class="password-input">
                                     <input type="password" id="registerConfirmPassword" placeholder="Digite a senha novamente" required>
                                     <button type="button" class="toggle-password" id="toggleRegisterConfirmPassword">
@@ -130,7 +179,10 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="userType"><i class="fas fa-users"></i> Tipo de Conta</label>
+                                <label for="userType">
+                                    <i class="fas fa-users"></i>
+                                    <span>Tipo de Conta</span>
+                                </label>
                                 <select id="userType" required>
                                     <option value="" disabled selected>Selecione o tipo de conta</option>
                                     <option value="student">Aluno</option>
@@ -140,40 +192,61 @@
                             </div>
                             <div class="form-group checkbox">
                                 <input type="checkbox" id="agreeTerms" required>
-                                <label for="agreeTerms">Eu concordo com os <a href="#" id="termsLink">Termos de Uso</a> e <a href="#" id="privacyLink">Política de Privacidade</a></label>
+                                <label for="agreeTerms" class="terms-label">
+                                    <span class="checkmark"></span>
+                                    Eu concordo com os <a href="#" id="termsLink">Termos de Uso</a> e <a href="#" id="privacyLink">Política de Privacidade</a>
+                                </label>
                             </div>
                             <button type="submit" class="btn-auth btn-primary">
-                                <i class="fas fa-user-plus"></i> Criar Conta
+                                <i class="fas fa-user-plus"></i>
+                                <span>Criar Minha Conta</span>
                             </button>
                         </form>
                         <div class="auth-switch">
-                            <p>Já tem uma conta? <a href="#" id="showLogin">Faça login</a></p>
+                            <p>Já tem uma conta? <a href="#" id="showLogin" class="switch-link">Faça login aqui</a></p>
                         </div>
                     </div>
                     
                     <!-- Formulário de Recuperação de Senha -->
                     <div id="recoverForm" class="auth-form">
-                        <h3><i class="fas fa-key"></i> Recuperar Senha</h3>
-                        <p class="recover-info">Digite seu e-mail cadastrado para receber um link de recuperação de senha.</p>
+                        <div class="form-header">
+                            <h3><i class="fas fa-key"></i> Recuperar Senha</h3>
+                            <p>Vamos te ajudar a recuperar o acesso</p>
+                        </div>
+                        <div class="recover-info">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Digite seu e-mail cadastrado para receber um link de recuperação de senha.</p>
+                        </div>
                         <form id="recoverFormElement">
                             <div class="form-group">
-                                <label for="recoverEmail"><i class="fas fa-envelope"></i> E-mail</label>
+                                <label for="recoverEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
                                 <input type="email" id="recoverEmail" placeholder="seu@email.com" required>
                             </div>
                             <button type="submit" class="btn-auth btn-primary">
-                                <i class="fas fa-paper-plane"></i> Enviar Link de Recuperação
+                                <i class="fas fa-paper-plane"></i>
+                                <span>Enviar Link de Recuperação</span>
                             </button>
                         </form>
                         <div class="auth-switch">
-                            <p>Lembrou sua senha? <a href="#" id="showLoginFromRecover">Fazer login</a></p>
+                            <p>Lembrou sua senha? <a href="#" id="showLoginFromRecover" class="switch-link">Fazer login</a></p>
                         </div>
                     </div>
                 </div>
             </div>
             
             <div class="auth-footer">
-                <p>&copy; 2023 MathKids Pro. Todos os direitos reservados.</p>
-                <p class="version">Versão 2.0.0</p>
+                <div class="footer-content">
+                    <p>&copy; 2024 MathKids Pro. Todos os direitos reservados.</p>
+                    <div class="footer-links">
+                        <a href="#" id="termsLinkFooter">Termos de Uso</a>
+                        <a href="#" id="privacyLinkFooter">Privacidade</a>
+                        <a href="#" id="contactLink">Contato</a>
+                    </div>
+                    <p class="version">Versão 2.1.0</p>
+                </div>
             </div>
         </div>
     </div>
@@ -189,28 +262,63 @@
                     </button>
                     <div class="logo">
                         <i class="fas fa-calculator"></i>
-                        <h1>Math<span>Kids</span> <span class="pro">Pro</span></h1>
+                        <div class="logo-text">
+                            <h1>Math<span>Kids</span></h1>
+                            <span class="pro-badge">PRO</span>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="header-center">
                     <nav class="main-nav">
                         <ul>
-                            <li><a href="#dashboard" class="nav-link active"><i class="fas fa-home"></i> <span>Início</span></a></li>
-                            <li><a href="#learn" class="nav-link"><i class="fas fa-book-open"></i> <span>Aprender</span></a></li>
-                            <li><a href="#practice" class="nav-link"><i class="fas fa-dumbbell"></i> <span>Praticar</span></a></li>
-                            <li><a href="#games" class="nav-link"><i class="fas fa-gamepad"></i> <span>Jogos</span></a></li>
-                            <li><a href="#progress" class="nav-link"><i class="fas fa-chart-line"></i> <span>Progresso</span></a></li>
-                            <li id="adminNav" style="display: none;"><a href="#admin" class="nav-link"><i class="fas fa-cogs"></i> <span>Admin</span></a></li>
+                            <li><a href="#dashboard" class="nav-link active" data-section="dashboard">
+                                <i class="fas fa-home"></i>
+                                <span>Início</span>
+                            </a></li>
+                            <li><a href="#learn" class="nav-link" data-section="learn">
+                                <i class="fas fa-book-open"></i>
+                                <span>Aprender</span>
+                            </a></li>
+                            <li><a href="#practice" class="nav-link" data-section="practice">
+                                <i class="fas fa-dumbbell"></i>
+                                <span>Praticar</span>
+                            </a></li>
+                            <li><a href="#games" class="nav-link" data-section="games">
+                                <i class="fas fa-gamepad"></i>
+                                <span>Jogos</span>
+                            </a></li>
+                            <li><a href="#progress" class="nav-link" data-section="progress">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Progresso</span>
+                            </a></li>
+                            <li id="adminNav" style="display: none;"><a href="#admin" class="nav-link" data-section="admin">
+                                <i class="fas fa-cogs"></i>
+                                <span>Admin</span>
+                            </a></li>
                         </ul>
                     </nav>
                 </div>
                 
                 <div class="header-right">
+                    <div class="quick-actions">
+                        <button class="btn-quick" id="quickPractice" title="Prática Rápida">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                        <button class="btn-quick" id="quickGame" title="Jogo Rápido">
+                            <i class="fas fa-gamepad"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="notifications" id="notificationsToggle">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationCount">0</span>
+                    </div>
+                    
                     <div class="user-menu">
                         <div class="user-info" id="userDropdownToggle">
                             <div class="user-avatar">
-                                <i class="fas fa-user-circle"></i>
+                                <span id="userAvatarInitials">U</span>
                             </div>
                             <div class="user-details">
                                 <span class="user-name" id="userName">Carregando...</span>
@@ -220,19 +328,29 @@
                         </div>
                         <div class="dropdown-menu" id="userDropdown">
                             <div class="dropdown-header">
-                                <strong id="dropdownUserName">Usuário</strong>
-                                <span class="badge" id="dropdownUserRole">Aluno</span>
+                                <div class="dropdown-avatar">
+                                    <span id="dropdownAvatarInitials">U</span>
+                                </div>
+                                <div class="dropdown-user-info">
+                                    <strong id="dropdownUserName">Usuário</strong>
+                                    <span class="badge" id="dropdownUserRole">Aluno</span>
+                                </div>
                             </div>
-                            <a href="#profile" class="dropdown-item"><i class="fas fa-user"></i> Meu Perfil</a>
-                            <a href="#settings" class="dropdown-item"><i class="fas fa-cog"></i> Configurações</a>
                             <div class="dropdown-divider"></div>
-                            <button id="logoutBtn" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i> Sair</button>
+                            <a href="#profile" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <a href="#settings" class="dropdown-item">
+                                <i class="fas fa-cog"></i>
+                                <span>Configurações</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <button id="logoutBtn" class="dropdown-item logout">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </button>
                         </div>
-                    </div>
-                    
-                    <div class="notifications" id="notificationsToggle">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge" id="notificationCount">0</span>
                     </div>
                 </div>
             </div>
@@ -243,7 +361,7 @@
             <div class="sidebar-header">
                 <div class="user-info">
                     <div class="user-avatar">
-                        <i class="fas fa-user-circle"></i>
+                        <span id="mobileAvatarInitials">U</span>
                     </div>
                     <div class="user-details">
                         <span class="user-name" id="mobileUserName">Usuário</span>
@@ -256,21 +374,50 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="#dashboard" class="sidebar-link active"><i class="fas fa-home"></i> Início</a>
-                <a href="#learn" class="sidebar-link"><i class="fas fa-book-open"></i> Aprender</a>
-                <a href="#practice" class="sidebar-link"><i class="fas fa-dumbbell"></i> Praticar</a>
-                <a href="#games" class="sidebar-link"><i class="fas fa-gamepad"></i> Jogos</a>
-                <a href="#progress" class="sidebar-link"><i class="fas fa-chart-line"></i> Progresso</a>
-                <a href="#admin" class="sidebar-link" id="mobileAdminLink" style="display: none;"><i class="fas fa-cogs"></i> Admin</a>
-                <a href="#profile" class="sidebar-link"><i class="fas fa-user"></i> Perfil</a>
-                <a href="#settings" class="sidebar-link"><i class="fas fa-cog"></i> Configurações</a>
-                <button id="mobileLogoutBtn" class="sidebar-link logout"><i class="fas fa-sign-out-alt"></i> Sair</button>
+                <a href="#dashboard" class="sidebar-link active">
+                    <i class="fas fa-home"></i>
+                    <span>Início</span>
+                </a>
+                <a href="#learn" class="sidebar-link">
+                    <i class="fas fa-book-open"></i>
+                    <span>Aprender</span>
+                </a>
+                <a href="#practice" class="sidebar-link">
+                    <i class="fas fa-dumbbell"></i>
+                    <span>Praticar</span>
+                </a>
+                <a href="#games" class="sidebar-link">
+                    <i class="fas fa-gamepad"></i>
+                    <span>Jogos</span>
+                </a>
+                <a href="#progress" class="sidebar-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Progresso</span>
+                </a>
+                <a href="#admin" class="sidebar-link" id="mobileAdminLink" style="display: none;">
+                    <i class="fas fa-cogs"></i>
+                    <span>Admin</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="#profile" class="sidebar-link">
+                    <i class="fas fa-user"></i>
+                    <span>Perfil</span>
+                </a>
+                <a href="#settings" class="sidebar-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Configurações</span>
+                </a>
+                <button id="mobileLogoutBtn" class="sidebar-link logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Sair</span>
+                </button>
             </nav>
             
             <div class="sidebar-footer">
-                <p>&copy; 2023 MathKids Pro</p>
+                <p>&copy; 2024 MathKids Pro</p>
             </div>
         </div>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <!-- Conteúdo Principal -->
         <main class="app-main">
@@ -278,136 +425,165 @@
                 <!-- Dashboard -->
                 <section id="dashboard" class="app-section active">
                     <div class="section-header">
-                        <h2><i class="fas fa-home"></i> Dashboard</h2>
-                        <p>Bem-vindo de volta, <span id="welcomeUserName">Usuário</span>! Veja suas atividades recentes.</p>
+                        <div class="header-content">
+                            <h2><i class="fas fa-home"></i> Dashboard</h2>
+                            <p>Bem-vindo de volta, <span id="welcomeUserName" class="highlight">Usuário</span>! Veja suas atividades recentes.</p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn-action" id="refreshDashboard">
+                                <i class="fas fa-sync-alt"></i>
+                                Atualizar
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="dashboard-grid">
+                    <div class="dashboard-content">
                         <!-- Estatísticas Rápidas -->
-                        <div class="stats-cards">
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background-color: #4f46e5;">
+                        <div class="stats-grid">
+                            <div class="stat-card primary">
+                                <div class="stat-icon">
                                     <i class="fas fa-check-circle"></i>
                                 </div>
                                 <div class="stat-info">
                                     <h3 id="statExercises">0</h3>
                                     <p>Exercícios Concluídos</p>
                                 </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+12%</span>
+                                </div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background-color: #10b981;">
+                            <div class="stat-card success">
+                                <div class="stat-icon">
                                     <i class="fas fa-percentage"></i>
                                 </div>
                                 <div class="stat-info">
                                     <h3 id="statAccuracy">0%</h3>
                                     <p>Taxa de Acerto</p>
                                 </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+5%</span>
+                                </div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background-color: #f59e0b;">
+                            <div class="stat-card warning">
+                                <div class="stat-icon">
                                     <i class="fas fa-clock"></i>
                                 </div>
                                 <div class="stat-info">
                                     <h3 id="statTime">0 min</h3>
                                     <p>Tempo de Prática</p>
                                 </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+25%</span>
+                                </div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-icon" style="background-color: #ef4444;">
+                            <div class="stat-card danger">
+                                <div class="stat-icon">
                                     <i class="fas fa-trophy"></i>
                                 </div>
                                 <div class="stat-info">
                                     <h3 id="statLevel">Iniciante</h3>
                                     <p>Seu Nível</p>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Atividades Recentes -->
-                        <div class="recent-activities">
-                            <h3><i class="fas fa-history"></i> Atividades Recentes</h3>
-                            <div class="activities-list" id="activitiesList">
-                                <div class="activity-item">
-                                    <i class="fas fa-plus-circle activity-icon"></i>
-                                    <div class="activity-details">
-                                        <p>Exercício de Adição concluído</p>
-                                        <small>Há 5 minutos</small>
-                                    </div>
-                                    <span class="activity-score correct">+10</span>
-                                </div>
-                                <div class="activity-item">
-                                    <i class="fas fa-times-circle activity-icon"></i>
-                                    <div class="activity-details">
-                                        <p>Desafio de Multiplicação</p>
-                                        <small>Há 2 horas</small>
-                                    </div>
-                                    <span class="activity-score wrong">-5</span>
-                                </div>
-                                <div class="activity-item">
-                                    <i class="fas fa-gamepad activity-icon"></i>
-                                    <div class="activity-details">
-                                        <p>Jogo Desafio Relâmpago</p>
-                                        <small>Ontem</small>
-                                    </div>
-                                    <span class="activity-score correct">+25</span>
+                                <div class="stat-trend">
+                                    <i class="fas fa-star"></i>
+                                    <span>Próximo: 50xp</span>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Operações para Praticar -->
-                        <div class="practice-quick">
-                            <h3><i class="fas fa-bolt"></i> Praticar Agora</h3>
-                            <div class="operations-quick">
-                                <div class="operation-quick" data-operation="addition">
-                                    <i class="fas fa-plus"></i>
-                                    <span>Adição</span>
+                        <div class="content-grid">
+                            <!-- Atividades Recentes -->
+                            <div class="card recent-activities">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-history"></i> Atividades Recentes</h3>
+                                    <a href="#" class="view-all">Ver todas</a>
                                 </div>
-                                <div class="operation-quick" data-operation="subtraction">
-                                    <i class="fas fa-minus"></i>
-                                    <span>Subtração</span>
-                                </div>
-                                <div class="operation-quick" data-operation="multiplication">
-                                    <i class="fas fa-times"></i>
-                                    <span>Multiplicação</span>
-                                </div>
-                                <div class="operation-quick" data-operation="division">
-                                    <i class="fas fa-divide"></i>
-                                    <span>Divisão</span>
+                                <div class="card-body">
+                                    <div class="activities-list" id="activitiesList">
+                                        <!-- Atividades serão carregadas aqui -->
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <!-- Próximos Desafios -->
-                        <div class="next-challenges">
-                            <h3><i class="fas fa-flag-checkered"></i> Seus Próximos Desafios</h3>
-                            <div class="challenges-list">
-                                <div class="challenge-item">
-                                    <div class="challenge-icon">
-                                        <i class="fas fa-star"></i>
-                                    </div>
-                                    <div class="challenge-info">
-                                        <h4>Domine a Tabuada do 7</h4>
-                                        <p>Complete 20 multiplicações com o número 7</p>
-                                        <div class="challenge-progress">
-                                            <div class="progress-bar">
-                                                <div class="progress-fill" style="width: 45%"></div>
+                            
+                            <!-- Operações para Praticar -->
+                            <div class="card practice-quick">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-bolt"></i> Praticar Agora</h3>
+                                    <p>Escolha uma operação para começar</p>
+                                </div>
+                                <div class="card-body">
+                                    <div class="operations-quick">
+                                        <div class="operation-quick" data-operation="addition">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-plus"></i>
                                             </div>
-                                            <span>9/20</span>
+                                            <span>Adição</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="subtraction">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-minus"></i>
+                                            </div>
+                                            <span>Subtração</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="multiplication">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-times"></i>
+                                            </div>
+                                            <span>Multiplicação</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="division">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-divide"></i>
+                                            </div>
+                                            <span>Divisão</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="challenge-item">
-                                    <div class="challenge-icon">
-                                        <i class="fas fa-bolt"></i>
+                            </div>
+                            
+                            <!-- Próximos Desafios -->
+                            <div class="card next-challenges">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-flag-checkered"></i> Seus Desafios</h3>
+                                    <a href="#" class="view-all">Ver mais</a>
+                                </div>
+                                <div class="card-body">
+                                    <div class="challenges-list" id="challengesList">
+                                        <!-- Desafios serão carregados aqui -->
                                     </div>
-                                    <div class="challenge-info">
-                                        <h4>Desafio de Velocidade</h4>
-                                        <p>Resolva 50 operações em menos de 5 minutos</p>
-                                        <div class="challenge-progress">
+                                </div>
+                            </div>
+                            
+                            <!-- Progresso do Dia -->
+                            <div class="card daily-progress">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-chart-bar"></i> Progresso Hoje</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="progress-stats">
+                                        <div class="progress-item">
+                                            <span>Exercícios</span>
                                             <div class="progress-bar">
-                                                <div class="progress-fill" style="width: 30%"></div>
+                                                <div class="progress-fill" style="width: 60%"></div>
                                             </div>
-                                            <span>15/50</span>
+                                            <span>6/10</span>
+                                        </div>
+                                        <div class="progress-item">
+                                            <span>Acertos</span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 80%"></div>
+                                            </div>
+                                            <span>80%</span>
+                                        </div>
+                                        <div class="progress-item">
+                                            <span>Tempo</span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 45%"></div>
+                                            </div>
+                                            <span>27/60 min</span>
                                         </div>
                                     </div>
                                 </div>
@@ -419,86 +595,29 @@
                 <!-- Seção Aprender -->
                 <section id="learn" class="app-section">
                     <div class="section-header">
-                        <h2><i class="fas fa-book-open"></i> Aprender</h2>
-                        <p>Explore lições interativas sobre as quatro operações matemáticas básicas.</p>
-                    </div>
-                    
-                    <div class="lessons-grid">
-                        <div class="lesson-card" data-operation="addition">
-                            <div class="lesson-header">
-                                <div class="lesson-icon">
-                                    <i class="fas fa-plus"></i>
-                                </div>
-                                <div class="lesson-badge">Fácil</div>
-                            </div>
-                            <h3>Adição</h3>
-                            <p>Descubra como somar números e encontrar totais. A base de todas as operações.</p>
-                            <div class="lesson-stats">
-                                <span><i class="fas fa-check-circle"></i> 5 lições</span>
-                                <span><i class="fas fa-clock"></i> 30 min</span>
-                            </div>
-                            <button class="btn-lesson">Começar Lição</button>
-                        </div>
-                        
-                        <div class="lesson-card" data-operation="subtraction">
-                            <div class="lesson-header">
-                                <div class="lesson-icon">
-                                    <i class="fas fa-minus"></i>
-                                </div>
-                                <div class="lesson-badge">Fácil</div>
-                            </div>
-                            <h3>Subtração</h3>
-                            <p>Aprenda a encontrar diferenças entre números e resolver problemas do dia a dia.</p>
-                            <div class="lesson-stats">
-                                <span><i class="fas fa-check-circle"></i> 5 lições</span>
-                                <span><i class="fas fa-clock"></i> 35 min</span>
-                            </div>
-                            <button class="btn-lesson">Começar Lição</button>
-                        </div>
-                        
-                        <div class="lesson-card featured" data-operation="multiplication">
-                            <div class="lesson-header">
-                                <div class="lesson-icon">
-                                    <i class="fas fa-times"></i>
-                                </div>
-                                <div class="lesson-badge">Médio</div>
-                            </div>
-                            <h3>Multiplicação</h3>
-                            <p>Domine a adição repetida e aprenda as tabuadas de forma divertida e eficiente.</p>
-                            <div class="lesson-stats">
-                                <span><i class="fas fa-check-circle"></i> 10 lições</span>
-                                <span><i class="fas fa-clock"></i> 1 hora</span>
-                            </div>
-                            <button class="btn-lesson">Começar Lição</button>
-                            <div class="featured-badge">Recomendado</div>
-                        </div>
-                        
-                        <div class="lesson-card" data-operation="division">
-                            <div class="lesson-header">
-                                <div class="lesson-icon">
-                                    <i class="fas fa-divide"></i>
-                                </div>
-                                <div class="lesson-badge">Médio</div>
-                            </div>
-                            <h3>Divisão</h3>
-                            <p>Entenda como distribuir quantidades igualmente e resolver problemas de divisão.</p>
-                            <div class="lesson-stats">
-                                <span><i class="fas fa-check-circle"></i> 8 lições</span>
-                                <span><i class="fas fa-clock"></i> 45 min</span>
-                            </div>
-                            <button class="btn-lesson">Começar Lição</button>
+                        <div class="header-content">
+                            <h2><i class="fas fa-book-open"></i> Aprender</h2>
+                            <p>Explore lições interativas sobre as quatro operações matemáticas básicas.</p>
                         </div>
                     </div>
                     
-                    <!-- Lição Ativa -->
-                    <div class="active-lesson" id="activeLesson">
-                        <div class="lesson-container">
-                            <div class="lesson-header">
-                                <h3 id="lessonTitle">Selecione uma lição para começar</h3>
-                                <button class="btn-close-lesson" id="closeLesson"><i class="fas fa-times"></i></button>
-                            </div>
-                            <div class="lesson-content" id="lessonContent">
-                                <p class="lesson-welcome">Escolha uma das operações acima para ver a explicação detalhada e começar a aprender.</p>
+                    <div class="learn-content">
+                        <div class="lessons-grid" id="lessonsGrid">
+                            <!-- Lições serão carregadas aqui -->
+                        </div>
+                        
+                        <!-- Lição Ativa -->
+                        <div class="active-lesson" id="activeLesson">
+                            <div class="lesson-container">
+                                <div class="lesson-header">
+                                    <h3 id="lessonTitle">Selecione uma lição para começar</h3>
+                                    <button class="btn-close-lesson" id="closeLesson">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="lesson-content" id="lessonContent">
+                                    <p class="lesson-welcome">Escolha uma das lições acima para ver a explicação detalhada e começar a aprender.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -544,7 +663,7 @@
                     <h3><i class="fas fa-user"></i> Meu Perfil</h3>
                     <button class="close-modal">&times;</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" id="profileModalBody">
                     <!-- Conteúdo será carregado dinamicamente -->
                 </div>
             </div>
@@ -557,11 +676,111 @@
                     <h3><i class="fas fa-cog"></i> Configurações</h3>
                     <button class="close-modal">&times;</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" id="settingsModalBody">
                     <!-- Conteúdo será carregado dinamicamente -->
                 </div>
             </div>
         </div>
+
+        <!-- Modal de Termos -->
+        <div class="modal" id="termsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-file-contract"></i> Termos de Uso</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="terms-content">
+                        <h4>1. Aceitação dos Termos</h4>
+                        <p>Ao acessar e usar o MathKids Pro, você concorda com estes termos de uso.</p>
+                        
+                        <h4>2. Uso da Plataforma</h4>
+                        <p>A plataforma é destinada ao aprendizado de matemática para estudantes do ensino fundamental.</p>
+                        
+                        <h4>3. Conta do Usuário</h4>
+                        <p>Você é responsável por manter a confidencialidade de sua conta e senha.</p>
+                        
+                        <h4>4. Privacidade</h4>
+                        <p>Respeitamos sua privacidade conforme nossa política de privacidade.</p>
+                        
+                        <h4>5. Limitações</h4>
+                        <p>O uso indevido da plataforma pode resultar na suspensão da conta.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Privacidade -->
+        <div class="modal" id="privacyModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-shield-alt"></i> Política de Privacidade</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="privacy-content">
+                        <h4>1. Informações Coletadas</h4>
+                        <p>Coletamos informações necessárias para o funcionamento da plataforma e melhoria da experiência do usuário.</p>
+                        
+                        <h4>2. Uso das Informações</h4>
+                        <p>As informações são usadas para personalizar o aprendizado e gerar estatísticas de progresso.</p>
+                        
+                        <h4>3. Segurança</h4>
+                        <p>Implementamos medidas de segurança para proteger suas informações.</p>
+                        
+                        <h4>4. Compartilhamento</h4>
+                        <p>Não compartilhamos suas informações pessoais com terceiros sem seu consentimento.</p>
+                        
+                        <h4>5. Seus Direitos</h4>
+                        <p>Você tem direito a acessar, corrigir e excluir suas informações pessoais.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Contato -->
+        <div class="modal" id="contactModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-envelope"></i> Contato</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="contact-content">
+                        <h4>Entre em Contato</h4>
+                        <p>Tem dúvidas ou sugestões? Entre em contato conosco!</p>
+                        
+                        <div class="contact-info">
+                            <div class="contact-item">
+                                <i class="fas fa-envelope"></i>
+                                <span>contato@mathkidspro.com</span>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone"></i>
+                                <span>(11) 99999-9999</span>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-clock"></i>
+                                <span>Segunda a Sexta, 9h às 18h</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <i class="fas fa-calculator"></i>
+                </div>
+                <p>Carregando...</p>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toastContainer"></div>
     </div>
 
     <!-- Scripts -->
@@ -569,4 +788,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
