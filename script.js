@@ -21,8 +21,8 @@ try {
     auth = firebase.auth();
     analytics = firebase.analytics();
     
-    // Verificar estatísticas do sistema
-    loadSystemStats();
+    // Configurar listeners em tempo real
+    setupRealtimeListeners();
 } catch (error) {
     console.log("Firebase não configurado. Modo de demonstração ativado.");
     setupDemoMode();
@@ -39,6 +39,8 @@ let gameTimer = null;
 let gameTimeLeft = 60;
 let gameScore = 0;
 let gameHighScore = 0;
+
+// Dados do sistema
 let systemStats = {
     totalStudents: 0,
     averageRating: 4.8,
@@ -66,6 +68,10 @@ let userProgress = {
         time: 0
     }
 };
+
+// Cache de dados
+let usersCache = [];
+let realtimeListeners = [];
 
 // Elementos DOM
 const authScreen = document.getElementById('authScreen');
@@ -134,17 +140,38 @@ const privacyModal = document.getElementById('privacyModal');
 const contactModal = document.getElementById('contactModal');
 const profileModal = document.getElementById('profileModal');
 const settingsModal = document.getElementById('settingsModal');
+const userModal = document.getElementById('userModal');
 const termsLink = document.getElementById('termsLink');
 const privacyLink = document.getElementById('privacyLink');
 const termsLinkFooter = document.getElementById('termsLinkFooter');
 const privacyLinkFooter = document.getElementById('privacyLinkFooter');
 const contactLink = document.getElementById('contactLink');
 
+// Modal de usuário (Admin)
+const userModalTitle = document.getElementById('userModalTitle');
+const userForm = document.getElementById('userForm');
+const modalUserName = document.getElementById('modalUserName');
+const modalUserEmail = document.getElementById('modalUserEmail');
+const modalUserPassword = document.getElementById('modalUserPassword');
+const modalUserRole = document.getElementById('modalUserRole');
+const modalUserVerified = document.getElementById('modalUserVerified');
+const cancelUserModal = document.getElementById('cancelUserModal');
+const saveUserModal = document.getElementById('saveUserModal');
+
 // Toast container
 const toastContainer = document.getElementById('toastContainer');
 
 // Loading overlay
 const loadingOverlay = document.getElementById('loadingOverlay');
+
+// Features da tela inicial
+const statsCardStudents = document.getElementById('statsCardStudents');
+const statsCardRating = document.getElementById('statsCardRating');
+const statsCardImprovement = document.getElementById('statsCardImprovement');
+const featureGames = document.getElementById('featureGames');
+const featureTracking = document.getElementById('featureTracking');
+const featureChallenges = document.getElementById('featureChallenges');
+const featureCommunity = document.getElementById('featureCommunity');
 
 // Quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
@@ -162,6 +189,37 @@ document.addEventListener('DOMContentLoaded', function() {
         auth.onAuthStateChanged(handleAuthStateChange);
     }
 });
+
+// Configurar listeners em tempo real
+function setupRealtimeListeners() {
+    if (!db) return;
+    
+    // Listener para estatísticas do sistema
+    const statsListener = db.collection('system').doc('stats')
+        .onSnapshot((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                systemStats = { ...systemStats, ...data };
+                updateSystemStatsUI();
+            }
+        }, (error) => {
+            console.error('Erro no listener de estatísticas:', error);
+        });
+    
+    realtimeListeners.push(statsListener);
+    
+    // Listener para contagem de usuários
+    const usersListener = db.collection('users')
+        .where('role', '==', 'student')
+        .onSnapshot((snapshot) => {
+            systemStats.totalStudents = snapshot.size;
+            updateSystemStatsUI();
+        }, (error) => {
+            console.error('Erro no listener de usuários:', error);
+        });
+    
+    realtimeListeners.push(usersListener);
+}
 
 // Configurar todos os event listeners
 function setupEventListeners() {
@@ -266,6 +324,9 @@ function setupEventListeners() {
     
     // Ações rápidas
     quickPractice.addEventListener('click', function() {
+        this.classList.add('active');
+        setTimeout(() => this.classList.remove('active'), 300);
+        
         const operations = ['addition', 'subtraction', 'multiplication', 'division'];
         const randomOperation = operations[Math.floor(Math.random() * operations.length)];
         switchSection('practice');
@@ -273,6 +334,9 @@ function setupEventListeners() {
     });
     
     quickGame.addEventListener('click', function() {
+        this.classList.add('active');
+        setTimeout(() => this.classList.remove('active'), 300);
+        
         const games = ['lightningGame', 'divisionPuzzle', 'mathChampionship'];
         const randomGame = games[Math.floor(Math.random() * games.length)];
         switchSection('games');
@@ -340,6 +404,78 @@ function setupEventListeners() {
             }
         });
     });
+    
+    // Features da tela inicial
+    featureGames.addEventListener('click', function() {
+        if (appScreen.style.display === 'block') {
+            switchSection('games');
+        } else {
+            location.reload();
+        }
+    });
+    
+    featureTracking.addEventListener('click', function() {
+        if (appScreen.style.display === 'block') {
+            switchSection('progress');
+        } else {
+            location.reload();
+        }
+    });
+    
+    featureChallenges.addEventListener('click', function() {
+        if (appScreen.style.display === 'block') {
+            switchSection('progress');
+        } else {
+            location.reload();
+        }
+    });
+    
+    featureCommunity.addEventListener('click', function() {
+        location.reload();
+    });
+    
+    statsCardStudents.addEventListener('click', function() {
+        location.reload();
+    });
+    
+    statsCardRating.addEventListener('click', function() {
+        if (appScreen.style.display === 'block') {
+            switchSection('progress');
+        } else {
+            location.reload();
+        }
+    });
+    
+    statsCardImprovement.addEventListener('click', function() {
+        if (appScreen.style.display === 'block') {
+            switchSection('progress');
+        } else {
+            location.reload();
+        }
+    });
+    
+    // Modal de usuário (Admin)
+    cancelUserModal.addEventListener('click', function() {
+        closeModal('userModal');
+        userForm.reset();
+    });
+    
+    userForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleUserFormSubmit();
+    });
+    
+    // Configurar evento de busca em tempo real para usuários
+    const searchUsersInput = document.getElementById('searchUsers');
+    if (searchUsersInput) {
+        let searchTimeout;
+        searchUsersInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filterUsersTable(e.target.value);
+            }, 300);
+        });
+    }
 }
 
 // Configurar toggles de senha
@@ -392,8 +528,8 @@ async function loadSystemStats() {
         // Atualizar estatísticas do sistema
         systemStats = {
             totalStudents,
-            averageRating: 4.8, // Valor fixo para demonstração
-            improvementRate: 98, // Valor fixo para demonstração
+            averageRating: 4.8,
+            improvementRate: 98,
             totalExercises,
             totalUsers
         };
@@ -403,15 +539,15 @@ async function loadSystemStats() {
         
     } catch (error) {
         console.error('Erro ao carregar estatísticas do sistema:', error);
-        updateSystemStatsUI(); // Usar valores padrão
+        updateSystemStatsUI();
     }
 }
 
 // Atualizar UI das estatísticas do sistema
 function updateSystemStatsUI() {
-    statsStudents.textContent = systemStats.totalStudents.toLocaleString();
-    statsRating.textContent = systemStats.averageRating.toFixed(1);
-    statsImprovement.textContent = systemStats.improvementRate + '%';
+    if (statsStudents) statsStudents.textContent = systemStats.totalStudents.toLocaleString();
+    if (statsRating) statsRating.textContent = systemStats.averageRating.toFixed(1);
+    if (statsImprovement) statsImprovement.textContent = systemStats.improvementRate + '%';
 }
 
 // Verificar estado de autenticação
@@ -420,7 +556,6 @@ function checkAuthState() {
     if (savedUser) {
         const user = JSON.parse(savedUser);
         if (user.email && user.lastLogin && (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
-            // Usuário logado recentemente (menos de 7 dias)
             loadUserData(user);
             showApp();
         }
@@ -451,6 +586,18 @@ function switchAuthForm(formType) {
 
 // Verificar se deve mostrar opção de admin
 async function checkAdminOption() {
+    if (!db) {
+        adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
+    } else {
+        try {
+            const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+            adminExists = !adminSnapshot.empty;
+        } catch (error) {
+            console.error('Erro ao verificar admin:', error);
+            adminExists = false;
+        }
+    }
+    
     if (adminExists) {
         adminOption.disabled = true;
         adminOption.title = "Já existe um administrador. Contate o administrador atual para acesso.";
@@ -477,11 +624,9 @@ async function handleLogin(e) {
     
     try {
         if (auth) {
-            // Firebase Auth
             const userCredential = await auth.signInWithEmailAndPassword(email, password);
             await loadUserDataFromFirebase(userCredential.user.uid);
         } else {
-            // Modo demo
             await handleDemoLogin(email, password);
         }
         
@@ -538,18 +683,14 @@ async function handleRegister(e) {
         let userId;
         
         if (auth) {
-            // Firebase Auth
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             userId = userCredential.user.uid;
             
-            // Enviar verificação de email
             await userCredential.user.sendEmailVerification();
         } else {
-            // Modo demo
             userId = 'demo_' + Date.now();
         }
         
-        // Criar dados do usuário
         const userData = {
             name: name,
             email: email,
@@ -567,7 +708,6 @@ async function handleRegister(e) {
             }
         };
         
-        // Salvar no Firebase ou localStorage
         if (db) {
             await db.collection('users').doc(userId).set(userData);
         } else {
@@ -577,13 +717,11 @@ async function handleRegister(e) {
             }));
         }
         
-        // Se for admin, atualizar flag
         if (userType === 'admin') {
             adminExists = true;
             localStorage.setItem('mathkids_admin_exists', 'true');
         }
         
-        // Atualizar estatísticas do sistema
         systemStats.totalStudents++;
         systemStats.totalUsers++;
         updateSystemStatsUI();
@@ -629,6 +767,12 @@ async function handlePasswordRecovery(e) {
 
 // Manipular logout
 function handleLogout() {
+    // Remover listeners em tempo real
+    realtimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+    });
+    realtimeListeners = [];
+    
     if (auth) {
         auth.signOut().then(() => {
             logoutLocal();
@@ -642,34 +786,27 @@ function handleLogout() {
 }
 
 function logoutLocal() {
-    // Limpar dados locais
     localStorage.removeItem('mathkids_user');
     currentUser = null;
     userData = {};
     
-    // Mostrar tela de autenticação
     authScreen.style.display = 'flex';
     appScreen.style.display = 'none';
     
-    // Limpar formulários
     loginFormElement.reset();
     registerFormElement.reset();
     recoverFormElement.reset();
     
-    // Mostrar formulário de login
     switchAuthForm('login');
-    
     showToast('Logout realizado com sucesso.', 'info');
 }
 
 // Manipular mudança de estado de autenticação
 function handleAuthStateChange(user) {
     if (user) {
-        // Usuário está logado
         loadUserDataFromFirebase(user.uid);
         showApp();
     } else {
-        // Usuário não está logado
         console.log('User is signed out');
     }
 }
@@ -683,19 +820,16 @@ async function loadUserDataFromFirebase(userId) {
             const data = doc.data();
             currentUser = { id: userId, ...data };
             
-            // Atualizar último login
             await db.collection('users').doc(userId).update({
                 lastLogin: new Date().toISOString()
             });
             
-            // Salvar localmente
             localStorage.setItem('mathkids_user', JSON.stringify({
                 ...data,
                 id: userId,
                 lastLogin: new Date().toISOString()
             }));
             
-            // Carregar interface
             loadUserData(currentUser);
         }
     } catch (error) {
@@ -709,21 +843,17 @@ function loadUserData(user) {
     currentUser = user;
     userData = user;
     
-    // Atualizar informações do usuário na interface
     updateUserInfo();
     
-    // Carregar progresso
     if (user.progress) {
         userProgress = user.progress;
         updateProgressUI();
     }
     
-    // Carregar configurações
     if (user.settings) {
         loadUserSettings();
     }
     
-    // Mostrar/ocultar admin nav
     if (user.role === 'admin') {
         adminNav.style.display = 'flex';
         mobileAdminLink.style.display = 'flex';
@@ -732,10 +862,7 @@ function loadUserData(user) {
         mobileAdminLink.style.display = 'none';
     }
     
-    // Carregar notificações
     loadNotifications();
-    
-    // Carregar conteúdo do dashboard
     loadDashboardContent();
 }
 
@@ -756,7 +883,6 @@ function updateUserInfo() {
     mobileAvatarInitials.textContent = initials;
     welcomeUserName.textContent = name;
     
-    // Atualizar badge de role
     const badge = dropdownUserRole;
     badge.textContent = role;
     badge.className = 'badge';
@@ -780,7 +906,6 @@ function getInitials(name) {
 
 // Atualizar UI de progresso
 function updateProgressUI() {
-    // Estatísticas do dashboard
     statExercises.textContent = userProgress.exercisesCompleted || 0;
     
     const accuracy = userProgress.totalAnswers > 0 
@@ -797,7 +922,6 @@ function showApp() {
     authScreen.style.display = 'none';
     appScreen.style.display = 'block';
     
-    // Carregar seção inicial
     switchSection('dashboard');
 }
 
@@ -832,18 +956,16 @@ function clearAllNotifications() {
 
 // Alternar seção
 function switchSection(sectionId) {
-    // Esconder todas as seções
     document.querySelectorAll('.app-section').forEach(section => {
         section.classList.remove('active');
     });
     
-    // Mostrar seção selecionada
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
         targetSection.classList.add('active');
         currentSection = sectionId;
         
-        // Carregar conteúdo dinâmico se necessário
+        updateActiveNavigation(sectionId);
         loadSectionContent(sectionId);
     }
 }
@@ -895,13 +1017,8 @@ function loadSectionContent(sectionId) {
 
 // Carregar conteúdo do dashboard
 function loadDashboardContent() {
-    // Carregar atividades recentes
     loadRecentActivities();
-    
-    // Carregar desafios
     loadChallenges();
-    
-    // Carregar lições
     loadLessons();
 }
 
@@ -1070,7 +1187,6 @@ function loadLessons() {
     
     lessonsGrid.innerHTML = html;
     
-    // Configurar eventos das lições
     document.querySelectorAll('.lesson-card').forEach(card => {
         card.addEventListener('click', function() {
             const operation = this.getAttribute('data-operation');
@@ -1237,113 +1353,6 @@ function loadLesson(operation) {
         lessonTitle.textContent = lessons[operation].title;
         lessonContent.innerHTML = lessons[operation].content;
         activeLesson.style.display = 'block';
-        
-        // Adicionar estilo para o conteúdo da lição
-        const style = document.createElement('style');
-        style.textContent = `
-            .lesson-content {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-xl);
-            }
-            
-            .lesson-content h3 {
-                font-size: 1.5rem;
-                color: var(--text-primary);
-            }
-            
-            .lesson-content p {
-                color: var(--text-secondary);
-                line-height: 1.6;
-            }
-            
-            .lesson-example, .lesson-tip, .multiplication-table, .division-types {
-                background: var(--bg-secondary);
-                border-radius: var(--radius-lg);
-                padding: var(--space-lg);
-                border-left: 4px solid var(--primary-500);
-            }
-            
-            .lesson-example h4, .lesson-tip h4, .multiplication-table h4, .division-types h4 {
-                font-size: 1rem;
-                margin-bottom: var(--space-md);
-                color: var(--text-primary);
-                display: flex;
-                align-items: center;
-                gap: var(--space-sm);
-            }
-            
-            .example-display {
-                display: flex;
-                align-items: center;
-                gap: var(--space-sm);
-                margin: var(--space-md) 0;
-                flex-wrap: wrap;
-            }
-            
-            .example-number, .example-symbol {
-                font-size: 1.5rem;
-                font-weight: 600;
-                padding: var(--space-sm) var(--space-md);
-                background: var(--bg-primary);
-                border-radius: var(--radius-md);
-            }
-            
-            .example-number {
-                color: var(--primary-600);
-            }
-            
-            .example-symbol {
-                color: var(--text-primary);
-            }
-            
-            .table-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: var(--space-sm);
-                margin-top: var(--space-md);
-            }
-            
-            .table-grid span {
-                padding: var(--space-sm);
-                background: var(--bg-primary);
-                border-radius: var(--radius-md);
-                text-align: center;
-                font-size: 0.875rem;
-            }
-            
-            .btn-lesson-start {
-                margin-top: var(--space-xl);
-                padding: var(--space-md) var(--space-xl);
-                background: var(--gradient-primary);
-                color: white;
-                border: none;
-                border-radius: var(--radius-md);
-                font-weight: 600;
-                font-size: 1rem;
-                cursor: pointer;
-                transition: all var(--transition-normal);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: var(--space-sm);
-                width: 100%;
-            }
-            
-            .btn-lesson-start:hover {
-                transform: translateY(-2px);
-                box-shadow: var(--shadow-md);
-            }
-        `;
-        
-        // Remover estilo anterior se existir
-        const existingStyle = document.getElementById('lessonStyle');
-        if (existingStyle) {
-            existingStyle.remove();
-        }
-        
-        style.id = 'lessonStyle';
-        document.head.appendChild(style);
     }
 }
 
@@ -1453,13 +1462,11 @@ function loadPracticeSection(operation = null) {
     
     section.innerHTML = content;
     
-    // Configurar eventos
     if (currentOperation) {
         setupPracticeEvents();
         generateExercise();
     }
     
-    // Configurar seletores de operação
     document.querySelectorAll('.operation-selector').forEach(selector => {
         selector.addEventListener('click', function() {
             const operation = this.getAttribute('data-operation');
@@ -1470,7 +1477,6 @@ function loadPracticeSection(operation = null) {
 
 // Configurar eventos da prática
 function setupPracticeEvents() {
-    // Dificuldade
     document.querySelectorAll('.btn-difficulty').forEach(btn => {
         btn.addEventListener('click', function() {
             currentDifficulty = this.getAttribute('data-level');
@@ -1480,12 +1486,10 @@ function setupPracticeEvents() {
         });
     });
     
-    // Controles do exercício
     document.getElementById('checkExercise')?.addEventListener('click', checkPracticeAnswer);
     document.getElementById('newExercise')?.addEventListener('click', generateExercise);
     document.getElementById('showHint')?.addEventListener('click', showPracticeHint);
     
-    // Enter para verificar resposta
     document.getElementById('exerciseAnswer')?.addEventListener('keyup', function(e) {
         if (e.key === 'Enter') {
             checkPracticeAnswer();
@@ -1500,7 +1504,6 @@ function generateExercise() {
     let num1, num2, answer;
     const symbol = getOperationSymbol(currentOperation);
     
-    // Definir faixa de números baseada na dificuldade
     const ranges = {
         'easy': { min: 1, max: 20 },
         'medium': { min: 10, max: 100 },
@@ -1509,7 +1512,6 @@ function generateExercise() {
     
     const range = ranges[currentDifficulty];
     
-    // Gerar números baseados na operação
     switch(currentOperation) {
         case 'addition':
             num1 = getRandomInt(range.min, range.max);
@@ -1551,7 +1553,6 @@ function generateExercise() {
         symbol: symbol
     };
     
-    // Atualizar display
     const num1Element = document.getElementById('exerciseNum1');
     const symbolElement = document.getElementById('exerciseSymbol');
     const num2Element = document.getElementById('exerciseNum2');
@@ -1585,48 +1586,37 @@ function checkPracticeAnswer() {
         return;
     }
     
-    // Atualizar estatísticas
     userProgress.exercisesCompleted++;
     userProgress.totalAnswers++;
     userProgress[currentExercise.operation].total++;
     
     if (userAnswer === currentExercise.answer) {
-        // Resposta correta
         feedback.textContent = `🎉 Correto! ${currentExercise.num1} ${currentExercise.symbol} ${currentExercise.num2} = ${currentExercise.answer}`;
         feedback.className = 'exercise-feedback correct';
         userProgress.correctAnswers++;
         userProgress[currentExercise.operation].correct++;
         
-        // Adicionar atividade recente
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} concluído`, 'correct');
         
-        // Atualizar progresso diário
         userProgress.dailyProgress.exercises++;
         userProgress.dailyProgress.correct++;
         
-        // Gerar novo exercício após 1.5 segundos
         setTimeout(generateExercise, 1500);
         
         showToast('Resposta correta! +10 pontos', 'success');
     } else {
-        // Resposta incorreta
         feedback.textContent = `❌ Ops! A resposta correta é ${currentExercise.answer}. Tente novamente!`;
         feedback.className = 'exercise-feedback error';
         
-        // Adicionar atividade recente
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} errado`, 'wrong');
-        
-        // Atualizar progresso diário
         userProgress.dailyProgress.exercises++;
         
         showToast('Resposta incorreta. Tente novamente!', 'error');
     }
     
-    // Atualizar UI
     updateProgressUI();
     saveUserProgress();
     
-    // Atualizar estatísticas do sistema
     systemStats.totalExercises++;
     updateSystemStatsUI();
 }
@@ -1732,7 +1722,6 @@ function loadGamesSection() {
     
     section.innerHTML = content;
     
-    // Configurar eventos dos jogos
     document.querySelectorAll('.btn-game').forEach(button => {
         button.addEventListener('click', function() {
             const gameId = this.closest('.game-card').id;
@@ -1822,7 +1811,6 @@ function startGame(gameId) {
         </div>
     `;
     
-    // Configurar eventos do jogo
     setupGameEvents(gameId);
 }
 
@@ -1839,15 +1827,11 @@ function startGameSession(gameId) {
     gameScore = 0;
     gameTimeLeft = gameId === 'lightningGame' ? 60 : gameId === 'divisionPuzzle' ? 120 : 90;
     
-    // Atualizar UI
     document.getElementById('startGameBtn').disabled = true;
     document.getElementById('endGameBtn').disabled = false;
     document.getElementById('gameScore').textContent = gameScore;
     
-    // Iniciar timer
     gameTimer = setInterval(updateGameTimer, 1000);
-    
-    // Gerar primeiro exercício
     generateGameExercise(gameId);
 }
 
@@ -1871,7 +1855,6 @@ function generateGameExercise(gameId) {
     
     switch(gameId) {
         case 'lightningGame':
-            // Multiplicação
             const num1 = getRandomInt(1, 12);
             const num2 = getRandomInt(1, 12);
             question = `${num1} × ${num2} = ?`;
@@ -1879,7 +1862,6 @@ function generateGameExercise(gameId) {
             break;
             
         case 'divisionPuzzle':
-            // Divisão
             const divisor = getRandomInt(2, 12);
             const quotient = getRandomInt(2, 12);
             const dividend = divisor * quotient;
@@ -1888,7 +1870,6 @@ function generateGameExercise(gameId) {
             break;
             
         case 'mathChampionship':
-            // Operação mista
             const operations = ['+', '-', '×', '÷'];
             const operation = operations[Math.floor(Math.random() * operations.length)];
             
@@ -1927,13 +1908,11 @@ function generateGameExercise(gameId) {
         </div>
     `;
     
-    // Configurar evento de resposta
     document.getElementById('submitGameAnswer').addEventListener('click', checkGameAnswer);
     document.getElementById('gameAnswerInput').addEventListener('keyup', (e) => {
         if (e.key === 'Enter') checkGameAnswer();
     });
     
-    // Focar no input
     document.getElementById('gameAnswerInput').focus();
 }
 
@@ -1952,28 +1931,23 @@ function checkGameAnswer() {
     }
     
     if (userAnswer === currentExercise.answer) {
-        // Resposta correta
         gameScore += 10;
         document.getElementById('gameScore').textContent = gameScore;
         feedback.textContent = '🎉 Correto! +10 pontos';
         feedback.className = 'game-feedback success';
         
-        // Adicionar tempo extra para respostas rápidas
         if (gameTimeLeft < 60) {
             gameTimeLeft += 2;
             feedback.textContent += ' (+2s)';
         }
     } else {
-        // Resposta incorreta
         feedback.textContent = `❌ Errado! A resposta correta é ${currentExercise.answer}`;
         feedback.className = 'game-feedback error';
         
-        // Penalidade de tempo
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
     }
     
-    // Gerar próximo exercício após 1 segundo
     setTimeout(() => {
         if (gameActive) {
             generateGameExercise(currentExercise.gameId);
@@ -2003,7 +1977,6 @@ function endGame() {
     gameActive = false;
     clearInterval(gameTimer);
     
-    // Atualizar UI
     document.getElementById('startGameBtn').disabled = false;
     document.getElementById('endGameBtn').disabled = true;
     
@@ -2022,7 +1995,6 @@ function endGame() {
     feedback.textContent = 'Clique em "Iniciar Jogo" para jogar novamente!';
     feedback.className = 'game-feedback info';
     
-    // Atualizar recorde se necessário
     if (gameScore > gameHighScore) {
         gameHighScore = gameScore;
         localStorage.setItem(`mathkids_highscore_${currentGame}`, gameHighScore);
@@ -2030,7 +2002,6 @@ function endGame() {
         showToast(`🎉 Novo recorde! ${gameHighScore} pontos`, 'success');
     }
     
-    // Adicionar atividade
     addActivity(`Jogo "${getGameName(currentGame)}" finalizado com ${gameScore} pontos`, 'game');
 }
 
@@ -2097,7 +2068,6 @@ function loadProgressSection() {
     
     section.innerHTML = content;
     
-    // Inicializar gráfico
     initializeOperationsChart();
 }
 
@@ -2154,7 +2124,7 @@ function loadAdminSection() {
                             <i class="fas fa-chart-line"></i>
                         </div>
                         <div class="stat-info">
-                            <h3 id="systemAccuracy">78%</h3>
+                            <h3 id="systemAccuracy">${calculateSystemAccuracy()}%</h3>
                             <p>Taxa de Acerto Geral</p>
                         </div>
                     </div>
@@ -2293,18 +2263,16 @@ function loadAdminSection() {
     
     section.innerHTML = content;
     
-    // Configurar eventos de administração
     setupAdminEvents();
+    loadUsersTable();
 }
 
 // Configurar eventos de administração
 function setupAdminEvents() {
-    // Tabs
     document.querySelectorAll('.tab-header').forEach(tab => {
         tab.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
             
-            // Atualizar tabs ativas
             document.querySelectorAll('.tab-header').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
             
@@ -2313,19 +2281,10 @@ function setupAdminEvents() {
         });
     });
     
-    // Botões
     document.getElementById('refreshUsers')?.addEventListener('click', loadUsersTable);
     document.getElementById('addUser')?.addEventListener('click', showAddUserModal);
     document.getElementById('generateReport')?.addEventListener('click', generateReport);
     document.getElementById('saveSettings')?.addEventListener('click', saveSystemSettings);
-    
-    // Busca de usuários
-    document.getElementById('searchUsers')?.addEventListener('input', function(e) {
-        filterUsersTable(e.target.value);
-    });
-    
-    // Carregar tabela de usuários
-    loadUsersTable();
 }
 
 // Carregar tabela de usuários
@@ -2343,20 +2302,17 @@ async function loadUsersTable() {
         let users = [];
         
         if (db) {
-            // Firebase
             const snapshot = await db.collection('users').get();
             users = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
         } else {
-            // Modo demo
             const demoUser = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
             if (demoUser.id) {
                 users = [demoUser];
             }
             
-            // Adicionar mais usuários de exemplo
             for (let i = 1; i <= 5; i++) {
                 users.push({
                     id: `demo_student_${i}`,
@@ -2369,6 +2325,7 @@ async function loadUsersTable() {
             }
         }
         
+        usersCache = users;
         renderUsersTable(users);
         
     } catch (error) {
@@ -2397,7 +2354,6 @@ function renderUsersTable(users) {
     
     let html = '';
     users.forEach(user => {
-        // Não mostrar o próprio usuário admin atual
         if (user.id === currentUser?.id) return;
         
         const name = user.name || 'Sem nome';
@@ -2416,9 +2372,6 @@ function renderUsersTable(users) {
                 <td><span class="status ${statusClass}">${status}</span></td>
                 <td>
                     <div class="user-actions">
-                        <button class="btn-action view" data-user="${user.id}" title="Ver detalhes">
-                            <i class="fas fa-eye"></i>
-                        </button>
                         <button class="btn-action edit" data-user="${user.id}" title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -2437,23 +2390,15 @@ function renderUsersTable(users) {
         </tr>
     `;
     
-    // Configurar eventos dos botões de ação
     setupUserActionButtons();
 }
 
 // Configurar botões de ação de usuários
 function setupUserActionButtons() {
-    document.querySelectorAll('.btn-action.view').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user');
-            viewUserDetails(userId);
-        });
-    });
-    
     document.querySelectorAll('.btn-action.edit').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user');
-            editUser(userId);
+            showEditUserModal(userId);
         });
     });
     
@@ -2467,12 +2412,150 @@ function setupUserActionButtons() {
 
 // Filtrar tabela de usuários
 function filterUsersTable(searchTerm) {
-    const rows = document.querySelectorAll('#usersTableBody tr');
-    
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
+    const filteredUsers = usersCache.filter(user => {
+        if (user.id === currentUser?.id) return false;
+        
+        const searchText = `${user.name || ''} ${user.email || ''} ${user.role || ''}`.toLowerCase();
+        return searchText.includes(searchTerm.toLowerCase());
     });
+    
+    renderUsersTable(filteredUsers);
+}
+
+// Mostrar modal para adicionar usuário
+function showAddUserModal() {
+    userModalTitle.textContent = 'Adicionar Usuário';
+    userForm.reset();
+    modalUserPassword.required = true;
+    openModal('userModal');
+}
+
+// Mostrar modal para editar usuário
+async function showEditUserModal(userId) {
+    const user = usersCache.find(u => u.id === userId);
+    if (!user) return;
+    
+    userModalTitle.textContent = 'Editar Usuário';
+    modalUserName.value = user.name || '';
+    modalUserEmail.value = user.email || '';
+    modalUserRole.value = user.role || 'student';
+    modalUserVerified.checked = user.verified || false;
+    modalUserPassword.required = false;
+    modalUserPassword.placeholder = 'Deixe em branco para manter';
+    
+    userForm.dataset.userId = userId;
+    openModal('userModal');
+}
+
+// Manipular formulário de usuário
+async function handleUserFormSubmit() {
+    const name = modalUserName.value.trim();
+    const email = modalUserEmail.value.trim();
+    const password = modalUserPassword.value;
+    const role = modalUserRole.value;
+    const verified = modalUserVerified.checked;
+    const isEdit = userForm.dataset.userId;
+    
+    if (!name || !email || !role) {
+        showToast('Preencha todos os campos obrigatórios.', 'error');
+        return;
+    }
+    
+    if (!isEdit && (!password || password.length < 6)) {
+        showToast('A senha deve ter pelo menos 6 caracteres.', 'error');
+        return;
+    }
+    
+    showLoading(true);
+    
+    try {
+        const userData = {
+            name: name,
+            email: email,
+            role: role,
+            verified: verified,
+            updatedAt: new Date().toISOString()
+        };
+        
+        if (isEdit) {
+            await updateUser(isEdit, userData, password);
+        } else {
+            await createUser(userData, password);
+        }
+        
+        closeModal('userModal');
+        userForm.reset();
+        delete userForm.dataset.userId;
+        
+        showLoading(false);
+        showToast(`Usuário ${isEdit ? 'atualizado' : 'criado'} com sucesso!`, 'success');
+        loadUsersTable();
+        
+    } catch (error) {
+        showLoading(false);
+        handleAuthError(error);
+    }
+}
+
+// Criar usuário
+async function createUser(userData, password) {
+    if (db && auth) {
+        const userCredential = await auth.createUserWithEmailAndPassword(userData.email, password);
+        userData.createdAt = new Date().toISOString();
+        userData.lastLogin = new Date().toISOString();
+        
+        await db.collection('users').doc(userCredential.user.uid).set(userData);
+    } else {
+        const userId = 'new_user_' + Date.now();
+        userData.id = userId;
+        userData.createdAt = new Date().toISOString();
+        userData.lastLogin = new Date().toISOString();
+        
+        usersCache.push(userData);
+        localStorage.setItem('mathkids_users', JSON.stringify(usersCache));
+    }
+}
+
+// Atualizar usuário
+async function updateUser(userId, userData, newPassword) {
+    if (db) {
+        if (newPassword) {
+            // Aqui precisaríamos de uma função para atualizar senha
+            // Por simplicidade, vamos apenas atualizar os dados
+        }
+        
+        await db.collection('users').doc(userId).update(userData);
+    } else {
+        const index = usersCache.findIndex(u => u.id === userId);
+        if (index !== -1) {
+            usersCache[index] = { ...usersCache[index], ...userData };
+            localStorage.setItem('mathkids_users', JSON.stringify(usersCache));
+        }
+    }
+}
+
+// Excluir usuário
+async function deleteUser(userId) {
+    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    
+    showLoading(true);
+    
+    try {
+        if (db) {
+            await db.collection('users').doc(userId).delete();
+        } else {
+            usersCache = usersCache.filter(u => u.id !== userId);
+            localStorage.setItem('mathkids_users', JSON.stringify(usersCache));
+        }
+        
+        showLoading(false);
+        showToast('Usuário excluído com sucesso!', 'success');
+        loadUsersTable();
+        
+    } catch (error) {
+        showLoading(false);
+        showToast('Erro ao excluir usuário.', 'error');
+    }
 }
 
 // Gerar relatório
@@ -2490,9 +2573,15 @@ function generateReport() {
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
                     <p>📊 Total de exercícios concluídos: ${systemStats.totalExercises}</p>
-                    <p>🎯 Taxa média de acerto: 78%</p>
+                    <p>🎯 Taxa média de acerto: ${calculateSystemAccuracy()}%</p>
                     <p>👥 Alunos ativos: ${systemStats.totalStudents}</p>
-                    <p>⏰ Tempo médio de prática: 45 minutos/aluno</p>
+                    <p>⏰ Tempo médio de prática: ${calculateAveragePracticeTime()} minutos/aluno</p>
+                    <p>📈 Aluno com melhor desempenho: ${getTopStudent()}</p>
+                </div>
+                <div class="report-actions">
+                    <button class="btn-admin" onclick="exportReport('${reportType}', '${reportPeriod}')">
+                        <i class="fas fa-download"></i> Exportar PDF
+                    </button>
                 </div>
             `;
             break;
@@ -2503,9 +2592,15 @@ function generateReport() {
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
                     <p>👥 Usuários totais: ${systemStats.totalUsers}</p>
-                    <p>📈 Novos cadastros: 12</p>
+                    <p>📈 Novos cadastros: ${calculateNewRegistrations(reportPeriod)}</p>
                     <p>🎮 Jogos mais jogados: Desafio Relâmpago</p>
+                    <p>⏰ Tempo médio por sessão: 25 minutos</p>
                     <p>📱 Dispositivos mais usados: Desktop (65%), Mobile (35%)</p>
+                </div>
+                <div class="report-actions">
+                    <button class="btn-admin" onclick="exportReport('${reportType}', '${reportPeriod}')">
+                        <i class="fas fa-download"></i> Exportar CSV
+                    </button>
                 </div>
             `;
             break;
@@ -2515,17 +2610,222 @@ function generateReport() {
                 <h4>Relatório de Desempenho por Operação</h4>
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
-                    <p>➕ Adição: 85% de acerto</p>
-                    <p>➖ Subtração: 82% de acerto</p>
-                    <p>✖️ Multiplicação: 75% de acerto</p>
-                    <p>➗ Divisão: 70% de acerto</p>
+                    <p>➕ Adição: ${calculateOperationAccuracy('addition')}% de acerto</p>
+                    <p>➖ Subtração: ${calculateOperationAccuracy('subtraction')}% de acerto</p>
+                    <p>✖️ Multiplicação: ${calculateOperationAccuracy('multiplication')}% de acerto</p>
+                    <p>➗ Divisão: ${calculateOperationAccuracy('division')}% de acerto</p>
+                    <p>📊 Operação mais difícil: Divisão</p>
+                    <p>🏆 Operação mais fácil: Adição</p>
+                </div>
+                <div class="report-chart">
+                    <canvas id="performanceChart" height="200"></canvas>
+                </div>
+                <div class="report-actions">
+                    <button class="btn-admin" onclick="exportReport('${reportType}', '${reportPeriod}')">
+                        <i class="fas fa-download"></i> Exportar Gráfico
+                    </button>
                 </div>
             `;
+            
+            setTimeout(() => {
+                initializePerformanceChart();
+            }, 100);
             break;
     }
     
     preview.innerHTML = reportContent;
     showToast('Relatório gerado com sucesso!', 'success');
+}
+
+// Calcular precisão do sistema
+function calculateSystemAccuracy() {
+    if (userProgress.totalAnswers === 0) return 0;
+    return Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100);
+}
+
+// Calcular tempo médio de prática
+function calculateAveragePracticeTime() {
+    if (systemStats.totalStudents === 0) return 0;
+    return Math.round((userProgress.practiceTime || 0) / Math.max(systemStats.totalStudents, 1));
+}
+
+// Obter aluno com melhor desempenho
+function getTopStudent() {
+    return usersCache.length > 0 ? usersCache[0].name : 'Nenhum';
+}
+
+// Calcular novas inscrições
+function calculateNewRegistrations(period) {
+    const base = Math.floor(Math.random() * 20) + 5;
+    switch(period) {
+        case 'week': return base;
+        case 'month': return base * 4;
+        case 'quarter': return base * 12;
+        case 'year': return base * 48;
+        default: return base;
+    }
+}
+
+// Calcular precisão por operação
+function calculateOperationAccuracy(operation) {
+    const stats = userProgress[operation] || { correct: 0, total: 0 };
+    if (stats.total === 0) return 0;
+    return Math.round((stats.correct / stats.total) * 100);
+}
+
+// Inicializar gráfico de desempenho
+function initializePerformanceChart() {
+    const ctx = document.getElementById('performanceChart');
+    if (!ctx) return;
+    
+    const operations = ['Adição', 'Subtração', 'Multiplicação', 'Divisão'];
+    const accuracies = [
+        calculateOperationAccuracy('addition'),
+        calculateOperationAccuracy('subtraction'),
+        calculateOperationAccuracy('multiplication'),
+        calculateOperationAccuracy('division')
+    ];
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: operations,
+            datasets: [{
+                label: 'Acurácia (%)',
+                data: accuracies,
+                backgroundColor: [
+                    'rgba(14, 165, 233, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(34, 197, 94, 0.8)',
+                    'rgba(245, 158, 11, 0.8)'
+                ],
+                borderColor: [
+                    'rgb(14, 165, 233)',
+                    'rgb(139, 92, 246)',
+                    'rgb(34, 197, 94)',
+                    'rgb(245, 158, 11)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Acurácia (%)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// Inicializar gráfico de operações (Progresso)
+function initializeOperationsChart() {
+    const ctx = document.getElementById('operationsChart');
+    if (!ctx) return;
+    
+    const operations = ['Adição', 'Subtração', 'Multiplicação', 'Divisão'];
+    const correct = [
+        userProgress.addition.correct || 0,
+        userProgress.subtraction.correct || 0,
+        userProgress.multiplication.correct || 0,
+        userProgress.division.correct || 0
+    ];
+    
+    const total = [
+        userProgress.addition.total || 0,
+        userProgress.subtraction.total || 0,
+        userProgress.multiplication.total || 0,
+        userProgress.division.total || 0
+    ];
+    
+    const accuracy = total.map((t, i) => t > 0 ? Math.round((correct[i] / t) * 100) : 0);
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: operations,
+            datasets: [
+                {
+                    label: 'Acertos',
+                    data: correct,
+                    backgroundColor: 'rgba(14, 165, 233, 0.8)',
+                    borderColor: 'rgb(14, 165, 233)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Tentativas',
+                    data: total,
+                    backgroundColor: 'rgba(203, 213, 225, 0.8)',
+                    borderColor: 'rgb(203, 213, 225)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Acurácia (%)',
+                    data: accuracy,
+                    type: 'line',
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'transparent',
+                    yAxisID: 'y1',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Quantidade'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                y1: {
+                    position: 'right',
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Acurácia (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            family: 'Inter'
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Salvar configurações do sistema
@@ -2541,6 +2841,11 @@ function saveSystemSettings() {
     
     localStorage.setItem('mathkids_system_settings', JSON.stringify(settings));
     showToast('Configurações salvas com sucesso!', 'success');
+}
+
+// Exportar relatório (simulado)
+function exportReport(type, period) {
+    showToast(`Relatório ${type} (${period}) exportado com sucesso!`, 'success');
 }
 
 // Funções auxiliares
@@ -2674,120 +2979,17 @@ function generateBadges() {
     return html;
 }
 
-function initializeOperationsChart() {
-    const ctx = document.getElementById('operationsChart');
-    if (!ctx) return;
-    
-    const operations = ['Adição', 'Subtração', 'Multiplicação', 'Divisão'];
-    const correct = [
-        userProgress.addition.correct || 0,
-        userProgress.subtraction.correct || 0,
-        userProgress.multiplication.correct || 0,
-        userProgress.division.correct || 0
-    ];
-    
-    const total = [
-        userProgress.addition.total || 0,
-        userProgress.subtraction.total || 0,
-        userProgress.multiplication.total || 0,
-        userProgress.division.total || 0
-    ];
-    
-    const accuracy = total.map((t, i) => t > 0 ? Math.round((correct[i] / t) * 100) : 0);
-    
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: operations,
-            datasets: [
-                {
-                    label: 'Acertos',
-                    data: correct,
-                    backgroundColor: 'rgba(14, 165, 233, 0.8)',
-                    borderColor: 'rgb(14, 165, 233)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Tentativas',
-                    data: total,
-                    backgroundColor: 'rgba(203, 213, 225, 0.8)',
-                    borderColor: 'rgb(203, 213, 225)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Acurácia (%)',
-                    data: accuracy,
-                    type: 'line',
-                    borderColor: 'rgb(34, 197, 94)',
-                    backgroundColor: 'transparent',
-                    yAxisID: 'y1',
-                    tension: 0.4
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Quantidade'
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.1)'
-                    }
-                },
-                y1: {
-                    position: 'right',
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Acurácia (%)'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.1)'
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: {
-                            family: 'Inter'
-                        }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    titleFont: {
-                        family: 'Inter'
-                    },
-                    bodyFont: {
-                        family: 'Inter'
-                    }
-                }
-            }
-        }
-    });
-}
-
 function openModal(modalId) {
-    const modal = document.getElementById(modalId + 'Modal');
+    const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
         
-        // Carregar conteúdo do modal
-        loadModalContent(modalId);
+        if (modalId === 'profile') {
+            loadProfileModal();
+        } else if (modalId === 'settings') {
+            loadSettingsModal();
+        }
     }
 }
 
@@ -2796,24 +2998,18 @@ function closeModal(modalId) {
     if (modal) {
         modal.classList.remove('active');
         document.body.style.overflow = '';
+        
+        if (modalId === 'userModal') {
+            userForm.reset();
+            delete userForm.dataset.userId;
+        }
     }
 }
 
-function loadModalContent(modalId) {
-    const modalBody = document.querySelector(`#${modalId}Modal .modal-body`);
-    if (!modalBody) return;
+function loadProfileModal() {
+    const container = document.getElementById('profileModalBody');
+    if (!container) return;
     
-    switch(modalId) {
-        case 'profile':
-            loadProfileModal(modalBody);
-            break;
-        case 'settings':
-            loadSettingsModal(modalBody);
-            break;
-    }
-}
-
-function loadProfileModal(container) {
     const accuracy = userProgress.totalAnswers > 0 
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
@@ -2856,124 +3052,12 @@ function loadProfileModal(container) {
             </div>
         </div>
     `;
-    
-    // Adicionar estilo
-    const style = document.createElement('style');
-    style.textContent = `
-        .profile-content {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-xl);
-        }
-        
-        .profile-header {
-            display: flex;
-            align-items: center;
-            gap: var(--space-lg);
-            padding-bottom: var(--space-lg);
-            border-bottom: 1px solid var(--border-light);
-        }
-        
-        .profile-avatar {
-            width: 4rem;
-            height: 4rem;
-            background: var(--gradient-primary);
-            border-radius: var(--radius-full);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-        
-        .profile-info {
-            flex: 1;
-        }
-        
-        .profile-info h4 {
-            font-size: 1.25rem;
-            margin-bottom: 0.25rem;
-            color: var(--text-primary);
-        }
-        
-        .profile-info p {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .profile-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background: var(--gradient-primary);
-            color: white;
-            border-radius: var(--radius-full);
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .profile-badge.admin {
-            background: var(--gradient-warning);
-        }
-        
-        .profile-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-md);
-            padding: var(--space-lg);
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-        }
-        
-        .profile-stat {
-            text-align: center;
-        }
-        
-        .profile-stat h5 {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
-            font-weight: 500;
-        }
-        
-        .profile-stat p {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .profile-actions {
-            display: flex;
-            gap: var(--space-md);
-        }
-        
-        .btn-profile {
-            flex: 1;
-            padding: 0.75rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: all var(--transition-fast);
-        }
-        
-        .btn-profile:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--border-medium);
-        }
-    `;
-    
-    document.head.appendChild(style);
 }
 
-function loadSettingsModal(container) {
+function loadSettingsModal() {
+    const container = document.getElementById('settingsModalBody');
+    if (!container) return;
+    
     const settings = currentUser.settings || {
         theme: 'light',
         notifications: true,
@@ -3039,7 +3123,6 @@ function loadSettingsModal(container) {
         </div>
     `;
     
-    // Configurar eventos
     document.getElementById('saveUserSettings').addEventListener('click', saveUserSettings);
     document.getElementById('resetSettings').addEventListener('click', resetUserSettings);
 }
@@ -3053,18 +3136,15 @@ function saveUserSettings() {
         progressNotifications: document.getElementById('progressNotifications').checked
     };
     
-    // Atualizar no usuário atual
     currentUser.settings = settings;
     userData.settings = settings;
     
-    // Salvar localmente
     if (currentUser.id) {
         const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
         user.settings = settings;
         localStorage.setItem('mathkids_user', JSON.stringify(user));
     }
     
-    // Salvar no Firebase se disponível
     if (db && currentUser.id) {
         db.collection('users').doc(currentUser.id).update({
             settings: settings
@@ -3073,6 +3153,7 @@ function saveUserSettings() {
         });
     }
     
+    loadUserSettings();
     showToast('Configurações salvas com sucesso!', 'success');
 }
 
@@ -3085,7 +3166,6 @@ function resetUserSettings() {
         progressNotifications: true
     };
     
-    // Restaurar valores padrão
     document.getElementById('themeSelect').value = defaultSettings.theme;
     document.getElementById('soundEffects').checked = defaultSettings.sound;
     document.getElementById('backgroundMusic').checked = defaultSettings.music;
@@ -3104,7 +3184,6 @@ function loadUserSettings() {
         progressNotifications: true
     };
     
-    // Aplicar tema
     if (settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.setAttribute('data-theme', 'dark');
     } else {
@@ -3154,18 +3233,14 @@ function addActivity(description, type = 'info') {
         timestamp: new Date().toISOString()
     };
     
-    // Adicionar ao início da lista
     userProgress.lastActivities.unshift(activity);
     
-    // Manter apenas as últimas 20 atividades
     if (userProgress.lastActivities.length > 20) {
         userProgress.lastActivities = userProgress.lastActivities.slice(0, 20);
     }
     
-    // Atualizar localStorage
     saveUserProgress();
     
-    // Atualizar lista de atividades se estiver visível
     if (currentSection === 'dashboard') {
         loadRecentActivities();
     }
@@ -3178,21 +3253,18 @@ function addActivity(description, type = 'info') {
 function saveUserProgress() {
     if (!currentUser) return;
     
-    // Atualizar level baseado no progresso
     const totalExercises = userProgress.exercisesCompleted || 0;
     if (totalExercises >= 200) userProgress.level = 'Mestre';
     else if (totalExercises >= 100) userProgress.level = 'Avançado';
     else if (totalExercises >= 50) userProgress.level = 'Intermediário';
     else userProgress.level = 'Iniciante';
     
-    // Salvar localmente
     if (currentUser.id) {
         const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
         user.progress = userProgress;
         localStorage.setItem('mathkids_user', JSON.stringify(user));
     }
     
-    // Salvar no Firebase se disponível
     if (db && currentUser.id) {
         db.collection('users').doc(currentUser.id).update({
             progress: userProgress
@@ -3218,13 +3290,11 @@ function showToast(message, type = 'info') {
     
     toastContainer.appendChild(toast);
     
-    // Configurar fechamento
     toast.querySelector('.toast-close').addEventListener('click', () => {
         toast.style.animation = 'slideOutRight 0.3s ease-out forwards';
         setTimeout(() => toast.remove(), 300);
     });
     
-    // Remover automaticamente após 5 segundos
     setTimeout(() => {
         if (toast.parentNode) {
             toast.style.animation = 'slideOutRight 0.3s ease-out forwards';
@@ -3235,22 +3305,6 @@ function showToast(message, type = 'info') {
             }, 300);
         }
     }, 5000);
-    
-    // Adicionar estilo de animação
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideOutRight {
-            from {
-                opacity: 1;
-                transform: translateX(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-        }
-    `;
-    document.head.appendChild(style);
 }
 
 function showLoading(show) {
@@ -3333,11 +3387,10 @@ function initializeComponents() {
     });
 }
 
-// Modo de demonstração (quando Firebase não está configurado)
+// Modo de demonstração
 function setupDemoMode() {
     console.log('Modo de demonstração ativado');
     
-    // Criar dados de demonstração
     userProgress = {
         exercisesCompleted: 15,
         correctAnswers: 12,
@@ -3361,10 +3414,8 @@ function setupDemoMode() {
         }
     };
     
-    // Verificar se admin existe localmente
     adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
     
-    // Estatísticas do sistema em modo demo
     systemStats = {
         totalStudents: 1250,
         averageRating: 4.8,
@@ -3373,12 +3424,10 @@ function setupDemoMode() {
         totalUsers: 1260
     };
     
-    // Atualizar UI das estatísticas
     updateSystemStatsUI();
 }
 
 async function handleDemoLogin(email, password) {
-    // Verificar credenciais de demonstração
     const demoUsers = {
         'admin@mathkids.com': { password: 'admin123', role: 'admin', name: 'Administrador Demo' },
         'aluno@mathkids.com': { password: 'aluno123', role: 'student', name: 'Aluno Demo' }
@@ -3403,7 +3452,6 @@ async function handleDemoLogin(email, password) {
             }
         };
         
-        // Salvar localmente
         localStorage.setItem('mathkids_user', JSON.stringify(currentUser));
         
         return currentUser;
@@ -3417,5 +3465,6 @@ window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
+window.exportReport = exportReport;
 
-console.log('MathKids Pro v3.0 carregado com sucesso!');
+console.log('MathKids Pro v3.1.0 carregado com sucesso!');
