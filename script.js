@@ -1,16 +1,18 @@
-// script.js - MathKids Pro - Versão 3.1
+// ============================================
+// CONFIGURAÇÃO E INICIALIZAÇÃO
+// ============================================
 
 // Configuração do Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
-  authDomain: "mathkids-de4a0.firebaseapp.com",
-  projectId: "mathkids-de4a0",
-  storageBucket: "mathkids-de4a0.firebasestorage.app",
-  messagingSenderId: "463966125316",
-  appId: "1:463966125316:web:6656af016d1c5a44da6451"
+    apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
+    authDomain: "mathkids-de4a0.firebaseapp.com",
+    projectId: "mathkids-de4a0",
+    storageBucket: "mathkids-de4a0.firebasestorage.app",
+    messagingSenderId: "463966125316",
+    appId: "1:463966125316:web:6656af016d1c5a44da6451"
 };
 
-// Inicializar Firebase
+// Variáveis globais
 let app, db, auth, analytics;
 let currentUser = null;
 let userData = {};
@@ -27,6 +29,8 @@ let gameTimer = null;
 let gameTimeLeft = 60;
 let gameScore = 0;
 let gameHighScore = 0;
+
+// Estatísticas do sistema
 let systemStats = {
     totalStudents: 0,
     averageRating: 4.8,
@@ -35,7 +39,7 @@ let systemStats = {
     totalUsers: 0
 };
 
-// Dados do usuário
+// Progresso do usuário
 let userProgress = {
     exercisesCompleted: 0,
     correctAnswers: 0,
@@ -55,7 +59,7 @@ let userProgress = {
     }
 };
 
-// Elementos DOM
+// Elementos DOM da tela de autenticação
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
 const loginForm = document.getElementById('loginForm');
@@ -76,7 +80,7 @@ const statsStudents = document.getElementById('statsStudents');
 const statsRating = document.getElementById('statsRating');
 const statsImprovement = document.getElementById('statsImprovement');
 
-// Elementos da aplicação
+// Elementos da aplicação principal
 const menuToggle = document.getElementById('menuToggle');
 const closeSidebar = document.getElementById('closeSidebar');
 const mobileSidebar = document.getElementById('mobileSidebar');
@@ -134,36 +138,60 @@ const toastContainer = document.getElementById('toastContainer');
 // Loading overlay
 const loadingOverlay = document.getElementById('loadingOverlay');
 
-// Quando o DOM estiver carregado
+// ============================================
+// INICIALIZAÇÃO DA APLICAÇÃO
+// ============================================
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Firebase
+    try {
+        app = firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        analytics = firebase.analytics();
+        loadSystemStats();
+    } catch (error) {
+        console.log("Firebase não configurado. Modo de demonstração ativado.");
+        setupDemoMode();
+    }
+    
+    // Configurar eventos
     setupEventListeners();
+    
+    // Verificar autenticação
     checkAuthState();
+    
+    // Inicializar componentes
     initializeComponents();
     
+    // Configurar Firebase Auth state observer
     if (auth) {
         auth.onAuthStateChanged(handleAuthStateChange);
     }
 });
 
-// Configurar todos os event listeners
+// ============================================
+// FUNÇÕES DE CONFIGURAÇÃO
+// ============================================
+
 function setupEventListeners() {
     // Alternância entre formulários de autenticação
-    showRegister.addEventListener('click', (e) => {
+    showRegister.addEventListener('click', function(e) {
         e.preventDefault();
         switchAuthForm('register');
     });
     
-    showLogin.addEventListener('click', (e) => {
+    showLogin.addEventListener('click', function(e) {
         e.preventDefault();
         switchAuthForm('login');
     });
     
-    showLoginFromRecover.addEventListener('click', (e) => {
+    showLoginFromRecover.addEventListener('click', function(e) {
         e.preventDefault();
         switchAuthForm('login');
     });
     
-    forgotPasswordLink.addEventListener('click', (e) => {
+    forgotPasswordLink.addEventListener('click', function(e) {
         e.preventDefault();
         switchAuthForm('recover');
     });
@@ -183,7 +211,8 @@ function setupEventListeners() {
     
     userDropdownToggle.addEventListener('click', toggleUserDropdown);
     
-    document.addEventListener('click', (e) => {
+    // Fechar dropdown ao clicar fora
+    document.addEventListener('click', function(e) {
         if (!userDropdownToggle.contains(e.target) && !userDropdown.contains(e.target)) {
             userDropdown.classList.remove('active');
         }
@@ -197,7 +226,8 @@ function setupEventListeners() {
     notificationsToggle.addEventListener('click', toggleNotifications);
     clearNotifications.addEventListener('click', clearAllNotifications);
     
-    document.addEventListener('click', (e) => {
+    // Fechar notificações ao clicar fora
+    document.addEventListener('click', function(e) {
         if (!notificationsToggle.contains(e.target) && !notificationsPanel.contains(e.target)) {
             notificationsPanel.classList.remove('active');
         }
@@ -227,78 +257,79 @@ function setupEventListeners() {
         });
     });
     
-    // Operações rápidas no dashboard
+    // Operações rápidas
     operationQuicks.forEach(operation => {
         operation.addEventListener('click', function() {
             const operationType = this.getAttribute('data-operation');
             switchSection('practice');
+            updateActiveNavigation('practice');
             loadPracticeSection(operationType);
         });
     });
     
-    closeLesson.addEventListener('click', () => {
+    closeLesson.addEventListener('click', function() {
         document.getElementById('activeLesson').style.display = 'none';
     });
     
     // Ações rápidas
-    quickPractice.addEventListener('click', () => {
+    quickPractice.addEventListener('click', function() {
         const operations = ['addition', 'subtraction', 'multiplication', 'division'];
         const randomOperation = operations[Math.floor(Math.random() * operations.length)];
         switchSection('practice');
+        updateActiveNavigation('practice');
         loadPracticeSection(randomOperation);
-        
-        // Marcar botão como ativo
-        quickPractice.classList.add('active');
-        setTimeout(() => quickPractice.classList.remove('active'), 300);
     });
     
-    quickGame.addEventListener('click', () => {
+    quickGame.addEventListener('click', function() {
         const games = ['lightningGame', 'divisionPuzzle', 'mathChampionship'];
         const randomGame = games[Math.floor(Math.random() * games.length)];
         switchSection('games');
+        updateActiveNavigation('games');
         startGame(randomGame);
-        
-        // Marcar botão como ativo
-        quickGame.classList.add('active');
-        setTimeout(() => quickGame.classList.remove('active'), 300);
     });
     
-    refreshDashboard.addEventListener('click', () => {
+    refreshDashboard.addEventListener('click', function() {
         loadDashboardContent();
         showToast('Dashboard atualizado!', 'success');
     });
     
     // Modal de perfil e configurações
     document.querySelectorAll('[href="#profile"]').forEach(link => {
-        link.addEventListener('click', (e) => {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
             openModal('profile');
         });
     });
     
     document.querySelectorAll('[href="#settings"]').forEach(link => {
-        link.addEventListener('click', (e) => {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
             openModal('settings');
         });
     });
     
     // Links de termos, privacidade e contato
-    [termsLink, termsLinkFooter].forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            openModal('terms');
-        });
+    termsLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('terms');
     });
     
-    [privacyLink, privacyLinkFooter].forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            openModal('privacy');
-        });
+    privacyLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('privacy');
     });
     
-    contactLink.addEventListener('click', (e) => {
+    termsLinkFooter.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('terms');
+    });
+    
+    privacyLinkFooter.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('privacy');
+    });
+    
+    contactLink.addEventListener('click', function(e) {
         e.preventDefault();
         openModal('contact');
     });
@@ -312,22 +343,50 @@ function setupEventListeners() {
     
     // Fechar modais ao clicar fora
     document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('click', function(e) {
             if (e.target === this) {
                 closeModal(this.id);
             }
         });
     });
     
-    // Blocos de funcionalidades na tela inicial
+    // Configurar recursos clicáveis na tela inicial
     document.querySelectorAll('.feature').forEach(feature => {
-        feature.addEventListener('click', () => {
-            location.reload();
+        feature.addEventListener('click', function() {
+            const featureName = this.querySelector('h4').textContent;
+            switch(featureName) {
+                case 'Jogos Educativos':
+                    if (currentUser) {
+                        switchSection('games');
+                        updateActiveNavigation('games');
+                    } else {
+                        showToast('Faça login para acessar os jogos!', 'info');
+                    }
+                    break;
+                case 'Acompanhamento':
+                    if (currentUser) {
+                        switchSection('progress');
+                        updateActiveNavigation('progress');
+                    } else {
+                        showToast('Faça login para ver seu progresso!', 'info');
+                    }
+                    break;
+                case 'Desafios':
+                    if (currentUser) {
+                        switchSection('practice');
+                        updateActiveNavigation('practice');
+                    } else {
+                        showToast('Faça login para começar os desafios!', 'info');
+                    }
+                    break;
+                case 'Comunidade':
+                    showToast('Funcionalidade de comunidade em breve!', 'info');
+                    break;
+            }
         });
     });
 }
 
-// Configurar toggles de senha
 function setupPasswordToggles() {
     const toggleButtons = [
         { button: 'toggleLoginPassword', input: 'loginPassword' },
@@ -343,15 +402,48 @@ function setupPasswordToggles() {
             toggleBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
-                const icon = this.querySelector('i');
-                icon.classList.toggle('fa-eye');
-                icon.classList.toggle('fa-eye-slash');
+                this.querySelector('i').classList.toggle('fa-eye');
+                this.querySelector('i').classList.toggle('fa-eye-slash');
             });
         }
     });
 }
 
-// Carregar estatísticas do sistema
+function updateActiveNavigation(sectionId) {
+    // Atualizar nav principal
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === `#${sectionId}`) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Atualizar sidebar mobile
+    sidebarLinks.forEach(link => {
+        if (!link.classList.contains('logout')) {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === `#${sectionId}`) {
+                link.classList.add('active');
+            }
+        }
+    });
+    
+    // Atualizar botões rápidos
+    document.querySelectorAll('.btn-quick').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    if (sectionId === 'practice') {
+        quickPractice.classList.add('active');
+    } else if (sectionId === 'games') {
+        quickGame.classList.add('active');
+    }
+}
+
+// ============================================
+// FUNÇÕES DO FIREBASE
+// ============================================
+
 async function loadSystemStats() {
     if (!db) {
         updateSystemStatsUI();
@@ -359,9 +451,11 @@ async function loadSystemStats() {
     }
     
     try {
+        // Contar usuários estudantes
         const usersSnapshot = await db.collection('users').where('role', '==', 'student').get();
         const totalStudents = usersSnapshot.size;
         
+        // Calcular estatísticas agregadas
         let totalExercises = 0;
         let totalUsers = usersSnapshot.size + 1;
         
@@ -372,6 +466,7 @@ async function loadSystemStats() {
             }
         });
         
+        // Atualizar estatísticas do sistema
         systemStats = {
             totalStudents,
             averageRating: 4.8,
@@ -380,22 +475,25 @@ async function loadSystemStats() {
             totalUsers
         };
         
+        // Atualizar UI
         updateSystemStatsUI();
         
     } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
+        console.error('Erro ao carregar estatísticas do sistema:', error);
         updateSystemStatsUI();
     }
 }
 
-// Atualizar UI das estatísticas do sistema
 function updateSystemStatsUI() {
     statsStudents.textContent = systemStats.totalStudents.toLocaleString();
     statsRating.textContent = systemStats.averageRating.toFixed(1);
     statsImprovement.textContent = systemStats.improvementRate + '%';
 }
 
-// Verificar estado de autenticação
+// ============================================
+// AUTENTICAÇÃO
+// ============================================
+
 function checkAuthState() {
     const savedUser = localStorage.getItem('mathkids_user');
     if (savedUser) {
@@ -407,7 +505,6 @@ function checkAuthState() {
     }
 }
 
-// Alternar entre formulários de autenticação
 function switchAuthForm(formType) {
     loginForm.classList.remove('active');
     registerForm.classList.remove('active');
@@ -427,8 +524,25 @@ function switchAuthForm(formType) {
     }
 }
 
-// Verificar se deve mostrar opção de admin
 async function checkAdminOption() {
+    if (!db) {
+        adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
+        updateAdminOption();
+        return;
+    }
+    
+    try {
+        const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+        adminExists = !adminSnapshot.empty;
+        updateAdminOption();
+    } catch (error) {
+        console.error('Erro ao verificar administradores:', error);
+        adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
+        updateAdminOption();
+    }
+}
+
+function updateAdminOption() {
     if (adminExists) {
         adminOption.disabled = true;
         adminOption.title = "Já existe um administrador. Contate o administrador atual para acesso.";
@@ -438,7 +552,6 @@ async function checkAdminOption() {
     }
 }
 
-// Manipular login
 async function handleLogin(e) {
     e.preventDefault();
     
@@ -471,7 +584,6 @@ async function handleLogin(e) {
     }
 }
 
-// Manipular cadastro
 async function handleRegister(e) {
     e.preventDefault();
     
@@ -482,6 +594,7 @@ async function handleRegister(e) {
     const userType = document.getElementById('userType').value;
     const agreeTerms = document.getElementById('agreeTerms').checked;
     
+    // Validações
     if (!name || !email || !password || !confirmPassword || !userType) {
         showToast('Por favor, preencha todos os campos.', 'error');
         return;
@@ -520,9 +633,10 @@ async function handleRegister(e) {
             userId = 'demo_' + Date.now();
         }
         
+        // Criar dados do usuário
         const userData = {
-            name,
-            email,
+            name: name,
+            email: email,
             role: userType,
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString(),
@@ -537,6 +651,7 @@ async function handleRegister(e) {
             }
         };
         
+        // Salvar no Firebase ou localStorage
         if (db) {
             await db.collection('users').doc(userId).set(userData);
         } else {
@@ -546,11 +661,13 @@ async function handleRegister(e) {
             }));
         }
         
+        // Se for admin, atualizar flag
         if (userType === 'admin') {
             adminExists = true;
             localStorage.setItem('mathkids_admin_exists', 'true');
         }
         
+        // Atualizar estatísticas do sistema
         systemStats.totalStudents++;
         systemStats.totalUsers++;
         updateSystemStatsUI();
@@ -565,7 +682,6 @@ async function handleRegister(e) {
     }
 }
 
-// Manipular recuperação de senha
 async function handlePasswordRecovery(e) {
     e.preventDefault();
     
@@ -594,7 +710,6 @@ async function handlePasswordRecovery(e) {
     }
 }
 
-// Manipular logout
 function handleLogout() {
     if (auth) {
         auth.signOut().then(() => {
@@ -624,7 +739,6 @@ function logoutLocal() {
     showToast('Logout realizado com sucesso.', 'info');
 }
 
-// Manipular mudança de estado de autenticação
 function handleAuthStateChange(user) {
     if (user) {
         loadUserDataFromFirebase(user.uid);
@@ -632,7 +746,6 @@ function handleAuthStateChange(user) {
     }
 }
 
-// Carregar dados do usuário do Firebase
 async function loadUserDataFromFirebase(userId) {
     try {
         const doc = await db.collection('users').doc(userId).get();
@@ -641,10 +754,12 @@ async function loadUserDataFromFirebase(userId) {
             const data = doc.data();
             currentUser = { id: userId, ...data };
             
+            // Atualizar último login
             await db.collection('users').doc(userId).update({
                 lastLogin: new Date().toISOString()
             });
             
+            // Salvar localmente
             localStorage.setItem('mathkids_user', JSON.stringify({
                 ...data,
                 id: userId,
@@ -659,22 +774,29 @@ async function loadUserDataFromFirebase(userId) {
     }
 }
 
-// Carregar dados do usuário
+// ============================================
+// GERENCIAMENTO DE USUÁRIO
+// ============================================
+
 function loadUserData(user) {
     currentUser = user;
     userData = user;
     
+    // Atualizar informações do usuário na interface
     updateUserInfo();
     
+    // Carregar progresso
     if (user.progress) {
         userProgress = user.progress;
         updateProgressUI();
     }
     
+    // Carregar configurações
     if (user.settings) {
         loadUserSettings();
     }
     
+    // Mostrar/ocultar admin nav
     if (user.role === 'admin') {
         adminNav.style.display = 'flex';
         mobileAdminLink.style.display = 'flex';
@@ -683,11 +805,13 @@ function loadUserData(user) {
         mobileAdminLink.style.display = 'none';
     }
     
+    // Carregar notificações
     loadNotifications();
+    
+    // Carregar conteúdo do dashboard
     loadDashboardContent();
 }
 
-// Atualizar informações do usuário na interface
 function updateUserInfo() {
     const name = currentUser.name || 'Usuário';
     const role = currentUser.role === 'admin' ? 'Administrador' : 'Aluno';
@@ -704,13 +828,18 @@ function updateUserInfo() {
     mobileAvatarInitials.textContent = initials;
     welcomeUserName.textContent = name;
     
+    // Atualizar badge de role
     const badge = dropdownUserRole;
     badge.textContent = role;
     badge.className = 'badge';
-    badge.style.background = role === 'Administrador' ? 'var(--gradient-warning)' : 'var(--gradient-primary)';
+    
+    if (role === 'Administrador') {
+        badge.style.background = 'var(--gradient-warning)';
+    } else {
+        badge.style.background = 'var(--gradient-primary)';
+    }
 }
 
-// Obter iniciais do nome
 function getInitials(name) {
     return name
         .split(' ')
@@ -720,7 +849,6 @@ function getInitials(name) {
         .substring(0, 2);
 }
 
-// Atualizar UI de progresso
 function updateProgressUI() {
     statExercises.textContent = userProgress.exercisesCompleted || 0;
     
@@ -733,14 +861,33 @@ function updateProgressUI() {
     statLevel.textContent = userProgress.level || 'Iniciante';
 }
 
-// Mostrar aplicação
+function loadUserSettings() {
+    const settings = currentUser.settings || {
+        theme: 'light',
+        notifications: true,
+        sound: true,
+        music: false,
+        progressNotifications: true
+    };
+    
+    // Aplicar tema
+    if (settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+}
+
+// ============================================
+// INTERFACE DA APLICAÇÃO
+// ============================================
+
 function showApp() {
     authScreen.style.display = 'none';
     appScreen.style.display = 'block';
     switchSection('dashboard');
 }
 
-// Alternar sidebar mobile
 function openMobileSidebar() {
     mobileSidebar.classList.add('active');
     sidebarOverlay.classList.add('active');
@@ -757,7 +904,6 @@ function toggleUserDropdown() {
     userDropdown.classList.toggle('active');
 }
 
-// Alternar painel de notificações
 function toggleNotifications() {
     notificationsPanel.classList.toggle('active');
 }
@@ -769,40 +915,23 @@ function clearAllNotifications() {
     showToast('Notificações limpas.', 'success');
 }
 
-// Alternar seção
 function switchSection(sectionId) {
+    // Esconder todas as seções
     document.querySelectorAll('.app-section').forEach(section => {
         section.classList.remove('active');
     });
     
+    // Mostrar seção selecionada
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
         targetSection.classList.add('active');
         currentSection = sectionId;
+        
+        // Carregar conteúdo dinâmico se necessário
         loadSectionContent(sectionId);
     }
 }
 
-// Atualizar navegação ativa
-function updateActiveNavigation(sectionId) {
-    navLinks.forEach(link => {
-        link.classList.remove('active');
-        if (link.getAttribute('href') === `#${sectionId}`) {
-            link.classList.add('active');
-        }
-    });
-    
-    sidebarLinks.forEach(link => {
-        if (!link.classList.contains('logout')) {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === `#${sectionId}`) {
-                link.classList.add('active');
-            }
-        }
-    });
-}
-
-// Carregar conteúdo da seção
 function loadSectionContent(sectionId) {
     switch(sectionId) {
         case 'dashboard':
@@ -826,14 +955,17 @@ function loadSectionContent(sectionId) {
     }
 }
 
-// Carregar conteúdo do dashboard
+// ============================================
+// DASHBOARD
+// ============================================
+
 function loadDashboardContent() {
     loadRecentActivities();
     loadChallenges();
     loadLessons();
+    updateProgressUI();
 }
 
-// Carregar atividades recentes
 function loadRecentActivities() {
     const activitiesList = document.getElementById('activitiesList');
     if (!activitiesList) return;
@@ -873,7 +1005,6 @@ function loadRecentActivities() {
     activitiesList.innerHTML = html;
 }
 
-// Carregar desafios
 function loadChallenges() {
     const challengesList = document.getElementById('challengesList');
     if (!challengesList) return;
@@ -927,7 +1058,10 @@ function loadChallenges() {
     challengesList.innerHTML = html;
 }
 
-// Carregar seção de aprendizado
+// ============================================
+// SEÇÃO APRENDER
+// ============================================
+
 function loadLearnSection() {
     const lessonsGrid = document.getElementById('lessonsGrid');
     if (!lessonsGrid) return;
@@ -998,6 +1132,7 @@ function loadLearnSection() {
     
     lessonsGrid.innerHTML = html;
     
+    // Configurar eventos das lições
     document.querySelectorAll('.lesson-card').forEach(card => {
         card.addEventListener('click', function() {
             const operation = this.getAttribute('data-operation');
@@ -1006,7 +1141,6 @@ function loadLearnSection() {
     });
 }
 
-// Carregar lição
 function loadLesson(operation) {
     const lessonTitle = document.getElementById('lessonTitle');
     const lessonContent = document.getElementById('lessonContent');
@@ -1033,34 +1167,14 @@ function loadLesson(operation) {
                         <p>Resposta: Você tem 8 maçãs no total.</p>
                     </div>
                     
-                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('addition')">
-                        <i class="fas fa-dumbbell"></i> Praticar Adição
-                    </button>
-                </div>
-            `
-        },
-        subtraction: {
-            title: 'Lição: Subtração',
-            content: `
-                <div class="lesson-content">
-                    <h3>O que é Subtração?</h3>
-                    <p>A subtração é a operação inversa da adição. Ela representa a remoção de uma quantidade de outra.</p>
-                    
-                    <div class="lesson-example">
-                        <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
-                        <p>Se você tinha 10 reais e gastou 4 reais, quanto dinheiro sobrou?</p>
-                        <div class="example-display">
-                            <span class="example-number">10</span>
-                            <span class="example-symbol">-</span>
-                            <span class="example-number">4</span>
-                            <span class="example-symbol">=</span>
-                            <span class="example-number">6</span>
-                        </div>
-                        <p>Resposta: Sobraram 6 reais.</p>
+                    <div class="lesson-tip">
+                        <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
+                        <p>Para somar números grandes, você pode quebrá-los em partes menores. Por exemplo:</p>
+                        <p>47 + 25 = (40 + 20) + (7 + 5) = 60 + 12 = 72</p>
                     </div>
                     
-                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('subtraction')">
-                        <i class="fas fa-dumbbell"></i> Praticar Subtração
+                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('addition')">
+                        <i class="fas fa-dumbbell"></i> Praticar Adição
                     </button>
                 </div>
             `
@@ -1074,7 +1188,10 @@ function loadLesson(operation) {
     }
 }
 
-// Carregar seção de prática
+// ============================================
+// SEÇÃO PRATICAR
+// ============================================
+
 function loadPracticeSection(operation = null) {
     const section = document.getElementById('practice');
     
@@ -1096,18 +1213,49 @@ function loadPracticeSection(operation = null) {
         <div class="practice-content">
             <div class="operations-selector">
                 <div class="operations-grid">
-                    ${['addition', 'subtraction', 'multiplication', 'division'].map(op => `
-                        <div class="operation-selector ${currentOperation === op ? 'active' : ''}" data-operation="${op}">
-                            <div class="operation-icon">
-                                <i class="fas fa-${getOperationIcon(op)}"></i>
-                            </div>
-                            <h3>${getOperationName(op)}</h3>
-                            <p>${getOperationDescription(op)}</p>
-                            <div class="operation-stats">
-                                <span>Acertos: ${userProgress[op].correct || 0}/${userProgress[op].total || 0}</span>
-                            </div>
+                    <div class="operation-selector ${currentOperation === 'addition' ? 'active' : ''}" data-operation="addition">
+                        <div class="operation-icon">
+                            <i class="fas fa-plus"></i>
                         </div>
-                    `).join('')}
+                        <h3>Adição</h3>
+                        <p>Some números e encontre o total</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.addition.correct || 0}/${userProgress.addition.total || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="operation-selector ${currentOperation === 'subtraction' ? 'active' : ''}" data-operation="subtraction">
+                        <div class="operation-icon">
+                            <i class="fas fa-minus"></i>
+                        </div>
+                        <h3>Subtração</h3>
+                        <p>Encontre a diferença entre números</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.subtraction.correct || 0}/${userProgress.subtraction.total || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="operation-selector ${currentOperation === 'multiplication' ? 'active' : ''}" data-operation="multiplication">
+                        <div class="operation-icon">
+                            <i class="fas fa-times"></i>
+                        </div>
+                        <h3>Multiplicação</h3>
+                        <p>Domine as tabuadas e multiplicações</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.multiplication.correct || 0}/${userProgress.multiplication.total || 0}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="operation-selector ${currentOperation === 'division' ? 'active' : ''}" data-operation="division">
+                        <div class="operation-icon">
+                            <i class="fas fa-divide"></i>
+                        </div>
+                        <h3>Divisão</h3>
+                        <p>Aprenda a dividir igualmente</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.division.correct || 0}/${userProgress.division.total || 0}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1118,11 +1266,9 @@ function loadPracticeSection(operation = null) {
                     <div class="difficulty-selector">
                         <span>Dificuldade:</span>
                         <div class="difficulty-buttons">
-                            ${['easy', 'medium', 'hard'].map(level => `
-                                <button class="btn-difficulty ${currentDifficulty === level ? 'active' : ''}" data-level="${level}">
-                                    ${level === 'easy' ? 'Fácil' : level === 'medium' ? 'Médio' : 'Difícil'}
-                                </button>
-                            `).join('')}
+                            <button class="btn-difficulty ${currentDifficulty === 'easy' ? 'active' : ''}" data-level="easy">Fácil</button>
+                            <button class="btn-difficulty ${currentDifficulty === 'medium' ? 'active' : ''}" data-level="medium">Médio</button>
+                            <button class="btn-difficulty ${currentDifficulty === 'hard' ? 'active' : ''}" data-level="hard">Difícil</button>
                         </div>
                     </div>
                 </div>
@@ -1151,11 +1297,13 @@ function loadPracticeSection(operation = null) {
     
     section.innerHTML = content;
     
+    // Configurar eventos
     if (currentOperation) {
         setupPracticeEvents();
         generateExercise();
     }
     
+    // Configurar seletores de operação
     document.querySelectorAll('.operation-selector').forEach(selector => {
         selector.addEventListener('click', function() {
             const operation = this.getAttribute('data-operation');
@@ -1164,8 +1312,8 @@ function loadPracticeSection(operation = null) {
     });
 }
 
-// Configurar eventos da prática
 function setupPracticeEvents() {
+    // Dificuldade
     document.querySelectorAll('.btn-difficulty').forEach(btn => {
         btn.addEventListener('click', function() {
             currentDifficulty = this.getAttribute('data-level');
@@ -1175,10 +1323,12 @@ function setupPracticeEvents() {
         });
     });
     
+    // Controles do exercício
     document.getElementById('checkExercise')?.addEventListener('click', checkPracticeAnswer);
     document.getElementById('newExercise')?.addEventListener('click', generateExercise);
     document.getElementById('showHint')?.addEventListener('click', showPracticeHint);
     
+    // Enter para verificar resposta
     document.getElementById('exerciseAnswer')?.addEventListener('keyup', function(e) {
         if (e.key === 'Enter') {
             checkPracticeAnswer();
@@ -1186,13 +1336,13 @@ function setupPracticeEvents() {
     });
 }
 
-// Gerar exercício
 function generateExercise() {
     if (!currentOperation) return;
     
     let num1, num2, answer;
     const symbol = getOperationSymbol(currentOperation);
     
+    // Definir faixa de números baseada na dificuldade
     const ranges = {
         'easy': { min: 1, max: 20 },
         'medium': { min: 10, max: 100 },
@@ -1201,6 +1351,7 @@ function generateExercise() {
     
     const range = ranges[currentDifficulty];
     
+    // Gerar números baseados na operação
     switch(currentOperation) {
         case 'addition':
             num1 = getRandomInt(range.min, range.max);
@@ -1234,8 +1385,15 @@ function generateExercise() {
             break;
     }
     
-    currentExercise = { num1, num2, answer, operation: currentOperation, symbol };
+    currentExercise = {
+        num1: num1,
+        num2: num2,
+        answer: answer,
+        operation: currentOperation,
+        symbol: symbol
+    };
     
+    // Atualizar display
     const num1Element = document.getElementById('exerciseNum1');
     const symbolElement = document.getElementById('exerciseSymbol');
     const num2Element = document.getElementById('exerciseNum2');
@@ -1255,7 +1413,6 @@ function generateExercise() {
     }
 }
 
-// Verificar resposta na prática
 function checkPracticeAnswer() {
     const input = document.getElementById('exerciseAnswer');
     const userAnswer = parseInt(input.value);
@@ -1269,37 +1426,77 @@ function checkPracticeAnswer() {
         return;
     }
     
+    // Atualizar estatísticas
     userProgress.exercisesCompleted++;
     userProgress.totalAnswers++;
     userProgress[currentExercise.operation].total++;
     
     if (userAnswer === currentExercise.answer) {
+        // Resposta correta
         feedback.textContent = `🎉 Correto! ${currentExercise.num1} ${currentExercise.symbol} ${currentExercise.num2} = ${currentExercise.answer}`;
         feedback.className = 'exercise-feedback correct';
         userProgress.correctAnswers++;
         userProgress[currentExercise.operation].correct++;
         
+        // Adicionar atividade recente
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} concluído`, 'correct');
-        userProgress.dailyProgress.exercises++;
-        userProgress.dailyProgress.correct++;
         
+        // Gerar novo exercício após 1.5 segundos
         setTimeout(generateExercise, 1500);
+        
         showToast('Resposta correta! +10 pontos', 'success');
     } else {
+        // Resposta incorreta
         feedback.textContent = `❌ Ops! A resposta correta é ${currentExercise.answer}. Tente novamente!`;
         feedback.className = 'exercise-feedback error';
+        
+        // Adicionar atividade recente
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} errado`, 'wrong');
-        userProgress.dailyProgress.exercises++;
+        
         showToast('Resposta incorreta. Tente novamente!', 'error');
     }
     
+    // Atualizar UI
     updateProgressUI();
     saveUserProgress();
+    
+    // Atualizar estatísticas do sistema
     systemStats.totalExercises++;
     updateSystemStatsUI();
 }
 
-// Carregar seção de jogos
+function showPracticeHint() {
+    if (!currentExercise) return;
+    
+    const { num1, num2, operation, answer } = currentExercise;
+    const feedback = document.getElementById('exerciseFeedback');
+    
+    if (!feedback) return;
+    
+    let hint = '';
+    switch(operation) {
+        case 'addition':
+            hint = `💡 Dica: ${num1} + ${num2} = ${num1 + num2}. Tente pensar em ${num1} mais ${num2} unidades.`;
+            break;
+        case 'subtraction':
+            hint = `💡 Dica: ${num1} - ${num2} = ${num1 - num2}. Comece de ${num1} e conte para trás ${num2} unidades.`;
+            break;
+        case 'multiplication':
+            hint = `💡 Dica: ${num1} × ${num2} = ${num1} repetido ${num2} vezes (${Array(num2).fill(num1).join(' + ')})`;
+            break;
+        case 'division':
+            hint = `💡 Dica: ${num1} ÷ ${num2} = ${answer}. Quantos grupos de ${num2} cabem em ${num1}?`;
+            break;
+    }
+    
+    feedback.textContent = hint;
+    feedback.className = 'exercise-feedback info';
+}
+
+// ============================================
+// SEÇÃO JOGOS
+// ============================================
+
 function loadGamesSection() {
     const section = document.getElementById('games');
     
@@ -1363,6 +1560,7 @@ function loadGamesSection() {
                 <div class="game-welcome">
                     <h3>Selecione um jogo para começar!</h3>
                     <p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
+                    <p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
                 </div>
             </div>
         </div>
@@ -1370,6 +1568,7 @@ function loadGamesSection() {
     
     section.innerHTML = content;
     
+    // Configurar eventos dos jogos
     document.querySelectorAll('.btn-game').forEach(button => {
         button.addEventListener('click', function() {
             const gameId = this.closest('.game-card').id;
@@ -1378,7 +1577,6 @@ function loadGamesSection() {
     });
 }
 
-// Iniciar jogo
 function startGame(gameId) {
     currentGame = gameId;
     const gameContainer = document.getElementById('gameContainer');
@@ -1443,11 +1641,6 @@ function startGame(gameId) {
                 </div>
             </div>
             
-            <div class="game-answer-container">
-                <input type="number" id="gameAnswerInput" class="game-answer-input" placeholder="Digite sua resposta" autofocus>
-                <button id="submitGameAnswer" class="btn-game-submit">Responder</button>
-            </div>
-            
             <div class="game-controls">
                 <button class="btn-game-control" id="startGameBtn">
                     <i class="fas fa-play"></i> Iniciar Jogo
@@ -1455,40 +1648,42 @@ function startGame(gameId) {
                 <button class="btn-game-control secondary" id="endGameBtn" disabled>
                     <i class="fas fa-stop"></i> Parar Jogo
                 </button>
+                <button class="btn-game-control outline" id="howToPlayBtn">
+                    <i class="fas fa-question-circle"></i> Como Jogar
+                </button>
             </div>
             
             <div class="game-feedback" id="gameFeedback"></div>
         </div>
     `;
     
+    // Configurar eventos do jogo
     setupGameEvents(gameId);
 }
 
-// Configurar eventos do jogo
 function setupGameEvents(gameId) {
     document.getElementById('startGameBtn').addEventListener('click', () => startGameSession(gameId));
     document.getElementById('endGameBtn').addEventListener('click', endGame);
-    document.getElementById('submitGameAnswer').addEventListener('click', checkGameAnswer);
-    document.getElementById('gameAnswerInput').addEventListener('keyup', (e) => {
-        if (e.key === 'Enter') checkGameAnswer();
-    });
+    document.getElementById('howToPlayBtn').addEventListener('click', showHowToPlay);
 }
 
-// Iniciar sessão do jogo
 function startGameSession(gameId) {
     gameActive = true;
     gameScore = 0;
     gameTimeLeft = gameId === 'lightningGame' ? 60 : gameId === 'divisionPuzzle' ? 120 : 90;
     
+    // Atualizar UI
     document.getElementById('startGameBtn').disabled = true;
     document.getElementById('endGameBtn').disabled = false;
     document.getElementById('gameScore').textContent = gameScore;
     
+    // Iniciar timer
     gameTimer = setInterval(updateGameTimer, 1000);
+    
+    // Gerar primeiro exercício
     generateGameExercise(gameId);
 }
 
-// Atualizar timer do jogo
 function updateGameTimer() {
     gameTimeLeft--;
     document.getElementById('gameTimer').textContent = gameTimeLeft + 's';
@@ -1498,14 +1693,16 @@ function updateGameTimer() {
     }
 }
 
-// Gerar exercício do jogo
 function generateGameExercise(gameId) {
     if (!gameActive) return;
     
     let question, answer;
+    const gameExercise = document.getElementById('gameExercise');
+    const gameQuestion = document.getElementById('gameQuestion');
     
     switch(gameId) {
         case 'lightningGame':
+            // Multiplicação
             const num1 = getRandomInt(1, 12);
             const num2 = getRandomInt(1, 12);
             question = `${num1} × ${num2} = ?`;
@@ -1513,6 +1710,7 @@ function generateGameExercise(gameId) {
             break;
             
         case 'divisionPuzzle':
+            // Divisão
             const divisor = getRandomInt(2, 12);
             const quotient = getRandomInt(2, 12);
             const dividend = divisor * quotient;
@@ -1521,6 +1719,7 @@ function generateGameExercise(gameId) {
             break;
             
         case 'mathChampionship':
+            // Operação mista
             const operations = ['+', '-', '×', '÷'];
             const operation = operations[Math.floor(Math.random() * operations.length)];
             
@@ -1545,14 +1744,30 @@ function generateGameExercise(gameId) {
             break;
     }
     
-    currentExercise = { question, answer, gameId };
+    currentExercise = {
+        question: question,
+        answer: answer,
+        gameId: gameId
+    };
     
-    document.getElementById('gameQuestion').innerHTML = `<h4>${question}</h4>`;
-    document.getElementById('gameAnswerInput').value = '';
+    gameQuestion.innerHTML = `
+        <h4>${question}</h4>
+        <div class="game-answer-input">
+            <input type="number" id="gameAnswerInput" placeholder="?" autofocus>
+            <button id="submitGameAnswer">Responder</button>
+        </div>
+    `;
+    
+    // Configurar evento de resposta
+    document.getElementById('submitGameAnswer').addEventListener('click', checkGameAnswer);
+    document.getElementById('gameAnswerInput').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') checkGameAnswer();
+    });
+    
+    // Focar no input
     document.getElementById('gameAnswerInput').focus();
 }
 
-// Verificar resposta do jogo
 function checkGameAnswer() {
     if (!gameActive) return;
     
@@ -1567,22 +1782,28 @@ function checkGameAnswer() {
     }
     
     if (userAnswer === currentExercise.answer) {
+        // Resposta correta
         gameScore += 10;
         document.getElementById('gameScore').textContent = gameScore;
         feedback.textContent = '🎉 Correto! +10 pontos';
         feedback.className = 'game-feedback success';
         
+        // Adicionar tempo extra para respostas rápidas
         if (gameTimeLeft < 60) {
             gameTimeLeft += 2;
             feedback.textContent += ' (+2s)';
         }
     } else {
+        // Resposta incorreta
         feedback.textContent = `❌ Errado! A resposta correta é ${currentExercise.answer}`;
         feedback.className = 'game-feedback error';
+        
+        // Penalidade de tempo
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
     }
     
+    // Gerar próximo exercício após 1 segundo
     setTimeout(() => {
         if (gameActive) {
             generateGameExercise(currentExercise.gameId);
@@ -1591,11 +1812,26 @@ function checkGameAnswer() {
     }, 1000);
 }
 
-// Encerrar jogo
+function showHowToPlay() {
+    const feedback = document.getElementById('gameFeedback');
+    feedback.innerHTML = `
+        <h4>Como Jogar:</h4>
+        <ul>
+            <li>Resolva os exercícios matemáticos o mais rápido possível</li>
+            <li>Cada resposta correta vale 10 pontos</li>
+            <li>Respostas rápidas podem ganhar tempo extra</li>
+            <li>Respostas erradas perdem 5 segundos</li>
+            <li>Tente bater seu recorde!</li>
+        </ul>
+    `;
+    feedback.className = 'game-feedback info';
+}
+
 function endGame() {
     gameActive = false;
     clearInterval(gameTimer);
     
+    // Atualizar UI
     document.getElementById('startGameBtn').disabled = false;
     document.getElementById('endGameBtn').disabled = true;
     
@@ -1606,6 +1842,7 @@ function endGame() {
         <div class="game-result">
             <h4>Fim do Jogo!</h4>
             <p>Sua pontuação: <strong>${gameScore}</strong> pontos</p>
+            <p>Respostas corretas: <strong>${Math.floor(gameScore / 10)}</strong></p>
             <p>Tempo restante: <strong>${gameTimeLeft}</strong> segundos</p>
         </div>
     `;
@@ -1613,6 +1850,7 @@ function endGame() {
     feedback.textContent = 'Clique em "Iniciar Jogo" para jogar novamente!';
     feedback.className = 'game-feedback info';
     
+    // Atualizar recorde se necessário
     if (gameScore > gameHighScore) {
         gameHighScore = gameScore;
         localStorage.setItem(`mathkids_highscore_${currentGame}`, gameHighScore);
@@ -1620,10 +1858,14 @@ function endGame() {
         showToast(`🎉 Novo recorde! ${gameHighScore} pontos`, 'success');
     }
     
+    // Adicionar atividade
     addActivity(`Jogo "${getGameName(currentGame)}" finalizado com ${gameScore} pontos`, 'game');
 }
 
-// Carregar seção de progresso
+// ============================================
+// SEÇÃO PROGRESSO
+// ============================================
+
 function loadProgressSection() {
     const section = document.getElementById('progress');
     
@@ -1674,17 +1916,90 @@ function loadProgressSection() {
                     </div>
                 </div>
             </div>
+            
+            <div class="progress-badges">
+                <h3><i class="fas fa-award"></i> Conquistas</h3>
+                <div class="badges-grid" id="badgesGrid">
+                    ${generateBadges()}
+                </div>
+            </div>
         </div>
     `;
     
     section.innerHTML = content;
+    
+    // Inicializar gráfico
     initializeOperationsChart();
 }
 
-// Inicializar gráfico de operações
+function generateActivitiesTimeline() {
+    const activities = userProgress.lastActivities.slice(0, 10);
+    let html = '';
+    
+    if (activities.length === 0) {
+        html = '<p class="text-center">Nenhuma atividade registrada ainda.</p>';
+    } else {
+        activities.forEach(activity => {
+            const icon = activity.type === 'correct' ? 'fa-check' :
+                        activity.type === 'wrong' ? 'fa-times' :
+                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info';
+            
+            const iconClass = activity.type === 'correct' ? 'success' :
+                             activity.type === 'wrong' ? 'error' : 'info';
+            
+            html += `
+                <div class="timeline-item">
+                    <div class="timeline-marker ${iconClass}">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <p>${activity.description}</p>
+                        <small>${formatTimeAgo(activity.timestamp)}</small>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    return html;
+}
+
+function generateBadges() {
+    const badges = [
+        { id: 'beginner', name: 'Iniciante', description: 'Primeiro login', earned: true },
+        { id: 'exercises10', name: 'Aprendiz', description: '10 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 10 },
+        { id: 'exercises50', name: 'Estudante', description: '50 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 50 },
+        { id: 'accuracy80', name: 'Preciso', description: '80% de acertos', earned: ((userProgress.correctAnswers / userProgress.totalAnswers) || 0) >= 0.8 },
+        { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true },
+        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 }
+    ];
+    
+    let html = '';
+    badges.forEach(badge => {
+        html += `
+            <div class="badge-item ${badge.earned ? 'earned' : 'locked'}">
+                <div class="badge-icon">
+                    <i class="fas fa-${badge.earned ? 'award' : 'lock'}"></i>
+                </div>
+                <div class="badge-info">
+                    <h4>${badge.name}</h4>
+                    <p>${badge.description}</p>
+                </div>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
 function initializeOperationsChart() {
     const ctx = document.getElementById('operationsChart');
     if (!ctx) return;
+    
+    // Destruir gráfico anterior se existir
+    if (window.operationsChart instanceof Chart) {
+        window.operationsChart.destroy();
+    }
     
     const operations = ['Adição', 'Subtração', 'Multiplicação', 'Divisão'];
     const correct = [
@@ -1703,7 +2018,7 @@ function initializeOperationsChart() {
     
     const accuracy = total.map((t, i) => t > 0 ? Math.round((correct[i] / t) * 100) : 0);
     
-    new Chart(ctx.getContext('2d'), {
+    window.operationsChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: operations,
@@ -1728,7 +2043,8 @@ function initializeOperationsChart() {
                     type: 'line',
                     borderColor: 'rgb(34, 197, 94)',
                     backgroundColor: 'transparent',
-                    yAxisID: 'y1'
+                    yAxisID: 'y1',
+                    tension: 0.4
                 }
             ]
         },
@@ -1750,6 +2066,9 @@ function initializeOperationsChart() {
                     title: {
                         display: true,
                         text: 'Acurácia (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
                     }
                 }
             }
@@ -1757,7 +2076,10 @@ function initializeOperationsChart() {
     });
 }
 
-// Carregar seção de administração
+// ============================================
+// SEÇÃO ADMINISTRAÇÃO
+// ============================================
+
 function loadAdminSection() {
     if (!currentUser || currentUser.role !== 'admin') {
         switchSection('dashboard');
@@ -1805,22 +2127,28 @@ function loadAdminSection() {
                             <p>Exercícios Resolvidos</p>
                         </div>
                     </div>
+                    <div class="admin-stat">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="systemAccuracy">78%</h3>
+                            <p>Taxa de Acerto Geral</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="admin-tabs">
                     <div class="tab-headers">
                         <button class="tab-header active" data-tab="users">Gerenciar Usuários</button>
                         <button class="tab-header" data-tab="reports">Relatórios</button>
-                        <button class="tab-header" data-tab="settings">Configurações</button>
+                        <button class="tab-header" data-tab="settings">Configurações do Sistema</button>
                     </div>
                     
                     <div class="tab-content active" id="usersTab">
                         <div class="tab-actions">
                             <button class="btn-admin" id="refreshUsers">
                                 <i class="fas fa-sync-alt"></i> Atualizar
-                            </button>
-                            <button class="btn-admin primary" id="addUser">
-                                <i class="fas fa-user-plus"></i> Adicionar Usuário
                             </button>
                             <div class="search-box">
                                 <i class="fas fa-search"></i>
@@ -1892,6 +2220,26 @@ function loadAdminSection() {
                                 </div>
                             </div>
                             
+                            <div class="setting-group">
+                                <h4><i class="fas fa-gamepad"></i> Jogos</h4>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="enableGames" checked>
+                                        Habilitar jogos
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="setting-group">
+                                <h4><i class="fas fa-bell"></i> Notificações</h4>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="systemNotifications" checked>
+                                        Notificações do sistema
+                                    </label>
+                                </div>
+                            </div>
+                            
                             <button class="btn-admin primary" id="saveSettings">
                                 <i class="fas fa-save"></i> Salvar Configurações
                             </button>
@@ -1903,16 +2251,19 @@ function loadAdminSection() {
     `;
     
     section.innerHTML = content;
+    
+    // Configurar eventos de administração
     setupAdminEvents();
     loadUsersTable();
 }
 
-// Configurar eventos de administração
 function setupAdminEvents() {
+    // Tabs
     document.querySelectorAll('.tab-header').forEach(tab => {
         tab.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
             
+            // Atualizar tabs ativas
             document.querySelectorAll('.tab-header').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
             
@@ -1921,17 +2272,17 @@ function setupAdminEvents() {
         });
     });
     
+    // Botões
     document.getElementById('refreshUsers')?.addEventListener('click', loadUsersTable);
-    document.getElementById('addUser')?.addEventListener('click', showAddUserModal);
     document.getElementById('generateReport')?.addEventListener('click', generateReport);
     document.getElementById('saveSettings')?.addEventListener('click', saveSystemSettings);
     
+    // Busca de usuários
     document.getElementById('searchUsers')?.addEventListener('input', function(e) {
         filterUsersTable(e.target.value);
     });
 }
 
-// Carregar tabela de usuários
 async function loadUsersTable() {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -1946,17 +2297,20 @@ async function loadUsersTable() {
         let users = [];
         
         if (db) {
+            // Firebase
             const snapshot = await db.collection('users').get();
             users = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
         } else {
+            // Modo demo
             const demoUser = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
             if (demoUser.id) {
                 users = [demoUser];
             }
             
+            // Adicionar mais usuários de exemplo
             for (let i = 1; i <= 5; i++) {
                 users.push({
                     id: `demo_student_${i}`,
@@ -1981,7 +2335,6 @@ async function loadUsersTable() {
     }
 }
 
-// Renderizar tabela de usuários
 function renderUsersTable(users) {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -1997,6 +2350,7 @@ function renderUsersTable(users) {
     
     let html = '';
     users.forEach(user => {
+        // Não mostrar o próprio usuário admin atual
         if (user.id === currentUser?.id) return;
         
         const name = user.name || 'Sem nome';
@@ -2015,6 +2369,9 @@ function renderUsersTable(users) {
                 <td><span class="status ${statusClass}">${status}</span></td>
                 <td>
                     <div class="user-actions">
+                        <button class="btn-action edit" data-user="${user.id}" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
                         <button class="btn-action delete" data-user="${user.id}" title="Excluir">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -2030,22 +2387,46 @@ function renderUsersTable(users) {
         </tr>
     `;
     
+    // Configurar eventos dos botões de ação
     setupUserActionButtons();
 }
 
-// Configurar botões de ação de usuários
 function setupUserActionButtons() {
+    document.querySelectorAll('.btn-action.edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user');
+            editUser(userId);
+        });
+    });
+    
     document.querySelectorAll('.btn-action.delete').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user');
-            if (confirm('Tem certeza que deseja excluir este usuário?')) {
-                deleteUser(userId);
-            }
+            deleteUser(userId);
         });
     });
 }
 
-// Filtrar tabela de usuários
+async function editUser(userId) {
+    showToast('Funcionalidade de edição em desenvolvimento.', 'info');
+}
+
+async function deleteUser(userId) {
+    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    
+    try {
+        if (db) {
+            await db.collection('users').doc(userId).delete();
+        }
+        
+        showToast('Usuário excluído com sucesso.', 'success');
+        loadUsersTable();
+    } catch (error) {
+        console.error('Erro ao excluir usuário:', error);
+        showToast('Erro ao excluir usuário.', 'error');
+    }
+}
+
 function filterUsersTable(searchTerm) {
     const rows = document.querySelectorAll('#usersTableBody tr');
     
@@ -2055,22 +2436,6 @@ function filterUsersTable(searchTerm) {
     });
 }
 
-// Excluir usuário
-async function deleteUser(userId) {
-    try {
-        if (db) {
-            await db.collection('users').doc(userId).delete();
-        }
-        
-        showToast('Usuário excluído com sucesso!', 'success');
-        loadUsersTable();
-    } catch (error) {
-        console.error('Erro ao excluir usuário:', error);
-        showToast('Erro ao excluir usuário.', 'error');
-    }
-}
-
-// Gerar relatório
 function generateReport() {
     const reportType = document.getElementById('reportType').value;
     const reportPeriod = document.getElementById('reportPeriod').value;
@@ -2085,6 +2450,7 @@ function generateReport() {
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
                     <p>📊 Total de exercícios concluídos: ${systemStats.totalExercises}</p>
+                    <p>🎯 Taxa média de acerto: 78%</p>
                     <p>👥 Alunos ativos: ${systemStats.totalStudents}</p>
                     <p>⏰ Tempo médio de prática: 45 minutos/aluno</p>
                 </div>
@@ -2097,8 +2463,9 @@ function generateReport() {
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
                     <p>👥 Usuários totais: ${systemStats.totalUsers}</p>
-                    <p>📈 Novos cadastros: ${Math.floor(systemStats.totalUsers * 0.1)}</p>
+                    <p>📈 Novos cadastros: 12</p>
                     <p>🎮 Jogos mais jogados: Desafio Relâmpago</p>
+                    <p>📱 Dispositivos mais usados: Desktop (65%), Mobile (35%)</p>
                 </div>
             `;
             break;
@@ -2108,10 +2475,10 @@ function generateReport() {
                 <h4>Relatório de Desempenho por Operação</h4>
                 <p>Período: ${getPeriodName(reportPeriod)}</p>
                 <div class="report-data">
-                    <p>➕ Adição: ${calculateOperationAccuracy('addition')}% de acerto</p>
-                    <p>➖ Subtração: ${calculateOperationAccuracy('subtraction')}% de acerto</p>
-                    <p>✖️ Multiplicação: ${calculateOperationAccuracy('multiplication')}% de acerto</p>
-                    <p>➗ Divisão: ${calculateOperationAccuracy('division')}% de acerto</p>
+                    <p>➕ Adição: 85% de acerto</p>
+                    <p>➖ Subtração: 82% de acerto</p>
+                    <p>✖️ Multiplicação: 75% de acerto</p>
+                    <p>➗ Divisão: 70% de acerto</p>
                 </div>
             `;
             break;
@@ -2121,23 +2488,21 @@ function generateReport() {
     showToast('Relatório gerado com sucesso!', 'success');
 }
 
-// Calcular acurácia da operação
-function calculateOperationAccuracy(operation) {
-    const opData = userProgress[operation] || { correct: 0, total: 0 };
-    return opData.total > 0 ? Math.round((opData.correct / opData.total) * 100) : 0;
-}
-
-// Salvar configurações do sistema
 function saveSystemSettings() {
     const settings = {
-        allowRegistrations: document.getElementById('allowRegistrations').checked
+        allowRegistrations: document.getElementById('allowRegistrations').checked,
+        enableGames: document.getElementById('enableGames').checked,
+        systemNotifications: document.getElementById('systemNotifications').checked
     };
     
     localStorage.setItem('mathkids_system_settings', JSON.stringify(settings));
     showToast('Configurações salvas com sucesso!', 'success');
 }
 
-// Funções auxiliares
+// ============================================
+// FUNÇÕES AUXILIARES
+// ============================================
+
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -2150,16 +2515,6 @@ function getOperationName(operation) {
         division: 'Divisão'
     };
     return names[operation] || operation;
-}
-
-function getOperationDescription(operation) {
-    const descriptions = {
-        addition: 'Some números e encontre o total',
-        subtraction: 'Encontre a diferença entre números',
-        multiplication: 'Domine as tabuadas e multiplicações',
-        division: 'Aprenda a dividir igualmente'
-    };
-    return descriptions[operation] || '';
 }
 
 function getOperationIcon(operation) {
@@ -2218,43 +2573,13 @@ function formatTimeAgo(timestamp) {
     return time.toLocaleDateString('pt-BR');
 }
 
-function generateActivitiesTimeline() {
-    const activities = userProgress.lastActivities.slice(0, 10);
-    let html = '';
-    
-    if (activities.length === 0) {
-        html = '<p class="text-center">Nenhuma atividade registrada ainda.</p>';
-    } else {
-        activities.forEach(activity => {
-            const icon = activity.type === 'correct' ? 'fa-check' :
-                        activity.type === 'wrong' ? 'fa-times' :
-                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info';
-            
-            const iconClass = activity.type === 'correct' ? 'success' :
-                             activity.type === 'wrong' ? 'error' : 'info';
-            
-            html += `
-                <div class="timeline-item">
-                    <div class="timeline-marker ${iconClass}">
-                        <i class="fas ${icon}"></i>
-                    </div>
-                    <div class="timeline-content">
-                        <p>${activity.description}</p>
-                        <small>${formatTimeAgo(activity.timestamp)}</small>
-                    </div>
-                </div>
-            `;
-        });
-    }
-    
-    return html;
-}
-
 function openModal(modalId) {
     const modal = document.getElementById(modalId + 'Modal');
     if (modal) {
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        
+        // Carregar conteúdo do modal
         loadModalContent(modalId);
     }
 }
@@ -2281,79 +2606,185 @@ function loadModalContent(modalId) {
     }
 }
 
-function showAddUserModal() {
-    const name = prompt('Nome do usuário:');
-    if (!name) return;
+function loadProfileModal(container) {
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
+        : 0;
     
-    const email = prompt('Email do usuário:');
-    if (!email) return;
-    
-    const role = prompt('Tipo (student/admin):', 'student');
-    if (!['student', 'admin'].includes(role)) return;
-    
-    const password = prompt('Senha inicial:');
-    if (!password || password.length < 6) {
-        showToast('Senha deve ter pelo menos 6 caracteres.', 'error');
-        return;
-    }
-    
-    handleAdminUserCreation(name, email, password, role);
+    container.innerHTML = `
+        <div class="profile-content">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <span>${getInitials(currentUser.name)}</span>
+                </div>
+                <div class="profile-info">
+                    <h4>${currentUser.name}</h4>
+                    <p>${currentUser.email}</p>
+                    <span class="profile-badge ${currentUser.role}">${currentUser.role === 'admin' ? 'Administrador' : 'Aluno'}</span>
+                </div>
+            </div>
+            
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <h5>Exercícios Concluídos</h5>
+                    <p>${userProgress.exercisesCompleted}</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Taxa de Acerto</h5>
+                    <p>${accuracy}%</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Tempo de Prática</h5>
+                    <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <button class="btn-profile" id="editProfile">
+                    <i class="fas fa-edit"></i> Editar Perfil
+                </button>
+            </div>
+        </div>
+    `;
 }
 
-async function handleAdminUserCreation(name, email, password, role) {
-    showLoading(true);
+function loadSettingsModal(container) {
+    const settings = currentUser.settings || {
+        theme: 'light',
+        notifications: true,
+        sound: true,
+        music: false,
+        progressNotifications: true
+    };
     
-    try {
-        let userId;
-        
-        if (auth) {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            userId = userCredential.user.uid;
-        } else {
-            userId = 'admin_' + Date.now();
-        }
-        
-        const userData = {
-            name,
-            email,
-            role,
-            createdAt: new Date().toISOString(),
-            verified: true,
-            progress: userProgress
-        };
-        
-        if (db) {
-            await db.collection('users').doc(userId).set(userData);
-        } else {
-            showToast('Usuário criado (modo demo)', 'success');
-        }
-        
-        showLoading(false);
-        showToast('Usuário criado com sucesso!', 'success');
-        loadUsersTable();
-        
-    } catch (error) {
-        showLoading(false);
-        handleAuthError(error);
+    container.innerHTML = `
+        <div class="settings-content">
+            <div class="setting-group">
+                <h4><i class="fas fa-palette"></i> Aparência</h4>
+                <div class="setting">
+                    <label>Tema:</label>
+                    <select id="themeSelect">
+                        <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Claro</option>
+                        <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Escuro</option>
+                        <option value="auto" ${settings.theme === 'auto' ? 'selected' : ''}>Automático</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="setting-group">
+                <h4><i class="fas fa-volume-up"></i> Som</h4>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="soundEffects" ${settings.sound ? 'checked' : ''}>
+                        Efeitos sonoros
+                    </label>
+                </div>
+            </div>
+            
+            <div class="setting-group">
+                <h4><i class="fas fa-bell"></i> Notificações</h4>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="notificationsEnabled" ${settings.notifications ? 'checked' : ''}>
+                        Permitir notificações
+                    </label>
+                </div>
+            </div>
+            
+            <div class="settings-actions">
+                <button class="btn-settings primary" id="saveUserSettings">
+                    <i class="fas fa-save"></i> Salvar Configurações
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Configurar eventos
+    document.getElementById('saveUserSettings').addEventListener('click', saveUserSettings);
+}
+
+function saveUserSettings() {
+    const settings = {
+        theme: document.getElementById('themeSelect').value,
+        sound: document.getElementById('soundEffects').checked,
+        notifications: document.getElementById('notificationsEnabled').checked
+    };
+    
+    // Atualizar no usuário atual
+    currentUser.settings = settings;
+    userData.settings = settings;
+    
+    // Salvar localmente
+    if (currentUser.id) {
+        const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
+        user.settings = settings;
+        localStorage.setItem('mathkids_user', JSON.stringify(user));
     }
+    
+    // Aplicar tema
+    if (settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+    
+    showToast('Configurações salvas com sucesso!', 'success');
+}
+
+function loadNotifications() {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+    
+    const notifications = [
+        { id: 1, title: 'Bem-vindo ao MathKids Pro!', message: 'Comece a aprender matemática de forma divertida.', time: 'Agora', read: false },
+        { id: 2, title: 'Novo desafio disponível', message: 'Tente o Desafio Relâmpago de Multiplicação!', time: '5 min atrás', read: false },
+        { id: 3, title: 'Parabéns!', message: 'Você completou 10 exercícios.', time: 'Ontem', read: true }
+    ];
+    
+    let html = '';
+    let unreadCount = 0;
+    
+    notifications.forEach(notification => {
+        if (!notification.read) unreadCount++;
+        
+        html += `
+            <div class="notification-item ${notification.read ? 'read' : 'unread'}">
+                <div class="notification-icon">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <div class="notification-content">
+                    <h5>${notification.title}</h5>
+                    <p>${notification.message}</p>
+                    <small>${notification.time}</small>
+                </div>
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html || '<p class="text-center">Nenhuma notificação</p>';
+    document.getElementById('notificationCount').textContent = unreadCount;
 }
 
 function addActivity(description, type = 'info') {
     const activity = {
         id: Date.now(),
-        description,
-        type,
+        description: description,
+        type: type,
         timestamp: new Date().toISOString()
     };
     
+    // Adicionar ao início da lista
     userProgress.lastActivities.unshift(activity);
     
+    // Manter apenas as últimas 20 atividades
     if (userProgress.lastActivities.length > 20) {
         userProgress.lastActivities = userProgress.lastActivities.slice(0, 20);
     }
     
+    // Atualizar localStorage
     saveUserProgress();
     
+    // Atualizar lista de atividades se estiver visível
     if (currentSection === 'dashboard') {
         loadRecentActivities();
     }
@@ -2366,18 +2797,21 @@ function addActivity(description, type = 'info') {
 function saveUserProgress() {
     if (!currentUser) return;
     
+    // Atualizar level baseado no progresso
     const totalExercises = userProgress.exercisesCompleted || 0;
     if (totalExercises >= 200) userProgress.level = 'Mestre';
     else if (totalExercises >= 100) userProgress.level = 'Avançado';
     else if (totalExercises >= 50) userProgress.level = 'Intermediário';
     else userProgress.level = 'Iniciante';
     
+    // Salvar localmente
     if (currentUser.id) {
         const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
         user.progress = userProgress;
         localStorage.setItem('mathkids_user', JSON.stringify(user));
     }
     
+    // Salvar no Firebase se disponível
     if (db && currentUser.id) {
         db.collection('users').doc(currentUser.id).update({
             progress: userProgress
@@ -2392,21 +2826,22 @@ function showToast(message, type = 'info') {
     toast.className = `toast ${type}`;
     toast.innerHTML = `
         <div class="toast-icon">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
         </div>
         <div class="toast-content">
             <p>${message}</p>
-            <small>Agora</small>
         </div>
         <button class="toast-close">&times;</button>
     `;
     
     toastContainer.appendChild(toast);
     
+    // Configurar fechamento
     toast.querySelector('.toast-close').addEventListener('click', () => {
         toast.remove();
     });
     
+    // Remover automaticamente após 5 segundos
     setTimeout(() => {
         if (toast.parentNode) {
             toast.remove();
@@ -2423,12 +2858,17 @@ function showLoading(show) {
 }
 
 function handleAuthError(error) {
+    console.error('Auth error:', error);
+    
     let message = 'Erro na autenticação. Tente novamente.';
     
     if (error.code) {
         switch(error.code) {
             case 'auth/invalid-email':
                 message = 'Email inválido.';
+                break;
+            case 'auth/user-disabled':
+                message = 'Esta conta foi desativada.';
                 break;
             case 'auth/user-not-found':
                 message = 'Usuário não encontrado.';
@@ -2442,6 +2882,12 @@ function handleAuthError(error) {
             case 'auth/weak-password':
                 message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
                 break;
+            case 'auth/operation-not-allowed':
+                message = 'Operação não permitida.';
+                break;
+            case 'auth/too-many-requests':
+                message = 'Muitas tentativas. Tente novamente mais tarde.';
+                break;
         }
     }
     
@@ -2449,29 +2895,7 @@ function handleAuthError(error) {
 }
 
 function initializeComponents() {
-    const tooltips = document.querySelectorAll('[title]');
-    tooltips.forEach(element => {
-        element.addEventListener('mouseenter', function(e) {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.textContent = this.getAttribute('title');
-            document.body.appendChild(tooltip);
-            
-            const rect = this.getBoundingClientRect();
-            tooltip.style.left = rect.left + (rect.width / 2) + 'px';
-            tooltip.style.top = rect.top - tooltip.offsetHeight - 10 + 'px';
-            
-            this._tooltip = tooltip;
-        });
-        
-        element.addEventListener('mouseleave', function() {
-            if (this._tooltip) {
-                this._tooltip.remove();
-                delete this._tooltip;
-            }
-        });
-    });
-    
+    // Detectar tema do sistema
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     prefersDark.addEventListener('change', (e) => {
         const settings = currentUser?.settings || { theme: 'auto' };
@@ -2481,10 +2905,14 @@ function initializeComponents() {
     });
 }
 
-// Modo de demonstração
+// ============================================
+// MODO DE DEMONSTRAÇÃO
+// ============================================
+
 function setupDemoMode() {
     console.log('Modo de demonstração ativado');
     
+    // Criar dados de demonstração
     userProgress = {
         exercisesCompleted: 15,
         correctAnswers: 12,
@@ -2496,9 +2924,11 @@ function setupDemoMode() {
         division: { correct: 2, total: 3 },
         lastActivities: [
             { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
-            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() }
+            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
+            { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() }
         ],
         level: 'Iniciante',
+        badges: [],
         dailyProgress: {
             exercises: 6,
             correct: 5,
@@ -2506,8 +2936,10 @@ function setupDemoMode() {
         }
     };
     
+    // Verificar se admin existe localmente
     adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
     
+    // Estatísticas do sistema em modo demo
     systemStats = {
         totalStudents: 1250,
         averageRating: 4.8,
@@ -2520,6 +2952,7 @@ function setupDemoMode() {
 }
 
 async function handleDemoLogin(email, password) {
+    // Verificar credenciais de demonstração
     const demoUsers = {
         'admin@mathkids.com': { password: 'admin123', role: 'admin', name: 'Administrador Demo' },
         'aluno@mathkids.com': { password: 'aluno123', role: 'student', name: 'Aluno Demo' }
@@ -2532,10 +2965,15 @@ async function handleDemoLogin(email, password) {
             name: user.name,
             email: email,
             role: user.role,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
             progress: userProgress,
             settings: {
                 theme: 'light',
-                notifications: true
+                notifications: true,
+                sound: true,
+                music: false,
+                progressNotifications: true
             }
         };
         
@@ -2547,22 +2985,13 @@ async function handleDemoLogin(email, password) {
     }
 }
 
-// Inicializar Firebase
-try {
-    app = firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    analytics = firebase.analytics();
-    loadSystemStats();
-} catch (error) {
-    console.log("Firebase não configurado. Modo de demonstração ativado.");
-    setupDemoMode();
-}
+// ============================================
+// FUNÇÕES GLOBAIS
+// ============================================
 
-// Funções para uso global
 window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
 
-console.log('MathKids Pro v3.1 carregado com sucesso!');
+console.log('MathKids Pro v3.0 carregado com sucesso!');
