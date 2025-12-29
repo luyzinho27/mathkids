@@ -7,14 +7,12 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 </head>
 <body>
-    <!-- Tela de Introdução / Autenticação -->
     <div id="authScreen" class="auth-screen">
         <div class="auth-container">
             <div class="auth-header">
@@ -64,22 +62,22 @@
                     </div>
                     
                     <div class="features-grid">
-                        <div class="feature">
+                        <div class="feature" data-target="games">
                             <i class="fas fa-gamepad"></i>
                             <h4>Jogos Educativos</h4>
                             <p>Diversão garantida enquanto aprende</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" data-target="progress">
                             <i class="fas fa-chart-line"></i>
                             <h4>Acompanhamento</h4>
                             <p>Veja sua evolução no aprendizado</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" data-target="practice">
                             <i class="fas fa-trophy"></i>
                             <h4>Desafios</h4>
                             <p>Conquiste medalhas e reconhecimento</p>
                         </div>
-                        <div class="feature">
+                        <div class="feature" data-target="community">
                             <i class="fas fa-users"></i>
                             <h4>Comunidade</h4>
                             <p>Aprenda com outros estudantes</p>
@@ -88,7 +86,6 @@
                 </div>
                 
                 <div class="auth-forms">
-                    <!-- Formulário de Login -->
                     <div id="loginForm" class="auth-form active">
                         <div class="form-header">
                             <h3><i class="fas fa-sign-in-alt"></i> Fazer Login</h3>
@@ -132,7 +129,6 @@
                         </div>
                     </div>
                     
-                    <!-- Formulário de Cadastro -->
                     <div id="registerForm" class="auth-form">
                         <div class="form-header">
                             <h3><i class="fas fa-user-plus"></i> Criar Conta</h3>
@@ -207,7 +203,6 @@
                         </div>
                     </div>
                     
-                    <!-- Formulário de Recuperação de Senha -->
                     <div id="recoverForm" class="auth-form">
                         <div class="form-header">
                             <h3><i class="fas fa-key"></i> Recuperar Senha</h3>
@@ -251,9 +246,7 @@
         </div>
     </div>
 
-    <!-- Aplicação Principal (após login) -->
     <div id="appScreen" class="app-screen">
-        <!-- Header -->
         <header class="app-header">
             <div class="container">
                 <div class="header-left">
@@ -356,7 +349,6 @@
             </div>
         </header>
 
-        <!-- Sidebar Mobile -->
         <div class="sidebar-mobile" id="mobileSidebar">
             <div class="sidebar-header">
                 <div class="user-info">
@@ -419,10 +411,8 @@
         </div>
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-        <!-- Conteúdo Principal -->
         <main class="app-main">
             <div class="container">
-                <!-- Dashboard -->
                 <section id="dashboard" class="app-section active">
                     <div class="section-header">
                         <div class="header-content">
@@ -438,7 +428,6 @@
                     </div>
                     
                     <div class="dashboard-content">
-                        <!-- Estatísticas Rápidas -->
                         <div class="stats-grid">
                             <div class="stat-card primary">
                                 <div class="stat-icon">
@@ -495,7 +484,6 @@
                         </div>
                         
                         <div class="content-grid">
-                            <!-- Atividades Recentes -->
                             <div class="card recent-activities">
                                 <div class="card-header">
                                     <h3><i class="fas fa-history"></i> Atividades Recentes</h3>
@@ -503,12 +491,10 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="activities-list" id="activitiesList">
-                                        <!-- Atividades serão carregadas aqui -->
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- Operações para Praticar -->
                             <div class="card practice-quick">
                                 <div class="card-header">
                                     <h3><i class="fas fa-bolt"></i> Praticar Agora</h3>
@@ -544,7 +530,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Próximos Desafios -->
                             <div class="card next-challenges">
                                 <div class="card-header">
                                     <h3><i class="fas fa-flag-checkered"></i> Seus Desafios</h3>
@@ -552,12 +537,10 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="challenges-list" id="challengesList">
-                                        <!-- Desafios serão carregados aqui -->
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- Progresso do Dia -->
                             <div class="card daily-progress">
                                 <div class="card-header">
                                     <h3><i class="fas fa-chart-bar"></i> Progresso Hoje</h3>
@@ -592,7 +575,6 @@
                     </div>
                 </section>
                 
-                <!-- Seção Aprender -->
                 <section id="learn" class="app-section">
                     <div class="section-header">
                         <div class="header-content">
@@ -603,10 +585,8 @@
                     
                     <div class="learn-content">
                         <div class="lessons-grid" id="lessonsGrid">
-                            <!-- Lições serão carregadas aqui -->
                         </div>
                         
-                        <!-- Lição Ativa -->
                         <div class="active-lesson" id="activeLesson">
                             <div class="lesson-container">
                                 <div class="lesson-header">
@@ -623,40 +603,29 @@
                     </div>
                 </section>
                 
-                <!-- Seção Praticar -->
                 <section id="practice" class="app-section">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </section>
                 
-                <!-- Seção Jogos -->
                 <section id="games" class="app-section">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </section>
                 
-                <!-- Seção Progresso -->
                 <section id="progress" class="app-section">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </section>
                 
-                <!-- Seção Administração -->
                 <section id="admin" class="app-section">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </section>
             </div>
         </main>
 
-        <!-- Notificações -->
         <div class="notifications-panel" id="notificationsPanel">
             <div class="notifications-header">
                 <h3><i class="fas fa-bell"></i> Notificações</h3>
                 <button class="btn-clear" id="clearNotifications">Limpar Todas</button>
             </div>
             <div class="notifications-list" id="notificationsList">
-                <!-- Notificações serão carregadas aqui -->
             </div>
         </div>
 
-        <!-- Modal de Perfil -->
         <div class="modal" id="profileModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -664,12 +633,10 @@
                     <button class="close-modal">&times;</button>
                 </div>
                 <div class="modal-body" id="profileModalBody">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </div>
             </div>
         </div>
 
-        <!-- Modal de Configurações -->
         <div class="modal" id="settingsModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -677,12 +644,10 @@
                     <button class="close-modal">&times;</button>
                 </div>
                 <div class="modal-body" id="settingsModalBody">
-                    <!-- Conteúdo será carregado dinamicamente -->
                 </div>
             </div>
         </div>
 
-        <!-- Modal de Termos -->
         <div class="modal" id="termsModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -710,7 +675,6 @@
             </div>
         </div>
 
-        <!-- Modal de Privacidade -->
         <div class="modal" id="privacyModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -738,7 +702,6 @@
             </div>
         </div>
 
-        <!-- Modal de Contato -->
         <div class="modal" id="contactModal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -769,7 +732,6 @@
             </div>
         </div>
 
-        <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-content">
                 <div class="loading-spinner">
@@ -779,11 +741,9 @@
             </div>
         </div>
 
-        <!-- Toast Notifications -->
         <div class="toast-container" id="toastContainer"></div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
