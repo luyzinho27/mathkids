@@ -184,7 +184,7 @@ button {
     font-family: inherit;
     cursor: pointer;
     border: none;
-    background: none;
+    /* background: none;*/
     transition: all var(--transition-fast);
 }
 
@@ -4584,3 +4584,4 @@ select:valid {
 [data-theme="dark"] .divider-text {
     background: var(--gray-900);
 }
+
