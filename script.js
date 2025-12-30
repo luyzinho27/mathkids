@@ -343,7 +343,7 @@ function setupEventListeners() {
         feature.addEventListener('click', function(e) {
             e.preventDefault();
             // Recarregar a página
-            window.location.reload();
+            // window.location.reload();
         });
     });
     
@@ -3614,3 +3614,4 @@ setInterval(() => {
 }, 30000); // Atualizar a cada 30 segundos
 
 console.log('MathKids Pro v3.1 carregado com sucesso!');
+
