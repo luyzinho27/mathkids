@@ -159,7 +159,7 @@ html {
 
 body {
     font-family: var(--font-primary);
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     line-height: 1.5;
     color: var(--text-primary);
     background-color: var(--bg-primary);
@@ -4584,6 +4584,7 @@ select:valid {
 [data-theme="dark"] .divider-text {
     background: var(--gray-900);
 }
+
 
 
 
