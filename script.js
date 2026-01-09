@@ -21,8 +21,18 @@ try {
     auth = firebase.auth();
     analytics = firebase.analytics();
     
+    // Configurar listener em tempo real para usuários
+    if (db) {
+        // Listener para atualizações em tempo real
+        db.collection('users').onSnapshot(() => {
+            loadSystemStats(true);
+        }, error => {
+            console.error('Erro no listener do Firebase:', error);
+        });
+    }
+    
     // Verificar estatísticas do sistema
-    loadSystemStats();
+    loadSystemStats(true);
 } catch (error) {
     console.log("Firebase não configurado. Modo de demonstração ativado.");
     setupDemoMode();
@@ -44,7 +54,9 @@ let systemStats = {
     averageRating: 4.8,
     improvementRate: 98,
     totalExercises: 0,
-    totalUsers: 0
+    totalUsers: 0,
+    systemAccuracy: 0,
+    lastUpdated: null
 };
 
 // Dados do usuário
@@ -181,16 +193,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // Configurar eventos
     setupEventListeners();
     
-    // Verificar autenticação
+    // Verificar autenticação primeiro
     checkAuthState();
-    
-    // Inicializar componentes
-    initializeComponents();
     
     // Configurar Firebase Auth state observer
     if (auth) {
-        auth.onAuthStateChanged(handleAuthStateChange);
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                await loadUserDataFromFirebase(user.uid);
+                showApp();
+                loadSystemStats(true);
+            } else {
+                // Usuário não autenticado, garantir que mostre a tela de auth
+                DOM.authScreen.style.display = 'flex';
+                DOM.appScreen.style.display = 'none';
+                loadSystemStats(true);
+            }
+        });
+    } else {
+        // Sem Firebase, usar modo demo
+        checkAuthState();
     }
+    
+    initializeComponents();
 });
 
 // Configurar todos os event listeners
@@ -429,13 +454,20 @@ function setupPasswordToggles() {
 }
 
 // Carregar estatísticas do sistema - FIX: Atualizar em tempo real
-async function loadSystemStats() {
+async function loadSystemStats(forceUpdate = false) {
     if (!db) {
         updateSystemStatsUI();
         return;
     }
     
     try {
+        // Usar cache apenas se não for forçada a atualização
+        if (!forceUpdate && systemStats.lastUpdated && 
+            (Date.now() - systemStats.lastUpdated) < 30000) {
+            updateSystemStatsUI();
+            return;
+        }
+        
         // Contar usuários estudantes
         const usersSnapshot = await db.collection('users').where('role', '==', 'student').get();
         const totalStudents = usersSnapshot.size;
@@ -443,13 +475,21 @@ async function loadSystemStats() {
         // Calcular estatísticas agregadas
         let totalExercises = 0;
         let totalUsers = usersSnapshot.size;
+        let totalCorrect = 0;
+        let totalAttempts = 0;
         
         usersSnapshot.forEach(doc => {
             const user = doc.data();
             if (user.progress) {
                 totalExercises += user.progress.exercisesCompleted || 0;
+                totalCorrect += user.progress.correctAnswers || 0;
+                totalAttempts += user.progress.totalAnswers || 0;
             }
         });
+        
+        // Calcular taxa de acerto geral
+        const systemAccuracy = totalAttempts > 0 ? 
+            Math.round((totalCorrect / totalAttempts) * 100) : 0;
         
         // Verificar se há admin
         const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
@@ -461,11 +501,18 @@ async function loadSystemStats() {
             averageRating: 4.8,
             improvementRate: 98,
             totalExercises,
-            totalUsers
+            totalUsers,
+            systemAccuracy,
+            lastUpdated: Date.now()
         };
         
-        // Atualizar UI - FIX: Atualizar em tempo real
+        // Atualizar UI em tempo real
         updateSystemStatsUI();
+        
+        // Se a seção admin estiver ativa, atualizar também
+        if (currentSection === 'admin' && currentUser?.role === 'admin') {
+            updateAdminStatsUI();
+        }
         
     } catch (error) {
         console.error('Erro ao carregar estatísticas do sistema:', error);
@@ -473,7 +520,7 @@ async function loadSystemStats() {
     }
 }
 
-// Atualizar UI das estatísticas do sistema - FIX: Atualizar contador de alunos
+// Atualizar UI das estatísticas do sistema
 function updateSystemStatsUI() {
     if (DOM.statsStudents) {
         DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString();
@@ -484,17 +531,50 @@ function updateSystemStatsUI() {
     if (DOM.statsImprovement) {
         DOM.statsImprovement.textContent = systemStats.improvementRate + '%';
     }
+    
+    // Atualizar também na seção Admin se estiver ativa
+    if (currentSection === 'admin' && currentUser?.role === 'admin') {
+        updateAdminStatsUI();
+    }
+}
+
+// Atualizar estatísticas do Admin na UI
+function updateAdminStatsUI() {
+    const totalUsersEl = document.getElementById('totalUsers');
+    const activeStudentsEl = document.getElementById('activeStudents');
+    const totalExercisesEl = document.getElementById('totalExercises');
+    const systemAccuracyEl = document.getElementById('systemAccuracy');
+    
+    if (totalUsersEl) totalUsersEl.textContent = systemStats.totalUsers;
+    if (activeStudentsEl) activeStudentsEl.textContent = systemStats.totalStudents;
+    if (totalExercisesEl) totalExercisesEl.textContent = systemStats.totalExercises;
+    if (systemAccuracyEl) systemAccuracyEl.textContent = systemStats.systemAccuracy + '%';
 }
 
 // Verificar estado de autenticação
 function checkAuthState() {
     const savedUser = localStorage.getItem('mathkids_user');
     if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (user.email && user.lastLogin && (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
-            loadUserData(user);
-            showApp();
+        try {
+            const user = JSON.parse(savedUser);
+            if (user.email && user.lastLogin && 
+                (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
+                loadUserData(user);
+                showApp();
+                
+                // Carregar estatísticas do sistema imediatamente
+                loadSystemStats(true);
+            } else {
+                // Token expirado, fazer logout
+                logoutLocal();
+            }
+        } catch (e) {
+            console.error('Erro ao carregar usuário salvo:', e);
+            logoutLocal();
         }
+    } else {
+        // Sem usuário salvo, carregar estatísticas do sistema
+        loadSystemStats(true);
     }
 }
 
@@ -637,7 +717,7 @@ async function handleRegister(e) {
             await db.collection('users').doc(userId).set(userData);
             
             // Atualizar estatísticas do sistema após cadastro
-            await loadSystemStats();
+            await loadSystemStats(true);
         } else {
             localStorage.setItem('mathkids_user', JSON.stringify({
                 ...userData,
@@ -721,6 +801,9 @@ function logoutLocal() {
     DOM.recoverFormElement.reset();
     
     switchAuthForm('login');
+    
+    // Carregar estatísticas atualizadas
+    loadSystemStats(true);
     
     showToast('Logout realizado com sucesso.', 'info');
 }
@@ -886,6 +969,12 @@ function clearAllNotifications() {
 
 // Alternar seção - FIX: Marcar todas as abas corretamente
 function switchSection(sectionId) {
+    // Remover listener do Admin se estiver saindo da seção
+    if (currentSection === 'admin' && sectionId !== 'admin' && window.adminListener) {
+        window.adminListener();
+        window.adminListener = null;
+    }
+    
     document.querySelectorAll('.app-section').forEach(section => {
         section.classList.remove('active');
     });
@@ -899,6 +988,14 @@ function switchSection(sectionId) {
         updateActiveNavigation(sectionId);
         
         loadSectionContent(sectionId);
+        
+        // Se for a seção Admin, carregar dados em tempo real
+        if (sectionId === 'admin' && currentUser?.role === 'admin') {
+            loadSystemStats(true);
+        }
+        
+        // Fechar sidebar mobile se aberto
+        closeMobileSidebar();
     }
 }
 
@@ -2264,7 +2361,7 @@ function loadAdminSection() {
                             <i class="fas fa-chart-line"></i>
                         </div>
                         <div class="stat-info">
-                            <h3 id="systemAccuracy">78%</h3>
+                            <h3 id="systemAccuracy">${systemStats.systemAccuracy}%</h3>
                             <p>Taxa de Acerto Geral</p>
                         </div>
                     </div>
@@ -2443,6 +2540,22 @@ function loadAdminSection() {
     
     // Configurar eventos de administração
     setupAdminEvents();
+    
+    // Adicionar listener em tempo real para a seção Admin
+    if (db) {
+        // Remover listener anterior se existir
+        if (window.adminListener) {
+            window.adminListener();
+        }
+        
+        // Configurar novo listener para atualizações em tempo real
+        window.adminListener = db.collection('users').onSnapshot(() => {
+            loadUsersTable();
+            loadSystemStats(true);
+        }, error => {
+            console.error('Erro no listener do Admin:', error);
+        });
+    }
 }
 
 // Configurar eventos de administração - FIX: Funcionalidades completas
@@ -2574,7 +2687,7 @@ async function saveUser() {
         loadUsersTable();
         
         // Atualizar estatísticas
-        await loadSystemStats();
+        await loadSystemStats(true);
         
     } catch (error) {
         showToast('Erro ao salvar usuário: ' + error.message, 'error');
@@ -2825,7 +2938,7 @@ async function deleteUser(userId) {
         loadUsersTable();
         
         // Atualizar estatísticas
-        await loadSystemStats();
+        await loadSystemStats(true);
         
     } catch (error) {
         showToast('Erro ao excluir usuário: ' + error.message, 'error');
@@ -2871,7 +2984,7 @@ function generateReport() {
                     </div>
                     <div class="report-stat">
                         <span class="stat-label">Taxa Média de Acerto:</span>
-                        <span class="stat-value">78%</span>
+                        <span class="stat-value">${systemStats.systemAccuracy}%</span>
                     </div>
                     <div class="report-stat">
                         <span class="stat-label">Tempo Médio de Prática:</span>
@@ -3561,7 +3674,9 @@ function setupDemoMode() {
         averageRating: 4.8,
         improvementRate: 98,
         totalExercises: 12450,
-        totalUsers: 1260
+        totalUsers: 1260,
+        systemAccuracy: 78,
+        lastUpdated: Date.now()
     };
     
     updateSystemStatsUI();
@@ -3609,8 +3724,8 @@ window.startGame = startGame;
 // Atualizar estatísticas periodicamente
 setInterval(() => {
     if (db && currentUser) {
-        loadSystemStats();
+        loadSystemStats(true);
     }
-}, 30000); // Atualizar a cada 30 segundos
+}, 15000); // Atualizar a cada 15 segundos
 
 console.log('MathKids Pro v3.1 carregado com sucesso!');
