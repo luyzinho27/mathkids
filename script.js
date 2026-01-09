@@ -21,8 +21,11 @@ try {
     auth = firebase.auth();
     analytics = firebase.analytics();
     
-    // Verificar estatísticas do sistema
+    // Carregar estatísticas imediatamente
     loadSystemStats();
+    
+    // Atualizar estatísticas a cada 30 segundos
+    setInterval(loadSystemStats, 30000);
 } catch (error) {
     console.log("Firebase não configurado. Modo de demonstração ativado.");
     setupDemoMode();
@@ -436,36 +439,54 @@ async function loadSystemStats() {
     }
     
     try {
-        // Contar usuários estudantes
-        const usersSnapshot = await db.collection('users').where('role', '==', 'student').get();
-        const totalStudents = usersSnapshot.size;
-        
-        // Calcular estatísticas agregadas
-        let totalExercises = 0;
-        let totalUsers = usersSnapshot.size;
-        
-        usersSnapshot.forEach(doc => {
-            const user = doc.data();
-            if (user.progress) {
-                totalExercises += user.progress.exercisesCompleted || 0;
-            }
+        // Usar listeners em tempo real para atualização automática
+        const unsubscribeUsers = db.collection('users').onSnapshot(async (snapshot) => {
+            let totalStudents = 0;
+            let totalUsers = snapshot.size;
+            let totalExercises = 0;
+            let totalRating = 0;
+            let ratingCount = 0;
+            
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                if (user.role === 'student') {
+                    totalStudents++;
+                }
+                
+                if (user.progress) {
+                    totalExercises += user.progress.exercisesCompleted || 0;
+                }
+                
+                if (user.rating) {
+                    totalRating += user.rating;
+                    ratingCount++;
+                }
+            });
+            
+            // Calcular estatísticas
+            const averageRating = ratingCount > 0 ? (totalRating / ratingCount) : 4.8;
+            
+            // Calcular melhoria no aprendizado (baseado no aumento de acertos)
+            const improvementRate = await calculateImprovementRate();
+            
+            // Atualizar estatísticas do sistema
+            systemStats = {
+                totalStudents,
+                averageRating: averageRating,
+                improvementRate: improvementRate,
+                totalExercises,
+                totalUsers
+            };
+            
+            // Atualizar UI
+            updateSystemStatsUI();
+        }, error => {
+            console.error('Erro ao carregar estatísticas:', error);
+            updateSystemStatsUI();
         });
         
-        // Verificar se há admin
-        const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-        adminExists = !adminSnapshot.empty;
-        
-        // Atualizar estatísticas do sistema
-        systemStats = {
-            totalStudents,
-            averageRating: 4.8,
-            improvementRate: 98,
-            totalExercises,
-            totalUsers
-        };
-        
-        // Atualizar UI - FIX: Atualizar em tempo real
-        updateSystemStatsUI();
+        // Armazenar a função de unsubscribe para limpeza
+        window.systemStatsUnsubscribe = unsubscribeUsers;
         
     } catch (error) {
         console.error('Erro ao carregar estatísticas do sistema:', error);
@@ -473,17 +494,107 @@ async function loadSystemStats() {
     }
 }
 
+// Nova função para calcular taxa de melhoria
+async function calculateImprovementRate() {
+    if (!db) return 98;
+    
+    try {
+        const snapshot = await db.collection('users').get();
+        let totalImprovement = 0;
+        let userCount = 0;
+        
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            if (user.progress) {
+                const total = user.progress.totalAnswers || 0;
+                const correct = user.progress.correctAnswers || 0;
+                
+                if (total > 10) { // Apenas usuários com atividade significativa
+                    const accuracy = total > 0 ? (correct / total) * 100 : 0;
+                    // Simular melhoria (em um sistema real, compararia com dados históricos)
+                    const improvement = Math.min(98, 70 + (accuracy * 0.3));
+                    totalImprovement += improvement;
+                    userCount++;
+                }
+            }
+        });
+        
+        return userCount > 0 ? Math.round(totalImprovement / userCount) : 98;
+    } catch (error) {
+        console.error('Erro ao calcular melhoria:', error);
+        return 98;
+    }
+}
+
 // Atualizar UI das estatísticas do sistema - FIX: Atualizar contador de alunos
 function updateSystemStatsUI() {
     if (DOM.statsStudents) {
-        DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString();
+        // Adicionar animação de contagem
+        animateCounter(DOM.statsStudents, systemStats.totalStudents);
     }
     if (DOM.statsRating) {
+        // Formatar com 1 casa decimal
         DOM.statsRating.textContent = systemStats.averageRating.toFixed(1);
+        
+        // Adicionar estrelas visuais
+        const starsContainer = DOM.statsRating.parentElement;
+        if (!starsContainer.querySelector('.rating-stars')) {
+            const stars = document.createElement('div');
+            stars.className = 'rating-stars';
+            stars.innerHTML = '★'.repeat(Math.floor(systemStats.averageRating)) + 
+                             (systemStats.averageRating % 1 >= 0.5 ? '½' : '') +
+                             '☆'.repeat(5 - Math.ceil(systemStats.averageRating));
+            starsContainer.appendChild(stars);
+        }
     }
     if (DOM.statsImprovement) {
-        DOM.statsImprovement.textContent = systemStats.improvementRate + '%';
+        // Animar porcentagem
+        animateCounter(DOM.statsImprovement, systemStats.improvementRate, '%');
+        
+        // Adicionar indicador visual
+        const improvementContainer = DOM.statsImprovement.parentElement;
+        if (!improvementContainer.querySelector('.improvement-bar')) {
+            const bar = document.createElement('div');
+            bar.className = 'improvement-bar';
+            bar.style.width = '100%';
+            bar.style.height = '4px';
+            bar.style.background = 'var(--border-light)';
+            bar.style.borderRadius = '2px';
+            bar.style.marginTop = '4px';
+            bar.style.overflow = 'hidden';
+            
+            const fill = document.createElement('div');
+            fill.className = 'improvement-fill';
+            fill.style.width = '0%';
+            fill.style.height = '100%';
+            fill.style.background = 'var(--gradient-success)';
+            fill.style.transition = 'width 1s ease-in-out';
+            
+            bar.appendChild(fill);
+            improvementContainer.appendChild(bar);
+            
+            // Animar a barra após um delay
+            setTimeout(() => {
+                fill.style.width = systemStats.improvementRate + '%';
+            }, 500);
+        }
     }
+}
+
+// Função auxiliar para animar contadores
+function animateCounter(element, target, suffix = '') {
+    const current = parseInt(element.textContent) || 0;
+    const increment = target > current ? 1 : -1;
+    let currentValue = current;
+    
+    const interval = setInterval(() => {
+        currentValue += increment;
+        element.textContent = currentValue.toLocaleString() + suffix;
+        
+        if (currentValue === target) {
+            clearInterval(interval);
+        }
+    }, 50);
 }
 
 // Verificar estado de autenticação
@@ -709,12 +820,21 @@ function handleLogout() {
 }
 
 function logoutLocal() {
+    // Limpar listener das estatísticas
+    if (window.systemStatsUnsubscribe) {
+        window.systemStatsUnsubscribe();
+        delete window.systemStatsUnsubscribe;
+    }
+    
     localStorage.removeItem('mathkids_user');
     currentUser = null;
     userData = {};
     
     DOM.authScreen.style.display = 'flex';
     DOM.appScreen.style.display = 'none';
+    
+    // Recarregar estatísticas ao voltar para tela inicial
+    loadSystemStats();
     
     DOM.loginFormElement.reset();
     DOM.registerFormElement.reset();
@@ -897,6 +1017,9 @@ function switchSection(sectionId) {
         
         // Atualizar navegação ativa
         updateActiveNavigation(sectionId);
+        
+        // Fechar sidebar mobile se aberto
+        closeMobileSidebar();
         
         loadSectionContent(sectionId);
     }
@@ -3531,37 +3654,16 @@ function initializeComponents() {
 function setupDemoMode() {
     console.log('Modo de demonstração ativado');
     
-    userProgress = {
-        exercisesCompleted: 15,
-        correctAnswers: 12,
-        totalAnswers: 15,
-        practiceTime: 45,
-        addition: { correct: 4, total: 4 },
-        subtraction: { correct: 3, total: 4 },
-        multiplication: { correct: 3, total: 4 },
-        division: { correct: 2, total: 3 },
-        lastActivities: [
-            { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
-            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
-            { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() }
-        ],
-        level: 'Iniciante',
-        badges: [],
-        dailyProgress: {
-            exercises: 6,
-            correct: 5,
-            time: 27
-        }
-    };
-    
-    adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
+    // Gerar números aleatórios realistas
+    const randomStudents = Math.floor(Math.random() * 500) + 1000; // 1000-1500
+    const randomExercises = Math.floor(Math.random() * 5000) + 10000; // 10000-15000
     
     systemStats = {
-        totalStudents: 1250,
-        averageRating: 4.8,
-        improvementRate: 98,
-        totalExercises: 12450,
-        totalUsers: 1260
+        totalStudents: randomStudents,
+        averageRating: 4.5 + Math.random() * 0.5, // 4.5-5.0
+        improvementRate: 85 + Math.floor(Math.random() * 15), // 85-99%
+        totalExercises: randomExercises,
+        totalUsers: randomStudents + Math.floor(Math.random() * 50) + 50
     };
     
     updateSystemStatsUI();
@@ -3606,12 +3708,4 @@ window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
 
-// Atualizar estatísticas periodicamente
-setInterval(() => {
-    if (db && currentUser) {
-        loadSystemStats();
-    }
-}, 30000); // Atualizar a cada 30 segundos
-
 console.log('MathKids Pro v3.1 carregado com sucesso!');
-
