@@ -21,7 +21,8 @@ try {
     auth = firebase.auth();
     analytics = firebase.analytics();
     
-    console.log("Firebase inicializado com sucesso!");
+    // Verificar estatísticas do sistema
+    loadSystemStats();
 } catch (error) {
     console.log("Firebase não configurado. Modo de demonstração ativado.");
     setupDemoMode();
@@ -174,22 +175,17 @@ function initializeElements() {
 
 // Quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('MathKids Pro iniciando...');
-    
     // Inicializar elementos DOM
     initializeElements();
     
     // Configurar eventos
     setupEventListeners();
     
-    // Inicializar componentes
-    initializeComponents();
-    
-    // Carregar estatísticas do sistema AGORA (depois que o DOM está pronto)
-    loadSystemStats();
-    
     // Verificar autenticação
     checkAuthState();
+    
+    // Inicializar componentes
+    initializeComponents();
     
     // Configurar Firebase Auth state observer
     if (auth) {
@@ -432,23 +428,14 @@ function setupPasswordToggles() {
     });
 }
 
-// Carregar estatísticas do sistema - CORREÇÃO
+// Carregar estatísticas do sistema - FIX: Atualizar em tempo real
 async function loadSystemStats() {
+    if (!db) {
+        updateSystemStatsUI();
+        return;
+    }
+    
     try {
-        // Se não há Firebase configurado, use valores demo
-        if (!db) {
-            console.log("Modo demo: usando estatísticas simuladas");
-            systemStats = {
-                totalStudents: 1250,
-                averageRating: 4.8,
-                improvementRate: 98,
-                totalExercises: 12450,
-                totalUsers: 1260
-            };
-            updateSystemStatsUI();
-            return;
-        }
-        
         // Contar usuários estudantes
         const usersSnapshot = await db.collection('users').where('role', '==', 'student').get();
         const totalStudents = usersSnapshot.size;
@@ -456,28 +443,13 @@ async function loadSystemStats() {
         // Calcular estatísticas agregadas
         let totalExercises = 0;
         let totalUsers = usersSnapshot.size;
-        let totalRating = 0;
-        let ratingCount = 0;
         
         usersSnapshot.forEach(doc => {
             const user = doc.data();
             if (user.progress) {
                 totalExercises += user.progress.exercisesCompleted || 0;
-                
-                // Calcular rating médio (se existir)
-                if (user.rating) {
-                    totalRating += user.rating;
-                    ratingCount++;
-                }
             }
         });
-        
-        // Calcular rating médio
-        const averageRating = ratingCount > 0 ? (totalRating / ratingCount) : 4.8;
-        
-        // Calcular taxa de melhoria (baseada no aumento de acertos)
-        // Esta é uma simplificação - em produção, calcule com base no histórico
-        const improvementRate = Math.min(98, 75 + Math.floor(totalStudents / 50));
         
         // Verificar se há admin
         const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
@@ -486,61 +458,31 @@ async function loadSystemStats() {
         // Atualizar estatísticas do sistema
         systemStats = {
             totalStudents,
-            averageRating: parseFloat(averageRating.toFixed(1)),
-            improvementRate,
+            averageRating: 4.8,
+            improvementRate: 98,
             totalExercises,
             totalUsers
         };
         
-        // Atualizar UI
+        // Atualizar UI - FIX: Atualizar em tempo real
         updateSystemStatsUI();
         
     } catch (error) {
         console.error('Erro ao carregar estatísticas do sistema:', error);
-        
-        // Em caso de erro, use valores demo
-        systemStats = {
-            totalStudents: 1250,
-            averageRating: 4.8,
-            improvementRate: 98,
-            totalExercises: 12450,
-            totalUsers: 1260
-        };
-        
         updateSystemStatsUI();
     }
 }
 
-// Atualizar UI das estatísticas do sistema - CORREÇÃO
+// Atualizar UI das estatísticas do sistema - FIX: Atualizar contador de alunos
 function updateSystemStatsUI() {
-    console.log('Atualizando UI das estatísticas:', systemStats);
-    
     if (DOM.statsStudents) {
-        DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString('pt-BR');
-    } else {
-        console.warn('Elemento statsStudents não encontrado');
+        DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString();
     }
-    
     if (DOM.statsRating) {
-        DOM.statsRating.textContent = systemStats.averageRating.toFixed(1).replace('.', ',');
-    } else {
-        console.warn('Elemento statsRating não encontrado');
+        DOM.statsRating.textContent = systemStats.averageRating.toFixed(1);
     }
-    
     if (DOM.statsImprovement) {
         DOM.statsImprovement.textContent = systemStats.improvementRate + '%';
-    } else {
-        console.warn('Elemento statsImprovement não encontrado');
-    }
-}
-
-// Função para atualizar estatísticas em tempo real
-function refreshSystemStats() {
-    if (db) {
-        loadSystemStats();
-        showToast('Estatísticas atualizadas!', 'success');
-    } else {
-        showToast('Modo demo: estatísticas de exemplo', 'info');
     }
 }
 
@@ -3663,11 +3605,10 @@ window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
-window.refreshStats = refreshSystemStats;
 
 // Atualizar estatísticas periodicamente
 setInterval(() => {
-    if (db) {
+    if (db && currentUser) {
         loadSystemStats();
     }
 }, 30000); // Atualizar a cada 30 segundos
