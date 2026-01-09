@@ -1,3 +1,5 @@
+// script.js - MathKids Pro - Versão 3.1 (Corrigida)
+
 // Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
@@ -14,6 +16,9 @@ let currentUser = null;
 let userData = {};
 let adminExists = false;
 
+// Listener para estatísticas do sistema
+let systemStatsListener = null;
+
 // Inicialização do Firebase
 try {
     app = firebase.initializeApp(firebaseConfig);
@@ -21,7 +26,9 @@ try {
     auth = firebase.auth();
     analytics = firebase.analytics();
     
-    // Verificar estatísticas do sistema
+    console.log('🔧 Firebase inicializado com sucesso');
+    
+    // Verificar estatísticas do sistema (apenas uma vez)
     loadSystemStats();
 } catch (error) {
     console.log("Firebase não configurado. Modo de demonstração ativado.");
@@ -41,6 +48,7 @@ let gameScore = 0;
 let gameHighScore = 0;
 let systemStats = {
     totalStudents: 0,
+    totalActiveUsers: 0,
     averageRating: 4.8,
     improvementRate: 98,
     totalExercises: 0,
@@ -159,19 +167,7 @@ const DOM = {
     loadingOverlay: document.getElementById('loadingOverlay')
 };
 
-// Função auxiliar para inicializar elementos
-function initializeElements() {
-    // Obter todos os links de navegação
-    DOM.navLinks = document.querySelectorAll('.nav-link');
-    DOM.sidebarLinks = document.querySelectorAll('.sidebar-link');
-    DOM.operationQuicks = document.querySelectorAll('.operation-quick');
-    
-    // Elementos de ação rápida
-    DOM.closeLesson = document.getElementById('closeLesson');
-    DOM.quickPractice = document.getElementById('quickPractice');
-    DOM.quickGame = document.getElementById('quickGame');
-    DOM.refreshDashboard = document.getElementById('refreshDashboard');
-}
+// ===== FUNÇÕES PRINCIPAIS =====
 
 // Quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
@@ -192,6 +188,250 @@ document.addEventListener('DOMContentLoaded', function() {
         auth.onAuthStateChanged(handleAuthStateChange);
     }
 });
+
+// Inicializar elementos DOM
+function initializeElements() {
+    // Obter todos os links de navegação
+    DOM.navLinks = document.querySelectorAll('.nav-link');
+    DOM.sidebarLinks = document.querySelectorAll('.sidebar-link');
+    DOM.operationQuicks = document.querySelectorAll('.operation-quick');
+    
+    // Elementos de ação rápida
+    DOM.closeLesson = document.getElementById('closeLesson');
+    DOM.quickPractice = document.getElementById('quickPractice');
+    DOM.quickGame = document.getElementById('quickGame');
+    DOM.refreshDashboard = document.getElementById('refreshDashboard');
+}
+
+// ===== FUNÇÕES DE ESTATÍSTICAS DO SISTEMA =====
+
+// Carregar estatísticas do sistema - VERSÃO CORRIGIDA
+async function loadSystemStats() {
+    if (!db) {
+        updateSystemStatsUI();
+        return;
+    }
+    
+    try {
+        // Remover listener anterior se existir
+        if (systemStatsListener) {
+            systemStatsListener();
+            systemStatsListener = null;
+        }
+        
+        console.log('📊 Iniciando carregamento de estatísticas...');
+        
+        // Listener único para estatísticas
+        systemStatsListener = db.collection('users').onSnapshot(async (snapshot) => {
+            console.log('📊 Atualizando estatísticas do sistema...');
+            
+            let totalStudents = 0;
+            let totalUsers = snapshot.size;
+            let totalExercises = 0;
+            let totalRating = 0;
+            let ratingCount = 0;
+            
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                if (user.role === 'student') {
+                    totalStudents++;
+                }
+                
+                if (user.progress) {
+                    totalExercises += user.progress.exercisesCompleted || 0;
+                }
+                
+                if (user.rating && typeof user.rating === 'number') {
+                    totalRating += user.rating;
+                    ratingCount++;
+                }
+            });
+            
+            // Calcular estatísticas
+            const averageRating = ratingCount > 0 ? (totalRating / ratingCount) : 4.8;
+            
+            // Calcular melhoria no aprendizado
+            const improvementRate = await calculateImprovementRate(snapshot);
+            
+            // Atualizar estatísticas do sistema
+            systemStats = {
+                totalStudents: totalStudents,
+                totalActiveUsers: totalUsers, // Mostrar este valor como "Alunos Ativos"
+                averageRating: Math.max(1, Math.min(5, averageRating)),
+                improvementRate: Math.max(1, Math.min(100, improvementRate)),
+                totalExercises: totalExercises,
+                totalUsers: totalUsers
+            };
+            
+            console.log('📊 Estatísticas atualizadas:', systemStats);
+            
+            // Atualizar UI
+            updateSystemStatsUI();
+            
+        }, error => {
+            console.error('❌ Erro ao carregar estatísticas:', error);
+            updateSystemStatsUI();
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar estatísticas do sistema:', error);
+        updateSystemStatsUI();
+    }
+}
+
+// Função simplificada para calcular melhoria
+async function calculateImprovementRate(snapshot = null) {
+    if (!db) return 98;
+    
+    try {
+        let usersData = snapshot;
+        if (!usersData) {
+            usersData = await db.collection('users').get();
+        }
+        
+        let totalAccuracy = 0;
+        let userCount = 0;
+        
+        usersData.forEach(doc => {
+            const user = doc.data();
+            if (user.progress && user.progress.totalAnswers > 0) {
+                const accuracy = (user.progress.correctAnswers / user.progress.totalAnswers) * 100;
+                totalAccuracy += Math.min(100, accuracy);
+                userCount++;
+            }
+        });
+        
+        // Se não há dados suficientes, usar valor padrão
+        if (userCount === 0) return 98;
+        
+        // Normalizar para escala 0-100
+        const avgAccuracy = totalAccuracy / userCount;
+        // Transformar acurácia em "melhoria no aprendizado"
+        const improvementRate = Math.min(100, 70 + (avgAccuracy * 0.3));
+        
+        return Math.round(improvementRate);
+    } catch (error) {
+        console.error('Erro ao calcular melhoria:', error);
+        return 98;
+    }
+}
+
+// Atualizar UI das estatísticas do sistema - VERSÃO CORRIGIDA (SEM ANIMAÇÃO DE LOOP)
+function updateSystemStatsUI() {
+    if (!DOM.statsStudents || !DOM.statsRating || !DOM.statsImprovement) {
+        console.log('⚠️ Elementos de estatísticas não encontrados');
+        return;
+    }
+    
+    // Atualizar "Alunos Ativos" (agora mostra total de usuários)
+    DOM.statsStudents.textContent = systemStats.totalActiveUsers.toLocaleString();
+    
+    // Atualizar "Avaliação Média"
+    const rating = Math.max(0, Math.min(5, systemStats.averageRating));
+    DOM.statsRating.textContent = rating.toFixed(1);
+    
+    // Atualizar "Melhoria no Aprendizado"
+    const improvement = Math.max(0, Math.min(100, systemStats.improvementRate));
+    DOM.statsImprovement.textContent = improvement + '%';
+    
+    // Adicionar/atualizar indicadores visuais
+    updateStatsVisualIndicators();
+}
+
+// Função para atualizar indicadores visuais (apenas uma vez)
+function updateStatsVisualIndicators() {
+    // Estrelas para avaliação
+    const ratingContainer = DOM.statsRating.closest('.stat-info');
+    if (ratingContainer) {
+        let starsDiv = ratingContainer.querySelector('.rating-stars');
+        if (!starsDiv) {
+            starsDiv = document.createElement('div');
+            starsDiv.className = 'rating-stars';
+            ratingContainer.appendChild(starsDiv);
+        }
+        
+        const rating = parseFloat(DOM.statsRating.textContent);
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+        
+        starsDiv.innerHTML = '★'.repeat(fullStars) + 
+                           (hasHalfStar ? '½' : '') + 
+                           '☆'.repeat(emptyStars);
+        starsDiv.title = `${rating.toFixed(1)} de 5 estrelas`;
+    }
+    
+    // Barra de progresso para melhoria
+    const improvementContainer = DOM.statsImprovement.closest('.stat-info');
+    if (improvementContainer) {
+        let barDiv = improvementContainer.querySelector('.improvement-bar');
+        if (!barDiv) {
+            barDiv = document.createElement('div');
+            barDiv.className = 'improvement-bar';
+            barDiv.title = `${systemStats.improvementRate}% de melhoria`;
+            improvementContainer.appendChild(barDiv);
+        }
+        
+        const improvement = parseInt(DOM.statsImprovement.textContent);
+        barDiv.style.background = `linear-gradient(to right, 
+            var(--success-500) 0%, 
+            var(--success-500) ${improvement}%, 
+            var(--border-light) ${improvement}%, 
+            var(--border-light) 100%)`;
+    }
+}
+
+// Modo de demonstração
+function setupDemoMode() {
+    console.log('👨‍💻 Modo de demonstração ativado');
+    
+    // Usar valores do localStorage se existirem
+    const savedStats = localStorage.getItem('mathkids_system_stats');
+    if (savedStats) {
+        systemStats = JSON.parse(savedStats);
+    } else {
+        // Valores demo padrão
+        systemStats = {
+            totalStudents: 45,
+            totalActiveUsers: 50,
+            averageRating: 4.7,
+            improvementRate: 92,
+            totalExercises: 1245,
+            totalUsers: 50
+        };
+        localStorage.setItem('mathkids_system_stats', JSON.stringify(systemStats));
+    }
+    
+    adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
+    
+    userProgress = {
+        exercisesCompleted: 15,
+        correctAnswers: 12,
+        totalAnswers: 15,
+        practiceTime: 45,
+        addition: { correct: 4, total: 4 },
+        subtraction: { correct: 3, total: 4 },
+        multiplication: { correct: 3, total: 4 },
+        division: { correct: 2, total: 3 },
+        lastActivities: [
+            { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
+            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
+            { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() }
+        ],
+        level: 'Iniciante',
+        badges: [],
+        dailyProgress: {
+            exercises: 6,
+            correct: 5,
+            time: 27
+        }
+    };
+    
+    // Atualizar UI
+    updateSystemStatsUI();
+}
+
+// ===== FUNÇÕES DE AUTENTICAÇÃO =====
 
 // Configurar todos os event listeners
 function setupEventListeners() {
@@ -266,7 +506,7 @@ function setupEventListeners() {
             const sectionId = this.getAttribute('href').substring(1);
             switchSection(sectionId);
             
-            // Atualizar navegação ativa - FIX: Agora inclui todas as abas
+            // Atualizar navegação ativa
             updateActiveNavigation(sectionId);
             
             // Fechar sidebar mobile se aberto
@@ -296,10 +536,9 @@ function setupEventListeners() {
         });
     });
     
-    // Botões de ação rápida - FIX: Adicionar classe ativa quando clicados
+    // Botões de ação rápida
     if (DOM.quickPractice) {
         DOM.quickPractice.addEventListener('click', function() {
-            // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
             
@@ -312,7 +551,6 @@ function setupEventListeners() {
     
     if (DOM.quickGame) {
         DOM.quickGame.addEventListener('click', function() {
-            // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
             
@@ -337,15 +575,6 @@ function setupEventListeners() {
             showToast('Dashboard atualizado!', 'success');
         });
     }
-    
-    // Blocos de recursos na tela inicial - FIX: Recarregar página ao clicar
-    document.querySelectorAll('.feature').forEach(feature => {
-        feature.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Recarregar a página
-            // window.location.reload();
-        });
-    });
     
     // Modal de perfil e configurações
     document.querySelectorAll('[href="#profile"]').forEach(link => {
@@ -426,215 +655,6 @@ function setupPasswordToggles() {
             });
         }
     });
-}
-
-// Carregar estatísticas do sistema - FIX: Evitar loop infinito
-async function loadSystemStats() {
-    if (!db) {
-        updateSystemStatsUI();
-        return;
-    }
-    
-    try {
-        // Usar listener único para evitar múltiplos registros
-        if (window.systemStatsUnsubscribe) {
-            window.systemStatsUnsubscribe();
-        }
-        
-        const unsubscribeUsers = db.collection('users').onSnapshot((snapshot) => {
-            let totalStudents = 0;
-            let totalUsers = snapshot.size;
-            let totalExercises = 0;
-            let totalRating = 0;
-            let ratingCount = 0;
-            
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                if (user.role === 'student') {
-                    totalStudents++;
-                }
-                
-                if (user.progress) {
-                    totalExercises += user.progress.exercisesCompleted || 0;
-                }
-            });
-            
-            // Valores padrão para evitar loops
-            const averageRating = 4.8; // Valor padrão
-            const improvementRate = 98; // Valor padrão
-            
-            // Atualizar estatísticas do sistema
-            systemStats = {
-                totalStudents: Math.max(0, totalStudents),
-                averageRating: averageRating,
-                improvementRate: improvementRate,
-                totalExercises: Math.max(0, totalExercises),
-                totalUsers: Math.max(0, totalUsers)
-            };
-            
-            // Atualizar UI
-            updateSystemStatsUI();
-            
-        }, error => {
-            console.error('Erro ao carregar estatísticas:', error);
-            // Usar valores de fallback
-            systemStats = {
-                totalStudents: 1250,
-                averageRating: 4.8,
-                improvementRate: 98,
-                totalExercises: 12450,
-                totalUsers: 1260
-            };
-            updateSystemStatsUI();
-        });
-        
-        // Armazenar a função de unsubscribe para limpeza
-        window.systemStatsUnsubscribe = unsubscribeUsers;
-        
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas do sistema:', error);
-        updateSystemStatsUI();
-    }
-}
-
-// Atualizar UI das estatísticas do sistema - FIX: Corrigir loop infinito
-function updateSystemStatsUI() {
-    if (!DOM.statsStudents || !DOM.statsRating || !DOM.statsImprovement) return;
-    
-    // Garantir que os valores são números válidos e positivos
-    const safeStudents = Math.max(0, systemStats.totalStudents || 0);
-    const safeRating = Math.max(0, Math.min(5, systemStats.averageRating || 4.8));
-    const safeImprovement = Math.max(0, Math.min(100, systemStats.improvementRate || 98));
-    
-    if (DOM.statsStudents) {
-        // Usar uma abordagem mais simples sem animação para debug
-        DOM.statsStudents.textContent = safeStudents.toLocaleString();
-        
-        // Opcional: Adicionar animação apenas se houver mudança significativa
-        const current = parseInt(DOM.statsStudents.textContent.replace(/[^0-9]/g, '')) || 0;
-        if (Math.abs(safeStudents - current) > 10) {
-            setTimeout(() => {
-                animateCounter(DOM.statsStudents, safeStudents);
-            }, 100);
-        }
-    }
-    
-    if (DOM.statsRating) {
-        DOM.statsRating.textContent = safeRating.toFixed(1);
-        
-        // Atualizar estrelas visuais
-        let starsContainer = DOM.statsRating.parentElement;
-        if (!starsContainer) return;
-        
-        let stars = starsContainer.querySelector('.rating-stars');
-        if (!stars) {
-            stars = document.createElement('div');
-            stars.className = 'rating-stars';
-            starsContainer.appendChild(stars);
-        }
-        
-        const fullStars = Math.floor(safeRating);
-        const hasHalfStar = safeRating % 1 >= 0.5;
-        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-        
-        stars.innerHTML = '★'.repeat(fullStars) + 
-                         (hasHalfStar ? '½' : '') +
-                         '☆'.repeat(emptyStars);
-        stars.style.color = 'var(--warning-500)';
-        stars.style.fontSize = '0.75rem';
-        stars.style.marginTop = '0.25rem';
-        stars.style.letterSpacing = '1px';
-    }
-    
-    if (DOM.statsImprovement) {
-        DOM.statsImprovement.textContent = safeImprovement + '%';
-        
-        // Atualizar barra de progresso
-        let improvementContainer = DOM.statsImprovement.parentElement;
-        if (!improvementContainer) return;
-        
-        let bar = improvementContainer.querySelector('.improvement-bar');
-        if (!bar) {
-            bar = document.createElement('div');
-            bar.className = 'improvement-bar';
-            bar.style.cssText = `
-                width: 100%;
-                height: 4px;
-                background: var(--border-light);
-                border-radius: 2px;
-                margin-top: 4px;
-                overflow: hidden;
-            `;
-            
-            const fill = document.createElement('div');
-            fill.className = 'improvement-fill';
-            fill.style.cssText = `
-                width: 0%;
-                height: 100%;
-                background: var(--gradient-success);
-                transition: width 1s ease-in-out;
-            `;
-            
-            bar.appendChild(fill);
-            improvementContainer.appendChild(bar);
-        }
-        
-        const fill = bar.querySelector('.improvement-fill');
-        if (fill) {
-            setTimeout(() => {
-                fill.style.width = safeImprovement + '%';
-            }, 100);
-        }
-    }
-}
-
-// Função auxiliar para animar contadores - FIX: Corrigir loop infinito
-function animateCounter(element, target, suffix = '') {
-    // Limpar qualquer animação anterior
-    if (element._animationInterval) {
-        clearInterval(element._animationInterval);
-        delete element._animationInterval;
-    }
-    
-    // Garantir que os valores sejam números válidos
-    const current = parseInt(element.textContent.replace(/[^0-9-]/g, '')) || 0;
-    const finalTarget = parseInt(target) || 0;
-    
-    // Se já estiver no valor correto, não animar
-    if (current === finalTarget) {
-        element.textContent = finalTarget.toLocaleString() + suffix;
-        return;
-    }
-    
-    // Calcular direção e duração
-    const difference = Math.abs(finalTarget - current);
-    const duration = 1000; // 1 segundo
-    const stepTime = Math.max(50, Math.min(200, duration / difference));
-    const stepValue = Math.ceil(difference / (duration / stepTime));
-    const increment = finalTarget > current ? stepValue : -stepValue;
-    
-    let currentValue = current;
-    
-    element._animationInterval = setInterval(() => {
-        // Verificar se atingiu o alvo
-        if ((increment > 0 && currentValue >= finalTarget) || 
-            (increment < 0 && currentValue <= finalTarget)) {
-            clearInterval(element._animationInterval);
-            delete element._animationInterval;
-            element.textContent = finalTarget.toLocaleString() + suffix;
-            return;
-        }
-        
-        currentValue += increment;
-        
-        // Garantir que não passe do alvo
-        if ((increment > 0 && currentValue > finalTarget) || 
-            (increment < 0 && currentValue < finalTarget)) {
-            currentValue = finalTarget;
-        }
-        
-        element.textContent = currentValue.toLocaleString() + suffix;
-    }, stepTime);
 }
 
 // Verificar estado de autenticação
@@ -795,9 +815,13 @@ async function handleRegister(e) {
                 id: userId
             }));
             
-            // Atualizar estatísticas locais
-            systemStats.totalStudents++;
+            // Atualizar estatísticas locais (modo demo)
             systemStats.totalUsers++;
+            systemStats.totalActiveUsers = systemStats.totalUsers;
+            if (userType === 'student') {
+                systemStats.totalStudents++;
+            }
+            localStorage.setItem('mathkids_system_stats', JSON.stringify(systemStats));
             updateSystemStatsUI();
         }
         
@@ -859,26 +883,12 @@ function handleLogout() {
     }
 }
 
-// Função para limpar todos os listeners
-function cleanupAllListeners() {
-    // Limpar listener das estatísticas
-    if (window.systemStatsUnsubscribe) {
-        window.systemStatsUnsubscribe();
-        delete window.systemStatsUnsubscribe;
-    }
-    
-    // Limpar intervalos de animação
-    document.querySelectorAll('[id^="stats"]').forEach(element => {
-        if (element._animationInterval) {
-            clearInterval(element._animationInterval);
-            delete element._animationInterval;
-        }
-    });
-}
-
 function logoutLocal() {
-    // Limpar todos os listeners e intervalos
-    cleanupAllListeners();
+    // Limpar listener das estatísticas
+    if (systemStatsListener) {
+        systemStatsListener();
+        systemStatsListener = null;
+    }
     
     localStorage.removeItem('mathkids_user');
     currentUser = null;
@@ -890,8 +900,9 @@ function logoutLocal() {
     // Resetar estatísticas para valores iniciais
     systemStats = {
         totalStudents: 0,
-        averageRating: 0.0,
-        improvementRate: 0,
+        totalActiveUsers: 0,
+        averageRating: 4.8,
+        improvementRate: 98,
         totalExercises: 0,
         totalUsers: 0
     };
@@ -1029,6 +1040,42 @@ function updateProgressUI() {
     }
 }
 
+// Login demo
+async function handleDemoLogin(email, password) {
+    const demoUsers = {
+        'admin@mathkids.com': { password: 'admin123', role: 'admin', name: 'Administrador Demo' },
+        'aluno@mathkids.com': { password: 'aluno123', role: 'student', name: 'Aluno Demo' }
+    };
+    
+    if (demoUsers[email] && demoUsers[email].password === password) {
+        const user = demoUsers[email];
+        currentUser = {
+            id: 'demo_' + email,
+            name: user.name,
+            email: email,
+            role: user.role,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            progress: userProgress,
+            settings: {
+                theme: 'light',
+                notifications: true,
+                sound: true,
+                music: false,
+                progressNotifications: true
+            }
+        };
+        
+        localStorage.setItem('mathkids_user', JSON.stringify(currentUser));
+        
+        return currentUser;
+    } else {
+        throw new Error('Credenciais inválidas');
+    }
+}
+
+// ===== FUNÇÕES DA INTERFACE =====
+
 // Mostrar aplicação
 function showApp() {
     DOM.authScreen.style.display = 'none';
@@ -1067,7 +1114,7 @@ function clearAllNotifications() {
     showToast('Notificações limpas.', 'success');
 }
 
-// Alternar seção - FIX: Marcar todas as abas corretamente
+// Alternar seção
 function switchSection(sectionId) {
     document.querySelectorAll('.app-section').forEach(section => {
         section.classList.remove('active');
@@ -1085,7 +1132,7 @@ function switchSection(sectionId) {
     }
 }
 
-// Atualizar navegação ativa - FIX: Incluir todas as abas
+// Atualizar navegação ativa
 function updateActiveNavigation(sectionId) {
     // Atualizar nav principal
     const navLinks = document.querySelectorAll('.nav-link');
@@ -1471,6 +1518,8 @@ function loadLesson(operation) {
     }
 }
 
+// ===== FUNÇÕES DE PRÁTICA =====
+
 // Carregar seção de prática
 function loadPracticeSection(operation = null) {
     const section = document.getElementById('practice');
@@ -1766,7 +1815,9 @@ function showPracticeHint() {
     feedback.className = 'exercise-feedback info';
 }
 
-// Carregar seção de jogos - FIX: Estilizar input de resposta
+// ===== FUNÇÕES DE JOGOS =====
+
+// Carregar seção de jogos
 function loadGamesSection() {
     const section = document.getElementById('games');
     if (!section) return;
@@ -1847,7 +1898,7 @@ function loadGamesSection() {
     });
 }
 
-// Iniciar jogo - FIX: Estilizar input de resposta
+// Iniciar jogo
 function startGame(gameId) {
     currentGame = gameId;
     const gameContainer = document.getElementById('gameContainer');
@@ -1932,7 +1983,7 @@ function startGame(gameId) {
     setupGameEvents(gameId);
 }
 
-// Configurar eventos do jogo - FIX: Adicionar estilização ao input
+// Configurar eventos do jogo
 function setupGameEvents(gameId) {
     document.getElementById('startGameBtn')?.addEventListener('click', () => startGameSession(gameId));
     document.getElementById('endGameBtn')?.addEventListener('click', endGame);
@@ -1969,7 +2020,7 @@ function updateGameTimer() {
     }
 }
 
-// Gerar exercício do jogo - FIX: Estilizar input de resposta
+// Gerar exercício do jogo
 function generateGameExercise(gameId) {
     if (!gameActive) return;
     
@@ -2025,7 +2076,6 @@ function generateGameExercise(gameId) {
         gameId: gameId
     };
     
-    // FIX: Estilizar input de resposta semelhante à seção de prática
     gameQuestion.innerHTML = `
         <h4>${question}</h4>
         <div class="game-answer-container">
@@ -2202,6 +2252,8 @@ function endGame() {
     addActivity(`Jogo "${getGameName(currentGame)}" finalizado com ${gameScore} pontos`, 'game');
 }
 
+// ===== FUNÇÕES DE PROGRESSO =====
+
 // Carregar seção de progresso
 function loadProgressSection() {
     const section = document.getElementById('progress');
@@ -2271,7 +2323,7 @@ function loadProgressSection() {
     setTimeout(initializeOperationsChart, 100);
 }
 
-// FIX: Gráfico de operações corrigido
+// Gráfico de operações
 function initializeOperationsChart() {
     const ctx = document.getElementById('operationsChart');
     if (!ctx) return;
@@ -2393,7 +2445,9 @@ function initializeOperationsChart() {
     }
 }
 
-// Carregar seção de administração - FIX: Funcionalidades de administração
+// ===== FUNÇÕES DE ADMINISTRAÇÃO =====
+
+// Carregar seção de administração
 function loadAdminSection() {
     if (!currentUser || currentUser.role !== 'admin') {
         switchSection('dashboard');
@@ -2447,8 +2501,8 @@ function loadAdminSection() {
                             <i class="fas fa-chart-line"></i>
                         </div>
                         <div class="stat-info">
-                            <h3 id="systemAccuracy">78%</h3>
-                            <p>Taxa de Acerto Geral</p>
+                            <h3 id="systemAccuracy">${systemStats.improvementRate}%</h3>
+                            <p>Taxa de Melhoria Geral</p>
                         </div>
                     </div>
                 </div>
@@ -2582,44 +2636,6 @@ function loadAdminSection() {
                 </div>
             </div>
         </div>
-        
-        <!-- Modal para adicionar/editar usuário -->
-        <div class="modal" id="userModal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-user"></i> <span id="modalUserTitle">Adicionar Usuário</span></h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <form id="userForm">
-                        <div class="form-group">
-                            <label for="modalUserName">Nome Completo</label>
-                            <input type="text" id="modalUserName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="modalUserEmail">Email</label>
-                            <input type="email" id="modalUserEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="modalUserRole">Tipo de Conta</label>
-                            <select id="modalUserRole" required>
-                                <option value="student">Aluno</option>
-                                <option value="admin">Administrador</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="modalUserPassword">Senha</label>
-                            <input type="password" id="modalUserPassword" minlength="6">
-                            <small class="form-hint">Deixe em branco para manter a senha atual</small>
-                        </div>
-                        <input type="hidden" id="modalUserId">
-                        <button type="submit" class="btn-auth btn-primary" id="saveUserBtn">
-                            <i class="fas fa-save"></i> Salvar
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
     `;
     
     section.innerHTML = content;
@@ -2628,526 +2644,7 @@ function loadAdminSection() {
     setupAdminEvents();
 }
 
-// Configurar eventos de administração - FIX: Funcionalidades completas
-function setupAdminEvents() {
-    // Tabs
-    document.querySelectorAll('.tab-header').forEach(tab => {
-        tab.addEventListener('click', function() {
-            const tabId = this.getAttribute('data-tab');
-            
-            document.querySelectorAll('.tab-header').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(tabId + 'Tab').classList.add('active');
-        });
-    });
-    
-    // Botões de usuários
-    document.getElementById('refreshUsers')?.addEventListener('click', loadUsersTable);
-    document.getElementById('addUserBtn')?.addEventListener('click', () => openUserModal());
-    
-    // Busca de usuários
-    document.getElementById('searchUsers')?.addEventListener('input', function(e) {
-        filterUsersTable(e.target.value);
-    });
-    
-    // Relatórios
-    document.getElementById('generateReport')?.addEventListener('click', generateReport);
-    
-    // Configurações
-    document.getElementById('saveSettings')?.addEventListener('click', saveSystemSettings);
-    
-    // Carregar tabela de usuários
-    loadUsersTable();
-    
-    // Configurar modal de usuário
-    setupUserModal();
-}
-
-// Configurar modal de usuário
-function setupUserModal() {
-    const modal = document.getElementById('userModal');
-    const closeBtn = modal?.querySelector('.close-modal');
-    const form = document.getElementById('userForm');
-    
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-    }
-    
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await saveUser();
-        });
-    }
-    
-    // Fechar modal ao clicar fora
-    modal?.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
-}
-
-// Abrir modal de usuário
-function openUserModal(user = null) {
-    const modal = document.getElementById('userModal');
-    const title = document.getElementById('modalUserTitle');
-    const form = document.getElementById('userForm');
-    
-    if (!modal || !title || !form) return;
-    
-    if (user) {
-        title.textContent = 'Editar Usuário';
-        document.getElementById('modalUserName').value = user.name || '';
-        document.getElementById('modalUserEmail').value = user.email || '';
-        document.getElementById('modalUserRole').value = user.role || 'student';
-        document.getElementById('modalUserId').value = user.id || '';
-        document.getElementById('modalUserPassword').value = '';
-        document.getElementById('modalUserPassword').required = false;
-    } else {
-        title.textContent = 'Adicionar Usuário';
-        form.reset();
-        document.getElementById('modalUserId').value = '';
-        document.getElementById('modalUserPassword').required = true;
-    }
-    
-    modal.style.display = 'flex';
-}
-
-// Salvar usuário
-async function saveUser() {
-    const id = document.getElementById('modalUserId').value;
-    const name = document.getElementById('modalUserName').value.trim();
-    const email = document.getElementById('modalUserEmail').value.trim();
-    const role = document.getElementById('modalUserRole').value;
-    const password = document.getElementById('modalUserPassword').value;
-    
-    if (!name || !email || !role) {
-        showToast('Preencha todos os campos obrigatórios', 'error');
-        return;
-    }
-    
-    showLoading(true);
-    
-    try {
-        if (id) {
-            // Editar usuário existente
-            await updateUser(id, { name, email, role, password });
-            showToast('Usuário atualizado com sucesso!', 'success');
-        } else {
-            // Criar novo usuário
-            if (!password) {
-                showToast('A senha é obrigatória para novos usuários', 'error');
-                showLoading(false);
-                return;
-            }
-            
-            await createUser({ name, email, role, password });
-            showToast('Usuário criado com sucesso!', 'success');
-        }
-        
-        // Fechar modal
-        document.getElementById('userModal').style.display = 'none';
-        
-        // Recarregar tabela
-        loadUsersTable();
-        
-        // Atualizar estatísticas
-        await loadSystemStats();
-        
-    } catch (error) {
-        showToast('Erro ao salvar usuário: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Criar usuário
-async function createUser(userData) {
-    if (auth) {
-        const userCredential = await auth.createUserWithEmailAndPassword(userData.email, userData.password);
-        const userId = userCredential.user.uid;
-        
-        const userDoc = {
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            verified: false,
-            progress: { ...userProgress },
-            settings: {
-                theme: 'light',
-                notifications: true,
-                sound: true,
-                music: false,
-                progressNotifications: true
-            }
-        };
-        
-        await db.collection('users').doc(userId).set(userDoc);
-        
-        if (userData.role === 'admin') {
-            adminExists = true;
-        }
-    } else {
-        // Modo demo
-        const userId = 'demo_' + Date.now();
-        const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
-        
-        demoUsers.push({
-            id: userId,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            verified: true
-        });
-        
-        localStorage.setItem('mathkids_demo_users', JSON.stringify(demoUsers));
-        
-        if (userData.role === 'admin') {
-            adminExists = true;
-            localStorage.setItem('mathkids_admin_exists', 'true');
-        }
-    }
-}
-
-// Atualizar usuário
-async function updateUser(userId, userData) {
-    if (db) {
-        const updateData = {
-            name: userData.name,
-            email: userData.email,
-            role: userData.role
-        };
-        
-        if (userData.password) {
-            // Atualizar senha no Firebase Auth
-            const user = auth.currentUser;
-            if (user && user.uid === userId) {
-                await user.updatePassword(userData.password);
-            }
-        }
-        
-        await db.collection('users').doc(userId).update(updateData);
-    } else {
-        // Modo demo
-        const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
-        const index = demoUsers.findIndex(u => u.id === userId);
-        
-        if (index !== -1) {
-            demoUsers[index] = {
-                ...demoUsers[index],
-                name: userData.name,
-                email: userData.email,
-                role: userData.role
-            };
-            
-            localStorage.setItem('mathkids_demo_users', JSON.stringify(demoUsers));
-        }
-    }
-}
-
-// Carregar tabela de usuários - FIX: Atualização automática
-async function loadUsersTable() {
-    const tbody = document.getElementById('usersTableBody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center">Carregando usuários...</td>
-        </tr>
-    `;
-    
-    try {
-        let users = [];
-        
-        if (db) {
-            const snapshot = await db.collection('users').get();
-            users = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-        } else {
-            const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
-            users = demoUsers;
-            
-            // Adicionar usuário atual se não estiver na lista
-            const currentUserData = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
-            if (currentUserData.id && !users.some(u => u.id === currentUserData.id)) {
-                users.push(currentUserData);
-            }
-        }
-        
-        renderUsersTable(users);
-        
-    } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" class="text-center">Erro ao carregar usuários</td>
-            </tr>
-        `;
-    }
-}
-
-// Renderizar tabela de usuários
-function renderUsersTable(users) {
-    const tbody = document.getElementById('usersTableBody');
-    if (!tbody) return;
-    
-    if (users.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
-            </tr>
-        `;
-        return;
-    }
-    
-    let html = '';
-    users.forEach(user => {
-        if (user.id === currentUser?.id) return;
-        
-        const name = user.name || 'Sem nome';
-        const email = user.email || 'Sem email';
-        const role = user.role === 'admin' ? 'Administrador' : 'Aluno';
-        const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '--';
-        const status = user.verified ? 'Verificado' : 'Pendente';
-        const statusClass = user.verified ? 'status-verified' : 'status-pending';
-        
-        html += `
-            <tr>
-                <td>${name}</td>
-                <td>${email}</td>
-                <td><span class="user-role-badge ${role === 'Administrador' ? 'admin' : 'student'}">${role}</span></td>
-                <td>${createdAt}</td>
-                <td><span class="status ${statusClass}">${status}</span></td>
-                <td>
-                    <div class="user-actions">
-                        <button class="btn-action edit" data-user-id="${user.id}" data-user-name="${name}" data-user-email="${email}" data-user-role="${user.role}" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-action delete" data-user-id="${user.id}" data-user-name="${name}" title="Excluir">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    
-    tbody.innerHTML = html || `
-        <tr>
-            <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
-        </tr>
-    `;
-    
-    setupUserTableActions();
-}
-
-// Configurar ações da tabela de usuários
-function setupUserTableActions() {
-    // Botões de editar
-    document.querySelectorAll('.btn-action.edit').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user-id');
-            const userName = this.getAttribute('data-user-name');
-            const userEmail = this.getAttribute('data-user-email');
-            const userRole = this.getAttribute('data-user-role');
-            
-            openUserModal({
-                id: userId,
-                name: userName,
-                email: userEmail,
-                role: userRole
-            });
-        });
-    });
-    
-    // Botões de excluir
-    document.querySelectorAll('.btn-action.delete').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const userId = this.getAttribute('data-user-id');
-            const userName = this.getAttribute('data-user-name');
-            
-            if (confirm(`Tem certeza que deseja excluir o usuário "${userName}"?`)) {
-                deleteUser(userId);
-            }
-        });
-    });
-}
-
-// Excluir usuário
-async function deleteUser(userId) {
-    showLoading(true);
-    
-    try {
-        if (db) {
-            await db.collection('users').doc(userId).delete();
-            
-            // Tentar excluir do Firebase Auth também
-            if (auth.currentUser && auth.currentUser.uid === userId) {
-                await auth.currentUser.delete();
-            }
-        } else {
-            const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
-            const filteredUsers = demoUsers.filter(u => u.id !== userId);
-            localStorage.setItem('mathkids_demo_users', JSON.stringify(filteredUsers));
-        }
-        
-        showToast('Usuário excluído com sucesso!', 'success');
-        
-        // Recarregar tabela
-        loadUsersTable();
-        
-        // Atualizar estatísticas
-        await loadSystemStats();
-        
-    } catch (error) {
-        showToast('Erro ao excluir usuário: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Filtrar tabela de usuários
-function filterUsersTable(searchTerm) {
-    const rows = document.querySelectorAll('#usersTableBody tr');
-    
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
-    });
-}
-
-// Gerar relatório - FIX: Funcionalidade completa
-function generateReport() {
-    const reportType = document.getElementById('reportType').value;
-    const reportPeriod = document.getElementById('reportPeriod').value;
-    const preview = document.getElementById('reportPreview');
-    
-    if (!preview) return;
-    
-    let reportContent = '';
-    const periodName = getPeriodName(reportPeriod);
-    
-    switch(reportType) {
-        case 'progress':
-            reportContent = `
-                <h4>📊 Relatório de Progresso dos Alunos</h4>
-                <p><strong>Período:</strong> ${periodName}</p>
-                <div class="report-data">
-                    <div class="report-stat">
-                        <span class="stat-label">Total de Alunos:</span>
-                        <span class="stat-value">${systemStats.totalStudents}</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Exercícios Concluídos:</span>
-                        <span class="stat-value">${systemStats.totalExercises}</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Taxa Média de Acerto:</span>
-                        <span class="stat-value">78%</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Tempo Médio de Prática:</span>
-                        <span class="stat-value">45 min/aluno</span>
-                    </div>
-                </div>
-                <div class="report-chart">
-                    <canvas id="reportChart" height="200"></canvas>
-                </div>
-            `;
-            break;
-            
-        case 'usage':
-            reportContent = `
-                <h4>📈 Relatório de Uso do Sistema</h4>
-                <p><strong>Período:</strong> ${periodName}</p>
-                <div class="report-data">
-                    <div class="report-stat">
-                        <span class="stat-label">Usuários Totais:</span>
-                        <span class="stat-value">${systemStats.totalUsers}</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Novos Cadastros:</span>
-                        <span class="stat-value">12</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Acessos Diários:</span>
-                        <span class="stat-value">245</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Tempo Médio de Sessão:</span>
-                        <span class="stat-value">18 min</span>
-                    </div>
-                </div>
-                <div class="usage-breakdown">
-                    <h5>Dispositivos Mais Usados:</h5>
-                    <ul>
-                        <li>Desktop: 65%</li>
-                        <li>Mobile: 30%</li>
-                        <li>Tablet: 5%</li>
-                    </ul>
-                </div>
-            `;
-            break;
-            
-        case 'performance':
-            reportContent = `
-                <h4>🎯 Relatório de Desempenho por Operação</h4>
-                <p><strong>Período:</strong> ${periodName}</p>
-                <div class="report-data">
-                    <div class="report-stat">
-                        <span class="stat-label">Adição:</span>
-                        <span class="stat-value">85% de acerto</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Subtração:</span>
-                        <span class="stat-value">82% de acerto</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Multiplicação:</span>
-                        <span class="stat-value">75% de acerto</span>
-                    </div>
-                    <div class="report-stat">
-                        <span class="stat-label">Divisão:</span>
-                        <span class="stat-value">70% de acerto</span>
-                    </div>
-                </div>
-                <div class="performance-trend">
-                    <h5>Tendência de Melhoria:</h5>
-                    <p>Os alunos mostraram uma melhoria média de <strong>15%</strong> no desempenho geral durante o período.</p>
-                </div>
-            `;
-            break;
-    }
-    
-    preview.innerHTML = reportContent;
-    showToast('Relatório gerado com sucesso!', 'success');
-}
-
-// Salvar configurações do sistema
-function saveSystemSettings() {
-    const settings = {
-        allowRegistrations: document.getElementById('allowRegistrations').checked,
-        emailVerification: document.getElementById('emailVerification').checked,
-        enableGames: document.getElementById('enableGames').checked,
-        gameTimeLimit: document.getElementById('gameTimeLimit').value,
-        systemNotifications: document.getElementById('systemNotifications').checked,
-        progressNotifications: document.getElementById('progressNotifications').checked
-    };
-    
-    localStorage.setItem('mathkids_system_settings', JSON.stringify(settings));
-    showToast('Configurações salvas com sucesso!', 'success');
-}
+// ===== FUNÇÕES AUXILIARES =====
 
 // Funções auxiliares
 function getRandomInt(min, max) {
@@ -3191,16 +2688,6 @@ function getGameName(gameId) {
         mathChampionship: 'Campeonato MathKids'
     };
     return names[gameId] || gameId;
-}
-
-function getPeriodName(period) {
-    const names = {
-        week: 'Última Semana',
-        month: 'Último Mês',
-        quarter: 'Último Trimestre',
-        year: 'Último Ano'
-    };
-    return names[period] || period;
 }
 
 function formatTimeAgo(timestamp) {
@@ -3279,6 +2766,8 @@ function generateBadges() {
     
     return html;
 }
+
+// ===== FUNÇÕES DE MODAIS E NOTIFICAÇÕES =====
 
 function openModal(modalId) {
     const modal = document.getElementById(modalId + 'Modal');
@@ -3710,95 +3199,10 @@ function initializeComponents() {
     });
 }
 
-// Modo de demonstração
-function setupDemoMode() {
-    console.log('Modo de demonstração ativado');
-    
-    // Valores estáticos para evitar loops
-    userProgress = {
-        exercisesCompleted: 15,
-        correctAnswers: 12,
-        totalAnswers: 15,
-        practiceTime: 45,
-        addition: { correct: 4, total: 4 },
-        subtraction: { correct: 3, total: 4 },
-        multiplication: { correct: 3, total: 4 },
-        division: { correct: 2, total: 3 },
-        lastActivities: [
-            { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
-            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
-            { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() }
-        ],
-        level: 'Iniciante',
-        badges: [],
-        dailyProgress: {
-            exercises: 6,
-            correct: 5,
-            time: 27
-        }
-    };
-    
-    adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
-    
-    // Valores estáticos para evitar loops
-    systemStats = {
-        totalStudents: 1250,
-        averageRating: 4.8,
-        improvementRate: 98,
-        totalExercises: 12450,
-        totalUsers: 1260
-    };
-    
-    // Atualizar UI apenas uma vez
-    setTimeout(() => {
-        updateSystemStatsUI();
-    }, 100);
-}
-
-async function handleDemoLogin(email, password) {
-    const demoUsers = {
-        'admin@mathkids.com': { password: 'admin123', role: 'admin', name: 'Administrador Demo' },
-        'aluno@mathkids.com': { password: 'aluno123', role: 'student', name: 'Aluno Demo' }
-    };
-    
-    if (demoUsers[email] && demoUsers[email].password === password) {
-        const user = demoUsers[email];
-        currentUser = {
-            id: 'demo_' + email,
-            name: user.name,
-            email: email,
-            role: user.role,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            progress: userProgress,
-            settings: {
-                theme: 'light',
-                notifications: true,
-                sound: true,
-                music: false,
-                progressNotifications: true
-            }
-        };
-        
-        localStorage.setItem('mathkids_user', JSON.stringify(currentUser));
-        
-        return currentUser;
-    } else {
-        throw new Error('Credenciais inválidas');
-    }
-}
-
 // Funções para uso global
 window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
 
-// Atualizar estatísticas periodicamente
-setInterval(() => {
-    if (db && currentUser) {
-        loadSystemStats();
-    }
-}, 30000); // Atualizar a cada 30 segundos
-
-console.log('MathKids Pro v3.1 carregado com sucesso!');
+console.log('✅ MathKids Pro v3.1.1 carregado com sucesso!');
