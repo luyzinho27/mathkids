@@ -4509,3 +4509,42 @@ select:valid {
 [data-theme="dark"] .divider-text {
     background: var(--gray-900);
 }
+
+/* Estilo para botão de atualização de estatísticas */
+.stats-refresh {
+    margin-top: var(--space-md);
+}
+
+.btn-refresh-stats {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin: 0 auto;
+}
+
+.btn-refresh-stats:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(180deg);
+}
+
+/* Animação de rotação para o ícone de atualização */
+.fa-sync-alt {
+    transition: transform var(--transition-normal);
+}
+
+.btn-refresh-stats:hover .fa-sync-alt {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
