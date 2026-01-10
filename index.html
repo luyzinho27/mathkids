@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MathKids Pro - Aprendizado Interativo de Matemática</title>
+	<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%230ea5e9'>🧮</text></svg>">
+	<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%230ea5e9'>🧮</text></svg>">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -615,74 +617,12 @@
                     </div>
                     
                     <div class="games-content">
-                        <div class="games-grid">
-                            <div class="game-card" id="lightningGame">
-                                <div class="game-header">
-                                    <div class="game-icon">
-                                        <i class="fas fa-bolt"></i>
-                                    </div>
-                                    <div class="game-badge">Popular</div>
-                                </div>
-                                <h3>Desafio Relâmpago</h3>
-                                <p>Resolva o máximo de multiplicações em 60 segundos!</p>
-                                <div class="game-stats">
-                                    <span><i class="fas fa-trophy"></i> Seu recorde: <span id="lightningHighScore">0</span></span>
-                                </div>
-                                <button class="btn-game">Jogar Agora</button>
-                            </div>
-                            
-                            <div class="game-card" id="divisionPuzzle">
-                                <div class="game-header">
-                                    <div class="game-icon">
-                                        <i class="fas fa-puzzle-piece"></i>
-                                    </div>
-                                    <div class="game-badge">Novo</div>
-                                </div>
-                                <h3>Quebra-cabeça da Divisão</h3>
-                                <p>Complete o quebra-cabeça resolvendo problemas de divisão.</p>
-                                <div class="game-stats">
-                                    <span><i class="fas fa-star"></i> Nível: <span id="divisionLevel">1</span></span>
-                                </div>
-                                <button class="btn-game">Jogar Agora</button>
-                            </div>
-                            
-                            <div class="game-card" id="mathChampionship">
-                                <div class="game-header">
-                                    <div class="game-icon">
-                                        <i class="fas fa-trophy"></i>
-                                    </div>
-                                    <div class="game-badge">Competitivo</div>
-                                </div>
-                                <h3>Campeonato MathKids</h3>
-                                <p>Enfrente operações mistas e suba no ranking.</p>
-                                <div class="game-stats">
-                                    <span><i class="fas fa-medal"></i> Posição: #<span id="ranking">--</span></span>
-                                </div>
-                                <button class="btn-game">Jogar Agora</button>
-                            </div>
-                            
-                            <div class="game-card" id="rachaCucaGame">
-                                <div class="game-header">
-                                    <div class="game-icon">
-                                        <i class="fas fa-puzzle-piece"></i>
-                                    </div>
-                                    <div class="game-badge">Lógica</div>
-                                </div>
-                                <h3>Racha Cuca</h3>
-                                <p>Organize os números na ordem correta no quebra-cabeça.</p>
-                                <div class="game-stats">
-                                    <span><i class="fas fa-clock"></i> Melhor tempo: <span id="rachaCucaBestTime">--</span></span>
-                                </div>
-                                <button class="btn-game">Jogar Agora</button>
-                            </div>
+                        <div class="games-grid" id="gamesGrid">
+                            <!-- Jogos serão carregados via JavaScript -->
                         </div>
                         
                         <div class="game-container" id="gameContainer">
-                            <div class="game-welcome">
-                                <h3>Selecione um jogo para começar!</h3>
-                                <p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
-                                <p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
-                            </div>
+                            <!-- Conteúdo do jogo ativo será carregado aqui -->
                         </div>
                     </div>
                 </section>
@@ -694,6 +634,150 @@
                 </section>
             </div>
         </main>
+
+        <!-- Painel de Racha Cuca -->
+        <div class="modal" id="rachacucaModal">
+            <div class="modal-content large-modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-puzzle-piece"></i> Racha Cuca - Quebra-cabeça Numérico</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="rachacuca-container">
+                        <div class="rachacuca-header">
+                            <div class="rachacuca-stats">
+                                <div class="rachacuca-stat">
+                                    <span class="stat-label">Movimentos:</span>
+                                    <span id="rachacucaMoves" class="stat-value">0</span>
+                                </div>
+                                <div class="rachacuca-stat">
+                                    <span class="stat-label">Tempo:</span>
+                                    <span id="rachacucaTimer" class="stat-value">00:00</span>
+                                </div>
+                                <div class="rachacuca-stat">
+                                    <span class="stat-label">Dificuldade:</span>
+                                    <span id="rachacucaDifficulty" class="stat-value">Normal</span>
+                                </div>
+                            </div>
+                            <div class="rachacuca-controls">
+                                <button id="rachacucaShuffle" class="btn-exercise">
+                                    <i class="fas fa-random"></i> Embaralhar
+                                </button>
+                                <button id="rachacucaSolve" class="btn-exercise secondary">
+                                    <i class="fas fa-lightbulb"></i> Ver Solução
+                                </button>
+                                <button id="rachacucaReset" class="btn-exercise secondary">
+                                    <i class="fas fa-redo"></i> Reiniciar
+                                </button>
+                                <button id="rachacucaHint" class="btn-exercise outline">
+                                    <i class="fas fa-question-circle"></i> Dica
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="rachacuca-game">
+                            <div class="rachacuca-board" id="rachacucaBoard">
+                                <!-- Tabuleiro do jogo será gerado aqui -->
+                            </div>
+                            
+                            <div class="rachacuca-sidebar">
+                                <div class="rachacuca-instructions">
+                                    <h4><i class="fas fa-info-circle"></i> Como Jogar</h4>
+                                    <p>Clique nas peças para movê-las para o espaço vazio. O objetivo é ordenar os números de 1 a 15.</p>
+                                    
+                                    <div class="rachacuca-difficulty">
+                                        <h5><i class="fas fa-sliders-h"></i> Dificuldade</h5>
+                                        <div class="difficulty-options">
+                                            <button class="difficulty-btn active" data-difficulty="easy">Fácil</button>
+                                            <button class="difficulty-btn" data-difficulty="normal">Normal</button>
+                                            <button class="difficulty-btn" data-difficulty="hard">Difícil</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="rachacuca-solution">
+                                        <h5><i class="fas fa-check-circle"></i> Solução</h5>
+                                        <div class="solution-board" id="rachacucaSolution">
+                                            <!-- Tabuleiro de solução -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="rachacuca-completion" id="rachacucaCompletion" style="display: none;">
+                                        <div class="completion-message">
+                                            <h4><i class="fas fa-trophy"></i> Parabéns!</h4>
+                                            <p>Você completou o quebra-cabeça em <strong id="rachacucaFinalMoves">0</strong> movimentos e <strong id="rachacucaFinalTime">00:00</strong>!</p>
+                                            <button id="rachacucaPlayAgain" class="btn-exercise">
+                                                <i class="fas fa-play"></i> Jogar Novamente
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="rachacuca-footer">
+                            <div class="rachacuca-actions">
+                                <button id="rachacucaSaveScore" class="btn-exercise outline">
+                                    <i class="fas fa-save"></i> Salvar Pontuação
+                                </button>
+                                <button id="rachacucaViewScores" class="btn-exercise outline">
+                                    <i class="fas fa-trophy"></i> Ver Ranking
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para salvar pontuação do Racha Cuca -->
+        <div class="modal" id="rachacucaSaveModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-save"></i> Salvar Pontuação</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="score-summary">
+                        <p>Você completou o quebra-cabeça em <strong id="saveRachacucaMoves">0</strong> movimentos e <strong id="saveRachacucaTime">00:00</strong>!</p>
+                        <p>Dificuldade: <strong id="saveRachacucaDifficulty">Normal</strong></p>
+                    </div>
+                    <div class="player-input">
+                        <label for="rachacucaPlayerName">Seu nome:</label>
+                        <input type="text" id="rachacucaPlayerName" placeholder="Digite seu nome" maxlength="20">
+                        <small>Máximo 20 caracteres</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="rachacucaConfirmSave" class="btn-auth btn-primary">
+                            <i class="fas fa-check"></i> Salvar Pontuação
+                        </button>
+                        <button id="rachacucaCancelSave" class="btn-auth btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para ranking do Racha Cuca -->
+        <div class="modal" id="rachacucaScoresModal">
+            <div class="modal-content large-modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-trophy"></i> Melhores Pontuações - Racha Cuca</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="ranking-tabs">
+                        <button class="tab-btn active" data-tab="global">Global</button>
+                        <button class="tab-btn" data-tab="easy">Fácil</button>
+                        <button class="tab-btn" data-tab="normal">Normal</button>
+                        <button class="tab-btn" data-tab="hard">Difícil</button>
+                    </div>
+                    <div id="rachacucaScoresList">
+                        <p class="no-scores">Nenhuma pontuação salva ainda.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="notifications-panel" id="notificationsPanel">
             <div class="notifications-header">
