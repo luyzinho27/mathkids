@@ -14,6 +14,10 @@ let currentUser = null;
 let userData = {};
 let adminExists = false;
 
+// Configurar listeners do Firebase em tempo real
+let statsListener = null;
+let userProgressListener = null;
+
 // Estados da aplicação
 let currentSection = 'dashboard';
 let currentOperation = null;
@@ -27,8 +31,8 @@ let gameScore = 0;
 let gameHighScore = 0;
 let systemStats = {
     totalStudents: 0,
-    averageRating: 4.8,
-    improvementRate: 98,
+    averageRating: 0,
+    improvementRate: 0,
     totalExercises: 0,
     totalUsers: 0,
     systemAccuracy: 0,
@@ -58,272 +62,228 @@ let userProgress = {
 // Variáveis globais para armazenamento de instâncias
 let operationsChartInstance = null;
 
+// Inicialização do Firebase
+try {
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    analytics = firebase.analytics();
+    
+    console.log('Firebase inicializado com sucesso');
+} catch (error) {
+    console.log("Firebase não configurado. Modo de demonstração ativado.");
+    setupDemoMode();
+}
+
 // Elementos DOM - consolidados para evitar duplicação
 const DOM = {
     // Telas
-    authScreen: null,
-    appScreen: null,
+    authScreen: document.getElementById('authScreen'),
+    appScreen: document.getElementById('appScreen'),
     
     // Formulários de autenticação
-    loginForm: null,
-    registerForm: null,
-    recoverForm: null,
-    loginFormElement: null,
-    registerFormElement: null,
-    recoverFormElement: null,
+    loginForm: document.getElementById('loginForm'),
+    registerForm: document.getElementById('registerForm'),
+    recoverForm: document.getElementById('recoverForm'),
+    loginFormElement: document.getElementById('loginFormElement'),
+    registerFormElement: document.getElementById('registerFormElement'),
+    recoverFormElement: document.getElementById('recoverFormElement'),
     
     // Links de autenticação
-    showRegister: null,
-    showLogin: null,
-    showLoginFromRecover: null,
-    forgotPasswordLink: null,
+    showRegister: document.getElementById('showRegister'),
+    showLogin: document.getElementById('showLogin'),
+    showLoginFromRecover: document.getElementById('showLoginFromRecover'),
+    forgotPasswordLink: document.getElementById('forgotPasswordLink'),
     
     // Opções de usuário
-    adminOption: null,
-    userTypeSelect: null,
+    adminOption: document.getElementById('adminOption'),
+    userTypeSelect: document.getElementById('userType'),
     
     // Estatísticas da tela inicial
-    statsStudents: null,
-    statsRating: null,
-    statsImprovement: null,
+    statsStudents: document.getElementById('statsStudents'),
+    statsRating: document.getElementById('statsRating'),
+    statsImprovement: document.getElementById('statsImprovement'),
     
     // Navegação
-    menuToggle: null,
-    closeSidebar: null,
-    mobileSidebar: null,
-    sidebarOverlay: null,
-    userDropdownToggle: null,
-    userDropdown: null,
-    notificationsToggle: null,
-    notificationsPanel: null,
-    clearNotifications: null,
+    menuToggle: document.getElementById('menuToggle'),
+    closeSidebar: document.getElementById('closeSidebar'),
+    mobileSidebar: document.getElementById('mobileSidebar'),
+    sidebarOverlay: document.getElementById('sidebarOverlay'),
+    userDropdownToggle: document.getElementById('userDropdownToggle'),
+    userDropdown: document.getElementById('userDropdown'),
+    notificationsToggle: document.getElementById('notificationsToggle'),
+    notificationsPanel: document.getElementById('notificationsPanel'),
+    clearNotifications: document.getElementById('clearNotifications'),
     
     // Botões de logout
-    logoutBtn: null,
-    mobileLogoutBtn: null,
+    logoutBtn: document.getElementById('logoutBtn'),
+    mobileLogoutBtn: document.getElementById('mobileLogoutBtn'),
     
     // Informações do usuário
-    userName: null,
-    userRole: null,
-    userAvatarInitials: null,
-    dropdownUserName: null,
-    dropdownUserRole: null,
-    dropdownAvatarInitials: null,
-    mobileUserName: null,
-    mobileUserRole: null,
-    mobileAvatarInitials: null,
-    welcomeUserName: null,
-    adminNav: null,
-    mobileAdminLink: null,
+    userName: document.getElementById('userName'),
+    userRole: document.getElementById('userRole'),
+    userAvatarInitials: document.getElementById('userAvatarInitials'),
+    dropdownUserName: document.getElementById('dropdownUserName'),
+    dropdownUserRole: document.getElementById('dropdownUserRole'),
+    dropdownAvatarInitials: document.getElementById('dropdownAvatarInitials'),
+    mobileUserName: document.getElementById('mobileUserName'),
+    mobileUserRole: document.getElementById('mobileUserRole'),
+    mobileAvatarInitials: document.getElementById('mobileAvatarInitials'),
+    welcomeUserName: document.getElementById('welcomeUserName'),
+    adminNav: document.getElementById('adminNav'),
+    mobileAdminLink: document.getElementById('mobileAdminLink'),
     
     // Estatísticas do dashboard
-    statExercises: null,
-    statAccuracy: null,
-    statTime: null,
-    statLevel: null,
+    statExercises: document.getElementById('statExercises'),
+    statAccuracy: document.getElementById('statAccuracy'),
+    statTime: document.getElementById('statTime'),
+    statLevel: document.getElementById('statLevel'),
     
     // Elementos de seções
-    activitiesList: null,
-    challengesList: null,
-    lessonsGrid: null,
-    activeLesson: null,
+    activitiesList: document.getElementById('activitiesList'),
+    challengesList: document.getElementById('challengesList'),
+    lessonsGrid: document.getElementById('lessonsGrid'),
+    activeLesson: document.getElementById('activeLesson'),
     
     // Modais
-    termsModal: null,
-    privacyModal: null,
-    contactModal: null,
-    profileModal: null,
-    settingsModal: null,
+    termsModal: document.getElementById('termsModal'),
+    privacyModal: document.getElementById('privacyModal'),
+    contactModal: document.getElementById('contactModal'),
+    profileModal: document.getElementById('profileModal'),
+    settingsModal: document.getElementById('settingsModal'),
     
     // Links de modais
-    termsLink: null,
-    privacyLink: null,
-    termsLinkFooter: null,
-    privacyLinkFooter: null,
-    contactLink: null,
+    termsLink: document.getElementById('termsLink'),
+    privacyLink: document.getElementById('privacyLink'),
+    termsLinkFooter: document.getElementById('termsLinkFooter'),
+    privacyLinkFooter: document.getElementById('privacyLinkFooter'),
+    contactLink: document.getElementById('contactLink'),
     
     // Containers
-    toastContainer: null,
-    loadingOverlay: null
+    toastContainer: document.getElementById('toastContainer'),
+    loadingOverlay: document.getElementById('loadingOverlay')
 };
 
-// Função auxiliar para inicializar elementos
-function initializeElements() {
-    console.log('Inicializando elementos DOM...');
+// Configurar listeners do Firebase em tempo real
+function setupFirebaseListeners() {
+    if (!db) return;
     
-    // Telas
-    DOM.authScreen = document.getElementById('authScreen');
-    DOM.appScreen = document.getElementById('appScreen');
+    // Remover listener anterior se existir
+    if (statsListener) {
+        statsListener();
+        statsListener = null;
+    }
     
-    // Formulários de autenticação
-    DOM.loginForm = document.getElementById('loginForm');
-    DOM.registerForm = document.getElementById('registerForm');
-    DOM.recoverForm = document.getElementById('recoverForm');
-    DOM.loginFormElement = document.getElementById('loginFormElement');
-    DOM.registerFormElement = document.getElementById('registerFormElement');
-    DOM.recoverFormElement = document.getElementById('recoverFormElement');
+    // Configurar listener em tempo real para usuários (estatísticas gerais)
+    statsListener = db.collection('users').onSnapshot(
+        (snapshot) => {
+            console.log('📊 Dados do Firebase atualizados em tempo real');
+            loadSystemStats(true); // Forçar atualização
+        },
+        (error) => {
+            console.error('❌ Erro no listener do Firebase:', error);
+            // Tentar reconectar após 5 segundos
+            setTimeout(() => setupFirebaseListeners(), 5000);
+        }
+    );
     
-    // Links de autenticação
-    DOM.showRegister = document.getElementById('showRegister');
-    DOM.showLogin = document.getElementById('showLogin');
-    DOM.showLoginFromRecover = document.getElementById('showLoginFromRecover');
-    DOM.forgotPasswordLink = document.getElementById('forgotPasswordLink');
-    
-    // Opções de usuário
-    DOM.adminOption = document.getElementById('adminOption');
-    DOM.userTypeSelect = document.getElementById('userType');
-    
-    // Estatísticas da tela inicial - CRÍTICO!
-    DOM.statsStudents = document.getElementById('statsStudents');
-    DOM.statsRating = document.getElementById('statsRating');
-    DOM.statsImprovement = document.getElementById('statsImprovement');
-    
-    // Navegação
-    DOM.menuToggle = document.getElementById('menuToggle');
-    DOM.closeSidebar = document.getElementById('closeSidebar');
-    DOM.mobileSidebar = document.getElementById('mobileSidebar');
-    DOM.sidebarOverlay = document.getElementById('sidebarOverlay');
-    DOM.userDropdownToggle = document.getElementById('userDropdownToggle');
-    DOM.userDropdown = document.getElementById('userDropdown');
-    DOM.notificationsToggle = document.getElementById('notificationsToggle');
-    DOM.notificationsPanel = document.getElementById('notificationsPanel');
-    DOM.clearNotifications = document.getElementById('clearNotifications');
-    
-    // Botões de logout
-    DOM.logoutBtn = document.getElementById('logoutBtn');
-    DOM.mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
-    
-    // Informações do usuário
-    DOM.userName = document.getElementById('userName');
-    DOM.userRole = document.getElementById('userRole');
-    DOM.userAvatarInitials = document.getElementById('userAvatarInitials');
-    DOM.dropdownUserName = document.getElementById('dropdownUserName');
-    DOM.dropdownUserRole = document.getElementById('dropdownUserRole');
-    DOM.dropdownAvatarInitials = document.getElementById('dropdownAvatarInitials');
-    DOM.mobileUserName = document.getElementById('mobileUserName');
-    DOM.mobileUserRole = document.getElementById('mobileUserRole');
-    DOM.mobileAvatarInitials = document.getElementById('mobileAvatarInitials');
-    DOM.welcomeUserName = document.getElementById('welcomeUserName');
-    DOM.adminNav = document.getElementById('adminNav');
-    DOM.mobileAdminLink = document.getElementById('mobileAdminLink');
-    
-    // Estatísticas do dashboard
-    DOM.statExercises = document.getElementById('statExercises');
-    DOM.statAccuracy = document.getElementById('statAccuracy');
-    DOM.statTime = document.getElementById('statTime');
-    DOM.statLevel = document.getElementById('statLevel');
-    
-    // Elementos de seções
-    DOM.activitiesList = document.getElementById('activitiesList');
-    DOM.challengesList = document.getElementById('challengesList');
-    DOM.lessonsGrid = document.getElementById('lessonsGrid');
-    DOM.activeLesson = document.getElementById('activeLesson');
-    
-    // Modais
-    DOM.termsModal = document.getElementById('termsModal');
-    DOM.privacyModal = document.getElementById('privacyModal');
-    DOM.contactModal = document.getElementById('contactModal');
-    DOM.profileModal = document.getElementById('profileModal');
-    DOM.settingsModal = document.getElementById('settingsModal');
-    
-    // Links de modais
-    DOM.termsLink = document.getElementById('termsLink');
-    DOM.privacyLink = document.getElementById('privacyLink');
-    DOM.termsLinkFooter = document.getElementById('termsLinkFooter');
-    DOM.privacyLinkFooter = document.getElementById('privacyLinkFooter');
-    DOM.contactLink = document.getElementById('contactLink');
-    
-    // Containers
-    DOM.toastContainer = document.getElementById('toastContainer');
-    DOM.loadingOverlay = document.getElementById('loadingOverlay');
-    
-    console.log('Elementos DOM inicializados');
+    // Configurar listener para progresso do usuário atual
+    if (currentUser && currentUser.id) {
+        setupUserProgressListener();
+    }
 }
 
-// Função para garantir que elementos críticos existam
-function ensureStatsElements() {
-    // Verificar se os elementos existem, se não, tentar encontrá-los novamente
-    if (!DOM.statsStudents) {
-        DOM.statsStudents = document.getElementById('statsStudents');
-    }
-    if (!DOM.statsRating) {
-        DOM.statsRating = document.getElementById('statsRating');
-    }
-    if (!DOM.statsImprovement) {
-        DOM.statsImprovement = document.getElementById('statsImprovement');
+// Configurar listener para progresso do usuário
+function setupUserProgressListener() {
+    if (!db || !currentUser || !currentUser.id) return;
+    
+    // Remover listener anterior se existir
+    if (userProgressListener) {
+        userProgressListener();
+        userProgressListener = null;
     }
     
-    // Log para debug
-    if (!DOM.statsStudents) console.warn('Elemento statsStudents não encontrado');
-    if (!DOM.statsRating) console.warn('Elemento statsRating não encontrado');
-    if (!DOM.statsImprovement) console.warn('Elemento statsImprovement não encontrado');
+    userProgressListener = db.collection('users').doc(currentUser.id).onSnapshot(
+        (doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.progress) {
+                    userProgress = data.progress;
+                    updateProgressUI();
+                }
+            }
+        },
+        (error) => {
+            console.error('❌ Erro no listener de progresso:', error);
+        }
+    );
 }
 
 // Quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM carregado, inicializando...');
+    console.log('🚀 MathKids Pro inicializando...');
     
-    // Inicializar elementos DOM primeiro
+    // Inicializar elementos DOM
     initializeElements();
     
     // Configurar eventos
     setupEventListeners();
     
-    // Inicializar Firebase
-    try {
-        app = firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        auth = firebase.auth();
-        analytics = firebase.analytics();
-        
-        console.log('Firebase inicializado com sucesso');
-        
-        // Configurar listener em tempo real para atualizações
-        if (db) {
-            db.collection('users').onSnapshot(() => {
-                console.log('Detectada alteração nos usuários, atualizando estatísticas...');
-                loadSystemStats(true);
-            }, error => {
-                console.error('Erro no listener do Firebase:', error);
-            });
-        }
-    } catch (error) {
-        console.log("Firebase não configurado. Modo de demonstração ativado.");
-        setupDemoMode();
+    // Configurar Firebase Auth state observer
+    if (auth) {
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('👤 Usuário autenticado:', user.email);
+                await loadUserDataFromFirebase(user.uid);
+                showApp();
+                // Configurar listeners após login
+                setupFirebaseListeners();
+                setupUserProgressListener();
+            } else {
+                console.log('👤 Nenhum usuário autenticado');
+                // Usuário não autenticado, garantir que mostre a tela de auth
+                DOM.authScreen.style.display = 'flex';
+                DOM.appScreen.style.display = 'none';
+            }
+            // SEMPRE carregar estatísticas, independente do login
+            loadSystemStats(true);
+        });
+    } else {
+        // Sem Firebase, usar modo demo
+        console.log('🎮 Modo demonstração ativado');
+        checkAuthState();
     }
-    
-    // Garantir que os elementos de estatísticas existam
-    ensureStatsElements();
-    
-    // Carregar estatísticas IMEDIATAMENTE
-    setTimeout(() => {
-        loadSystemStats(true);
-    }, 500);
-    
-    // Verificar autenticação
-    checkAuthState();
     
     // Inicializar componentes
     initializeComponents();
     
-    // Configurar Firebase Auth state observer
-    if (auth) {
-        auth.onAuthStateChanged(handleAuthStateChange);
-    }
-    
-    // Atualizar estatísticas periodicamente
-    setInterval(() => {
+    // Carregar estatísticas IMEDIATAMENTE (não esperar pelo auth)
+    setTimeout(() => {
         loadSystemStats(true);
-    }, 30000);
-    
-    console.log('Inicialização concluída');
+        // Configurar listeners do Firebase
+        setupFirebaseListeners();
+    }, 500);
 });
+
+// Função auxiliar para inicializar elementos
+function initializeElements() {
+    // Obter todos os links de navegação
+    DOM.navLinks = document.querySelectorAll('.nav-link');
+    DOM.sidebarLinks = document.querySelectorAll('.sidebar-link');
+    DOM.operationQuicks = document.querySelectorAll('.operation-quick');
+    
+    // Elementos de ação rápida
+    DOM.closeLesson = document.getElementById('closeLesson');
+    DOM.quickPractice = document.getElementById('quickPractice');
+    DOM.quickGame = document.getElementById('quickGame');
+    DOM.refreshDashboard = document.getElementById('refreshDashboard');
+}
 
 // Configurar todos os event listeners
 function setupEventListeners() {
     // Verificar se os elementos existem antes de adicionar listeners
     if (!DOM || !DOM.showRegister) {
-        console.error('Elementos DOM não encontrados');
+        console.error('❌ Elementos DOM não encontrados');
         return;
     }
     
@@ -365,30 +325,169 @@ function setupEventListeners() {
     
     // Fechar dropdown ao clicar fora
     document.addEventListener('click', function(e) {
-        if (DOM.userDropdownToggle && !DOM.userDropdownToggle.contains(e.target) && 
-            DOM.userDropdown && !DOM.userDropdown.contains(e.target)) {
+        if (!DOM.userDropdownToggle.contains(e.target) && !DOM.userDropdown.contains(e.target)) {
             DOM.userDropdown.classList.remove('active');
         }
     });
     
     // Logout
-    if (DOM.logoutBtn) DOM.logoutBtn.addEventListener('click', handleLogout);
-    if (DOM.mobileLogoutBtn) DOM.mobileLogoutBtn.addEventListener('click', handleLogout);
+    DOM.logoutBtn.addEventListener('click', handleLogout);
+    DOM.mobileLogoutBtn.addEventListener('click', handleLogout);
     
     // Notificações
-    if (DOM.notificationsToggle) {
-        DOM.notificationsToggle.addEventListener('click', toggleNotifications);
-    }
-    if (DOM.clearNotifications) {
-        DOM.clearNotifications.addEventListener('click', clearAllNotifications);
-    }
+    DOM.notificationsToggle.addEventListener('click', toggleNotifications);
+    DOM.clearNotifications.addEventListener('click', clearAllNotifications);
     
     // Fechar notificações ao clicar fora
     document.addEventListener('click', function(e) {
-        if (DOM.notificationsToggle && !DOM.notificationsToggle.contains(e.target) && 
-            DOM.notificationsPanel && !DOM.notificationsPanel.contains(e.target)) {
+        if (!DOM.notificationsToggle.contains(e.target) && !DOM.notificationsPanel.contains(e.target)) {
             DOM.notificationsPanel.classList.remove('active');
         }
+    });
+    
+    // Navegação entre seções
+    DOM.navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const sectionId = this.getAttribute('href').substring(1);
+            switchSection(sectionId);
+            
+            // Atualizar navegação ativa - FIX: Agora inclui todas as abas
+            updateActiveNavigation(sectionId);
+            
+            // Fechar sidebar mobile se aberto
+            closeMobileSidebar();
+        });
+    });
+    
+    // Navegação na sidebar mobile
+    DOM.sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            if (!this.classList.contains('logout')) {
+                e.preventDefault();
+                const sectionId = this.getAttribute('href').substring(1);
+                switchSection(sectionId);
+                updateActiveNavigation(sectionId);
+                closeMobileSidebar();
+            }
+        });
+    });
+    
+    // Operações rápidas no dashboard
+    DOM.operationQuicks.forEach(operation => {
+        operation.addEventListener('click', function() {
+            const operationType = this.getAttribute('data-operation');
+            switchSection('practice');
+            loadPracticeSection(operationType);
+        });
+    });
+    
+    // Botões de ação rápida
+    if (DOM.quickPractice) {
+        DOM.quickPractice.addEventListener('click', function() {
+            // Adicionar classe ativa temporariamente
+            this.classList.add('active');
+            setTimeout(() => this.classList.remove('active'), 300);
+            
+            const operations = ['addition', 'subtraction', 'multiplication', 'division'];
+            const randomOperation = operations[Math.floor(Math.random() * operations.length)];
+            switchSection('practice');
+            loadPracticeSection(randomOperation);
+        });
+    }
+    
+    if (DOM.quickGame) {
+        DOM.quickGame.addEventListener('click', function() {
+            // Adicionar classe ativa temporariamente
+            this.classList.add('active');
+            setTimeout(() => this.classList.remove('active'), 300);
+            
+            const games = ['lightningGame', 'divisionPuzzle', 'mathChampionship'];
+            const randomGame = games[Math.floor(Math.random() * games.length)];
+            switchSection('games');
+            startGame(randomGame);
+        });
+    }
+    
+    // Fechar lição ativa
+    if (DOM.closeLesson) {
+        DOM.closeLesson.addEventListener('click', function() {
+            DOM.activeLesson.style.display = 'none';
+        });
+    }
+    
+    // Recarregar dashboard
+    if (DOM.refreshDashboard) {
+        DOM.refreshDashboard.addEventListener('click', function() {
+            loadDashboardContent();
+            showToast('Dashboard atualizado!', 'success');
+        });
+    }
+    
+    // Blocos de recursos na tela inicial
+    document.querySelectorAll('.feature').forEach(feature => {
+        feature.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Recarregar estatísticas
+            loadSystemStats(true);
+        });
+    });
+    
+    // Modal de perfil e configurações
+    document.querySelectorAll('[href="#profile"]').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('profile');
+        });
+    });
+    
+    document.querySelectorAll('[href="#settings"]').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('settings');
+        });
+    });
+    
+    // Links de termos, privacidade e contato
+    DOM.termsLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('terms');
+    });
+    
+    DOM.privacyLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('privacy');
+    });
+    
+    DOM.termsLinkFooter.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('terms');
+    });
+    
+    DOM.privacyLinkFooter.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('privacy');
+    });
+    
+    DOM.contactLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal('contact');
+    });
+    
+    // Fechar modais
+    document.querySelectorAll('.close-modal').forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal(this.closest('.modal').id);
+        });
+    });
+    
+    // Fechar modais ao clicar fora
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal(this.id);
+            }
+        });
     });
 }
 
@@ -415,87 +514,16 @@ function setupPasswordToggles() {
     });
 }
 
-// Carregar estatísticas do sistema - CORRIGIDA
+// Carregar estatísticas do sistema - CORRIGIDO: Carregar sempre, mesmo sem login
 async function loadSystemStats(forceUpdate = false) {
-    try {
-        if (!db) {
-            // Modo demo - usar dados fictícios
-            systemStats = {
-                totalStudents: 1250,
-                averageRating: 4.8,
-                improvementRate: 98,
-                totalExercises: 12450,
-                totalUsers: 1260,
-                systemAccuracy: 78,
-                lastUpdated: Date.now()
-            };
-            updateSystemStatsUI();
-            return;
-        }
-        
-        // Limpar cache se forçado a atualizar ou se nunca foi atualizado
-        if (forceUpdate || !systemStats.lastUpdated) {
-            console.log('Carregando estatísticas do sistema...');
-            
-            // Contar todos os usuários
-            const allUsersSnapshot = await db.collection('users').get();
-            const totalUsers = allUsersSnapshot.size;
-            
-            // Contar usuários estudantes
-            const studentsSnapshot = await db.collection('users').where('role', '==', 'student').get();
-            const totalStudents = studentsSnapshot.size;
-            
-            // Calcular estatísticas agregadas
-            let totalExercises = 0;
-            let totalCorrect = 0;
-            let totalAttempts = 0;
-            
-            allUsersSnapshot.forEach(doc => {
-                const user = doc.data();
-                if (user.progress) {
-                    totalExercises += user.progress.exercisesCompleted || 0;
-                    totalCorrect += user.progress.correctAnswers || 0;
-                    totalAttempts += user.progress.totalAnswers || 0;
-                }
-            });
-            
-            // Calcular taxa de acerto geral
-            const systemAccuracy = totalAttempts > 0 ? 
-                Math.round((totalCorrect / totalAttempts) * 100) : 0;
-            
-            // Verificar se há admin
-            const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-            adminExists = !adminSnapshot.empty;
-            
-            // Atualizar estatísticas do sistema
-            systemStats = {
-                totalStudents,
-                averageRating: 4.8,
-                improvementRate: 98,
-                totalExercises,
-                totalUsers,
-                systemAccuracy,
-                lastUpdated: Date.now()
-            };
-            
-            console.log('Estatísticas carregadas:', systemStats);
-            
-            // Atualizar UI em tempo real
-            updateSystemStatsUI();
-            
-            // Se a seção admin estiver ativa, atualizar também
-            if (currentSection === 'admin' && currentUser?.role === 'admin') {
-                updateAdminStatsUI();
-            }
-            
-        } else if (Date.now() - systemStats.lastUpdated > 30000) {
-            // Se os dados estão velhos (> 30 segundos), atualizar
-            loadSystemStats(true);
-        }
-        
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas do sistema:', error);
-        // Usar dados demo em caso de erro
+    console.log('📊 Carregando estatísticas do sistema...', { forceUpdate, dbExists: !!db });
+    
+    // Mostrar estado de carregamento
+    updateSystemStatsUI(true);
+    
+    if (!db) {
+        // Modo demo
+        console.log('🎮 Usando dados de demonstração');
         systemStats = {
             totalStudents: 1250,
             averageRating: 4.8,
@@ -505,41 +533,181 @@ async function loadSystemStats(forceUpdate = false) {
             systemAccuracy: 78,
             lastUpdated: Date.now()
         };
-        updateSystemStatsUI();
+        updateSystemStatsUI(false);
+        return;
     }
-}
-
-// Atualizar UI das estatísticas do sistema - CORRIGIDA
-function updateSystemStatsUI() {
-    // Aguardar um momento para garantir que o DOM está pronto
-    setTimeout(() => {
-        // Garantir que elementos existam
-        ensureStatsElements();
+    
+    try {
+        // Verificar cache (5 minutos)
+        const cacheKey = 'mathkids_system_stats_cache';
+        const cacheDuration = 5 * 60 * 1000; // 5 minutos
         
-        if (DOM.statsStudents && DOM.statsStudents.textContent !== undefined) {
-            DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString();
-        }
-        if (DOM.statsRating && DOM.statsRating.textContent !== undefined) {
-            DOM.statsRating.textContent = systemStats.averageRating.toFixed(1);
-        }
-        if (DOM.statsImprovement && DOM.statsImprovement.textContent !== undefined) {
-            DOM.statsImprovement.textContent = systemStats.improvementRate + '%';
+        if (!forceUpdate) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const { stats, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < cacheDuration) {
+                        console.log('💾 Usando estatísticas em cache');
+                        systemStats = { ...stats, lastUpdated: timestamp };
+                        updateSystemStatsUI(false);
+                        
+                        // Atualizar em segundo plano (forçar atualização)
+                        setTimeout(() => loadSystemStats(true), 1000);
+                        return;
+                    }
+                } catch (cacheError) {
+                    console.warn('⚠️ Erro ao ler cache, buscando dados frescos');
+                }
+            }
         }
         
-        console.log('UI atualizada com:', {
-            alunos: systemStats.totalStudents,
-            rating: systemStats.averageRating,
-            improvement: systemStats.improvementRate
+        console.log('🔥 Buscando estatísticas do Firebase...');
+        
+        // Buscar todos os usuários
+        const usersSnapshot = await db.collection('users').get();
+        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Calcular estatísticas
+        const studentUsers = users.filter(user => user.role === 'student');
+        const totalStudents = studentUsers.length;
+        const totalUsers = users.length;
+        
+        let totalExercises = 0;
+        let totalCorrect = 0;
+        let totalAttempts = 0;
+        
+        studentUsers.forEach(user => {
+            if (user.progress) {
+                totalExercises += user.progress.exercisesCompleted || 0;
+                totalCorrect += user.progress.correctAnswers || 0;
+                totalAttempts += user.progress.totalAnswers || 0;
+            }
         });
         
-        // Atualizar também na seção Admin se estiver ativa
+        // Calcular métricas
+        const systemAccuracy = totalAttempts > 0 ? 
+            Math.round((totalCorrect / totalAttempts) * 100) : 78;
+        
+        // Verificar se há admin
+        const adminExists = users.some(user => user.role === 'admin');
+        window.adminExists = adminExists;
+        
+        // Atualizar opção de admin se o formulário estiver visível
+        if (DOM.adminOption) {
+            if (adminExists) {
+                DOM.adminOption.disabled = true;
+                DOM.adminOption.title = "Já existe um administrador. Contate o administrador atual para acesso.";
+            } else {
+                DOM.adminOption.disabled = false;
+                DOM.adminOption.title = "Se torne o administrador principal";
+            }
+        }
+        
+        // Calcular avaliação média (simulado - pode ser substituído por dados reais)
+        const averageRating = 4.8;
+        
+        // Calcular taxa de melhoria (simulado baseado na acurácia)
+        const improvementRate = Math.min(98, systemAccuracy + 20);
+        
+        // Atualizar estatísticas do sistema
+        systemStats = {
+            totalStudents,
+            averageRating,
+            improvementRate,
+            totalExercises,
+            totalUsers,
+            systemAccuracy,
+            lastUpdated: Date.now()
+        };
+        
+        console.log('✅ Estatísticas carregadas:', systemStats);
+        
+        // Salvar no cache
+        try {
+            const cacheData = {
+                stats: {
+                    totalStudents,
+                    averageRating,
+                    improvementRate,
+                    totalExercises,
+                    totalUsers,
+                    systemAccuracy
+                },
+                timestamp: Date.now()
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (cacheError) {
+            console.warn('⚠️ Não foi possível salvar cache:', cacheError);
+        }
+        
+        // Atualizar UI
+        updateSystemStatsUI(false);
+        
+        // Se estiver na seção Admin, atualizar também
         if (currentSection === 'admin' && currentUser?.role === 'admin') {
             updateAdminStatsUI();
         }
-    }, 100);
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar estatísticas do sistema:', error);
+        
+        // Tentar usar cache em caso de erro
+        try {
+            const cacheKey = 'mathkids_system_stats_cache';
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { stats } = JSON.parse(cached);
+                systemStats = { ...stats, lastUpdated: Date.now() };
+                console.log('🔄 Usando cache devido ao erro');
+            }
+        } catch (cacheError) {
+            // Fallback para dados demo
+            systemStats = {
+                totalStudents: 1250,
+                averageRating: 4.8,
+                improvementRate: 98,
+                totalExercises: 12450,
+                totalUsers: 1260,
+                systemAccuracy: 78,
+                lastUpdated: Date.now()
+            };
+            console.log('🎮 Usando dados de demonstração devido ao erro');
+        }
+        
+        updateSystemStatsUI(false);
+    }
 }
 
-// Atualizar UI das estatísticas do Admin
+// Atualizar UI das estatísticas do sistema
+function updateSystemStatsUI(loading = false) {
+    // Aplicar classe de loading aos cards
+    const statCards = document.querySelectorAll('.stat-card');
+    
+    if (loading) {
+        statCards.forEach(card => card.classList.add('loading'));
+    } else {
+        statCards.forEach(card => card.classList.remove('loading'));
+    }
+    
+    // Atualizar valores
+    if (DOM.statsStudents) {
+        DOM.statsStudents.textContent = loading ? '...' : systemStats.totalStudents.toLocaleString();
+    }
+    if (DOM.statsRating) {
+        DOM.statsRating.textContent = loading ? '...' : systemStats.averageRating.toFixed(1);
+    }
+    if (DOM.statsImprovement) {
+        DOM.statsImprovement.textContent = loading ? '...' : systemStats.improvementRate + '%';
+    }
+    
+    // Atualizar também na seção Admin se estiver ativa
+    if (currentSection === 'admin' && currentUser?.role === 'admin') {
+        updateAdminStatsUI();
+    }
+}
+
+// Atualizar estatísticas da seção Admin
 function updateAdminStatsUI() {
     const totalUsersEl = document.getElementById('totalUsers');
     const activeStudentsEl = document.getElementById('activeStudents');
@@ -552,12 +720,11 @@ function updateAdminStatsUI() {
     if (systemAccuracyEl) systemAccuracyEl.textContent = systemStats.systemAccuracy + '%';
 }
 
-// Verificar estado de autenticação - CORRIGIDA
+// Verificar estado de autenticação
 function checkAuthState() {
-    // SEMPRE carregar estatísticas do sistema primeiro
+    // SEMPRE carregar estatísticas, independente do login
     loadSystemStats(true);
     
-    // Depois verificar se há usuário logado
     const savedUser = localStorage.getItem('mathkids_user');
     if (savedUser) {
         try {
@@ -566,12 +733,17 @@ function checkAuthState() {
                 (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
                 loadUserData(user);
                 showApp();
+                
+                // Configurar listeners após carregar usuário
+                setupFirebaseListeners();
+                setupUserProgressListener();
             } else {
                 // Token expirado, fazer logout
+                console.log('⏰ Sessão expirada');
                 logoutLocal();
             }
         } catch (e) {
-            console.error('Erro ao carregar usuário salvo:', e);
+            console.error('❌ Erro ao carregar usuário salvo:', e);
             logoutLocal();
         }
     }
@@ -592,6 +764,8 @@ function switchAuthForm(formType) {
         case 'register':
             DOM.registerForm.classList.add('active');
             checkAdminOption();
+            // Atualizar estatísticas ao mostrar formulário de registro
+            loadSystemStats(false);
             break;
         case 'recover':
             DOM.recoverForm.classList.add('active');
@@ -601,6 +775,30 @@ function switchAuthForm(formType) {
 
 // Verificar se deve mostrar opção de admin
 async function checkAdminOption() {
+    if (!DOM.adminOption) return;
+    
+    // Se já temos o valor, usar ele
+    if (typeof adminExists !== 'undefined') {
+        updateAdminOption();
+        return;
+    }
+    
+    // Buscar do Firebase se disponível
+    if (db) {
+        try {
+            const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
+            adminExists = !adminSnapshot.empty;
+            updateAdminOption();
+        } catch (error) {
+            console.error('❌ Erro ao verificar admin:', error);
+            updateAdminOption();
+        }
+    } else {
+        updateAdminOption();
+    }
+}
+
+function updateAdminOption() {
     if (!DOM.adminOption) return;
     
     if (adminExists) {
@@ -638,6 +836,9 @@ async function handleLogin(e) {
         showLoading(false);
         showToast('Login realizado com sucesso!', 'success');
         showApp();
+        
+        // Atualizar estatísticas após login
+        setTimeout(() => loadSystemStats(true), 1000);
         
     } catch (error) {
         showLoading(false);
@@ -715,8 +916,8 @@ async function handleRegister(e) {
         if (db) {
             await db.collection('users').doc(userId).set(userData);
             
-            // Atualizar estatísticas do sistema após cadastro
-            await loadSystemStats(true);
+            // ATUALIZAR ESTATÍSTICAS IMEDIATAMENTE após cadastro
+            setTimeout(() => loadSystemStats(true), 1500);
         } else {
             localStorage.setItem('mathkids_user', JSON.stringify({
                 ...userData,
@@ -779,7 +980,7 @@ function handleLogout() {
         auth.signOut().then(() => {
             logoutLocal();
         }).catch(error => {
-            console.error('Logout error:', error);
+            console.error('❌ Logout error:', error);
             logoutLocal();
         });
     } else {
@@ -788,6 +989,16 @@ function handleLogout() {
 }
 
 function logoutLocal() {
+    // Remover listeners do Firebase
+    if (statsListener) {
+        statsListener();
+        statsListener = null;
+    }
+    if (userProgressListener) {
+        userProgressListener();
+        userProgressListener = null;
+    }
+    
     localStorage.removeItem('mathkids_user');
     currentUser = null;
     userData = {};
@@ -795,16 +1006,14 @@ function logoutLocal() {
     DOM.authScreen.style.display = 'flex';
     DOM.appScreen.style.display = 'none';
     
-    if (DOM.loginFormElement) DOM.loginFormElement.reset();
-    if (DOM.registerFormElement) DOM.registerFormElement.reset();
-    if (DOM.recoverFormElement) DOM.recoverFormElement.reset();
+    DOM.loginFormElement.reset();
+    DOM.registerFormElement.reset();
+    DOM.recoverFormElement.reset();
     
     switchAuthForm('login');
     
-    // ATUALIZAR ESTATÍSTICAS IMEDIATAMENTE após logout
-    setTimeout(() => {
-        loadSystemStats(true);
-    }, 100);
+    // Atualizar estatísticas após logout
+    setTimeout(() => loadSystemStats(true), 500);
     
     showToast('Logout realizado com sucesso.', 'info');
 }
@@ -814,11 +1023,9 @@ function handleAuthStateChange(user) {
     if (user) {
         loadUserDataFromFirebase(user.uid);
         showApp();
-    } else {
-        // Usuário deslogado, mostrar tela de autenticação
-        DOM.authScreen.style.display = 'flex';
-        DOM.appScreen.style.display = 'none';
-        loadSystemStats(true);
+        // Configurar listeners após login
+        setupFirebaseListeners();
+        setupUserProgressListener();
     }
 }
 
@@ -831,6 +1038,7 @@ async function loadUserDataFromFirebase(userId) {
             const data = doc.data();
             currentUser = { id: userId, ...data };
             
+            // Atualizar último login
             await db.collection('users').doc(userId).update({
                 lastLogin: new Date().toISOString()
             });
@@ -844,7 +1052,7 @@ async function loadUserDataFromFirebase(userId) {
             loadUserData(currentUser);
         }
     } catch (error) {
-        console.error('Error loading user data:', error);
+        console.error('❌ Error loading user data:', error);
         showToast('Erro ao carregar dados do usuário.', 'error');
     }
 }
@@ -866,11 +1074,11 @@ function loadUserData(user) {
     }
     
     if (user.role === 'admin') {
-        if (DOM.adminNav) DOM.adminNav.style.display = 'flex';
-        if (DOM.mobileAdminLink) DOM.mobileAdminLink.style.display = 'flex';
+        DOM.adminNav.style.display = 'flex';
+        DOM.mobileAdminLink.style.display = 'flex';
     } else {
-        if (DOM.adminNav) DOM.adminNav.style.display = 'none';
-        if (DOM.mobileAdminLink) DOM.mobileAdminLink.style.display = 'none';
+        DOM.adminNav.style.display = 'none';
+        DOM.mobileAdminLink.style.display = 'none';
     }
     
     loadNotifications();
@@ -940,9 +1148,6 @@ function showApp() {
     DOM.authScreen.style.display = 'none';
     DOM.appScreen.style.display = 'block';
     switchSection('dashboard');
-    
-    // Atualizar estatísticas ao mostrar o app
-    loadSystemStats(true);
 }
 
 // Alternar sidebar mobile
@@ -979,9 +1184,12 @@ function clearAllNotifications() {
 // Alternar seção
 function switchSection(sectionId) {
     // Remover listener do Admin se estiver saindo da seção
-    if (currentSection === 'admin' && sectionId !== 'admin' && window.adminListener) {
-        window.adminListener();
-        window.adminListener = null;
+    if (currentSection === 'admin' && sectionId !== 'admin') {
+        // Remover listener específico do admin se existir
+        if (window.adminTabListener) {
+            window.adminTabListener();
+            window.adminTabListener = null;
+        }
     }
     
     document.querySelectorAll('.app-section').forEach(section => {
@@ -993,14 +1201,39 @@ function switchSection(sectionId) {
         targetSection.classList.add('active');
         currentSection = sectionId;
         
+        // Atualizar navegação ativa
         updateActiveNavigation(sectionId);
+        
         loadSectionContent(sectionId);
         
         // Se for a seção Admin, carregar dados em tempo real
         if (sectionId === 'admin' && currentUser?.role === 'admin') {
             loadSystemStats(true);
+            // Configurar listener específico para admin
+            setupAdminFirebaseListener();
         }
     }
+}
+
+// Configurar listener do Firebase para Admin
+function setupAdminFirebaseListener() {
+    if (!db || currentUser?.role !== 'admin') return;
+    
+    // Remover listener anterior se existir
+    if (window.adminTabListener) {
+        window.adminTabListener();
+    }
+    
+    // Configurar listener em tempo real para a seção Admin
+    window.adminTabListener = db.collection('users').onSnapshot(
+        () => {
+            loadUsersTable();
+            loadSystemStats(true);
+        },
+        (error) => {
+            console.error('❌ Erro no listener do Admin:', error);
+        }
+    );
 }
 
 // Atualizar navegação ativa
@@ -1651,8 +1884,12 @@ function checkPracticeAnswer() {
     updateProgressUI();
     saveUserProgress();
     
+    // Atualizar estatísticas do sistema
     systemStats.totalExercises++;
     updateSystemStatsUI();
+    
+    // Salvar cache atualizado
+    saveSystemStatsCache();
 }
 
 // Mostrar dica na prática
@@ -1682,6 +1919,27 @@ function showPracticeHint() {
     
     feedback.textContent = hint;
     feedback.className = 'exercise-feedback info';
+}
+
+// Salvar cache das estatísticas do sistema
+function saveSystemStatsCache() {
+    try {
+        const cacheKey = 'mathkids_system_stats_cache';
+        const cacheData = {
+            stats: {
+                totalStudents: systemStats.totalStudents,
+                averageRating: systemStats.averageRating,
+                improvementRate: systemStats.improvementRate,
+                totalExercises: systemStats.totalExercises,
+                totalUsers: systemStats.totalUsers,
+                systemAccuracy: systemStats.systemAccuracy
+            },
+            timestamp: Date.now()
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (error) {
+        console.warn('⚠️ Não foi possível salvar cache:', error);
+    }
 }
 
 // Carregar seção de jogos
@@ -2306,7 +2564,7 @@ function initializeOperationsChart() {
             }
         });
     } catch (error) {
-        console.error('Erro ao criar gráfico:', error);
+        console.error('❌ Erro ao criar gráfico:', error);
     }
 }
 
@@ -2543,22 +2801,6 @@ function loadAdminSection() {
     
     // Configurar eventos de administração
     setupAdminEvents();
-    
-    // Depois de carregar a seção, adicionar listener em tempo real
-    if (db) {
-        // Remover listener anterior se existir
-        if (window.adminListener) {
-            window.adminListener();
-        }
-        
-        // Configurar novo listener para atualizações em tempo real
-        window.adminListener = db.collection('users').onSnapshot(() => {
-            loadUsersTable();
-            loadSystemStats(true);
-        }, error => {
-            console.error('Erro no listener do Admin:', error);
-        });
-    }
 }
 
 // Configurar eventos de administração
@@ -2821,7 +3063,7 @@ async function loadUsersTable() {
         renderUsersTable(users);
         
     } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
+        console.error('❌ Erro ao carregar usuários:', error);
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center">Erro ao carregar usuários</td>
@@ -3381,7 +3623,7 @@ function saveUserSettings() {
         db.collection('users').doc(currentUser.id).update({
             settings: settings
         }).catch(error => {
-            console.error('Error saving settings:', error);
+            console.error('❌ Error saving settings:', error);
         });
     }
     
@@ -3502,7 +3744,7 @@ function saveUserProgress() {
         db.collection('users').doc(currentUser.id).update({
             progress: userProgress
         }).catch(error => {
-            console.error('Error saving progress:', error);
+            console.error('❌ Error saving progress:', error);
         });
     }
 }
@@ -3572,7 +3814,7 @@ function showLoading(show) {
 }
 
 function handleAuthError(error) {
-    console.error('Auth error:', error);
+    console.error('❌ Auth error:', error);
     
     let message = 'Erro na autenticação. Tente novamente.';
     
@@ -3645,7 +3887,7 @@ function initializeComponents() {
 
 // Modo de demonstração
 function setupDemoMode() {
-    console.log('Modo de demonstração ativado');
+    console.log('🎮 Modo de demonstração ativado');
     
     userProgress = {
         exercisesCompleted: 15,
@@ -3724,4 +3966,25 @@ window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
 
-console.log('MathKids Pro v3.1 carregado com sucesso!');
+// Atualizar estatísticas periodicamente (a cada 30 segundos)
+setInterval(() => {
+    if (db) {
+        loadSystemStats(false); // Usar cache se disponível
+    }
+}, 30000);
+
+// Atualizar estatísticas quando a página ganha foco
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && db) {
+        loadSystemStats(true);
+    }
+});
+
+// Atualizar estatísticas ao voltar para a página
+window.addEventListener('focus', function() {
+    if (db) {
+        loadSystemStats(true);
+    }
+});
+
+console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
