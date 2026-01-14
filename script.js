@@ -144,6 +144,36 @@ const DOM = {
     challengesList: document.getElementById('challengesList'),
     lessonsGrid: document.getElementById('lessonsGrid'),
     activeLesson: document.getElementById('activeLesson'),
+
+    // Seção de Jogos
+    gamesGrid: document.getElementById('gamesGrid'),
+    gameContainer: document.getElementById('gameContainer'),
+
+    // Racha Cuca
+    rachacucaGameContainer: document.getElementById('rachacucaGameContainer'),
+    rachacucaPuzzleBoard: document.getElementById('rachacucaPuzzleBoard'),
+    rachacucaMoveCounter: document.getElementById('rachacucaMoveCounter'),
+    rachacucaTimer: document.getElementById('rachacucaTimer'),
+    rachacucaDifficulty: document.getElementById('rachacucaDifficulty'),
+    rachacucaShuffleBtn: document.getElementById('rachacucaShuffleBtn'),
+    rachacucaSolveBtn: document.getElementById('rachacucaSolveBtn'),
+    rachacucaResetBtn: document.getElementById('rachacucaResetBtn'),
+    rachacucaHintBtn: document.getElementById('rachacucaHintBtn'),
+    rachacucaBackBtn: document.getElementById('rachacucaBackBtn'),
+    rachacucaCompletionMessage: document.getElementById('rachacucaCompletionMessage'),
+    rachacucaFinalMoves: document.getElementById('rachacucaFinalMoves'),
+    rachacucaFinalTime: document.getElementById('rachacucaFinalTime'),
+    rachacucaPlayAgainBtn: document.getElementById('rachacucaPlayAgainBtn'),
+    rachacucaSaveScoreBtn: document.getElementById('rachacucaSaveScoreBtn'),
+    rachacucaScoresModal: document.getElementById('rachacucaScoresModal'),
+    rachacucaScoresList: document.getElementById('rachacucaScoresList'),
+    rachacucaSaveScoreModal: document.getElementById('rachacucaSaveScoreModal'),
+    rachacucaSaveMoves: document.getElementById('rachacucaSaveMoves'),
+    rachacucaSaveTime: document.getElementById('rachacucaSaveTime'),
+    rachacucaSaveDifficulty: document.getElementById('rachacucaSaveDifficulty'),
+    rachacucaPlayerName: document.getElementById('rachacucaPlayerName'),
+    rachacucaConfirmSaveBtn: document.getElementById('rachacucaConfirmSaveBtn'),
+    rachacucaCancelSaveBtn: document.getElementById('rachacucaCancelSaveBtn'),
     
     // Modais
     termsModal: document.getElementById('termsModal'),
@@ -163,6 +193,16 @@ const DOM = {
     toastContainer: document.getElementById('toastContainer'),
     loadingOverlay: document.getElementById('loadingOverlay')
 };
+
+// Variáveis do Racha Cuca
+let rachacucaBoard = [];
+let rachacucaEmptyTileIndex = 15;
+let rachacucaMoves = 0;
+let rachacucaTimerSeconds = 0;
+let rachacucaTimerInterval = null;
+let rachacucaGameStarted = false;
+let rachacucaGameCompleted = false;
+let rachacucaCurrentDifficulty = 'normal';
 
 // Configurar listeners do Firebase em tempo real
 function setupFirebaseListeners() {
@@ -221,17 +261,25 @@ function setupUserProgressListener() {
 
 // Quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 MathKids Pro inicializando...');
-    
     // Inicializar elementos DOM
     initializeElements();
     
     // Configurar eventos
     setupEventListeners();
     
+    // Verificar autenticação
+    checkAuthState();
+    
+    // Inicializar componentes
+    initializeComponents();
+    
     // Configurar Firebase Auth state observer
     if (auth) {
-        auth.onAuthStateChanged(async (user) => {
+      auth.onAuthStateChanged(handleAuthStateChange);
+    }
+});
+        
+      /* auth.onAuthStateChanged(async (user) => {
             if (user) {
                 console.log('👤 Usuário autenticado:', user.email);
                 await loadUserDataFromFirebase(user.uid);
@@ -263,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Configurar listeners do Firebase
         setupFirebaseListeners();
     }, 500);
-});
+}); */
 
 // Função auxiliar para inicializar elementos
 function initializeElements() {
@@ -277,6 +325,10 @@ function initializeElements() {
     DOM.quickPractice = document.getElementById('quickPractice');
     DOM.quickGame = document.getElementById('quickGame');
     DOM.refreshDashboard = document.getElementById('refreshDashboard');
+
+    // Elementos do Racha Cuca
+    DOM.rachacucaDifficultyBtns = document.querySelectorAll('.difficulty-btn');
+    DOM.rachacucaTabBtns = document.querySelectorAll('.tab-btn');
 }
 
 // Configurar todos os event listeners
@@ -488,6 +540,83 @@ function setupEventListeners() {
                 closeModal(this.id);
             }
         });
+    });
+
+  // Eventos do Racha Cuca
+    if (DOM.rachacucaShuffleBtn) {
+        DOM.rachacucaShuffleBtn.addEventListener('click', rachacucaShuffleBoard);
+    }
+    
+    if (DOM.rachacucaSolveBtn) {
+        DOM.rachacucaSolveBtn.addEventListener('click', rachacucaShowSolution);
+    }
+    
+    if (DOM.rachacucaResetBtn) {
+        DOM.rachacucaResetBtn.addEventListener('click', rachacucaResetGame);
+    }
+    
+    if (DOM.rachacucaHintBtn) {
+        DOM.rachacucaHintBtn.addEventListener('click', rachacucaShowHint);
+    }
+    
+    if (DOM.rachacucaBackBtn) {
+        DOM.rachacucaBackBtn.addEventListener('click', rachacucaBackToGames);
+    }
+    
+    if (DOM.rachacucaPlayAgainBtn) {
+        DOM.rachacucaPlayAgainBtn.addEventListener('click', rachacucaResetGame);
+    }
+    
+    if (DOM.rachacucaSaveScoreBtn) {
+        DOM.rachacucaSaveScoreBtn.addEventListener('click', rachacucaOpenSaveScoreModal);
+    }
+    
+    // Eventos dos modais do Racha Cuca
+    if (DOM.rachacucaConfirmSaveBtn) {
+        DOM.rachacucaConfirmSaveBtn.addEventListener('click', rachacucaSaveScore);
+    }
+    
+    if (DOM.rachacucaCancelSaveBtn) {
+        DOM.rachacucaCancelSaveBtn.addEventListener('click', function() {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        });
+    }
+    
+    // Eventos dos botões de dificuldade do Racha Cuca
+    if (DOM.rachacucaDifficultyBtns) {
+        DOM.rachacucaDifficultyBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                DOM.rachacucaDifficultyBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                rachacucaCurrentDifficulty = this.dataset.difficulty;
+                DOM.rachacucaDifficulty.textContent = 
+                    rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
+                    rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+                rachacucaResetGame();
+            });
+        });
+    }
+
+     // Eventos das tabs do ranking do Racha Cuca
+    if (DOM.rachacucaTabBtns) {
+        DOM.rachacucaTabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                DOM.rachacucaTabBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const tab = this.dataset.tab;
+                rachacucaLoadScores(tab);
+            });
+        });
+    }
+
+  // Fechar modais do Racha Cuca ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (e.target === DOM.rachacucaScoresModal) {
+            DOM.rachacucaScoresModal.classList.remove('active');
+        }
+        if (e.target === DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
     });
 }
 
@@ -1956,7 +2085,7 @@ function loadGamesSection() {
         </div>
         
         <div class="games-content">
-            <div class="games-grid">
+            <div class="games-grid" id="gamesGrid">
                 <div class="game-card" id="lightningGame">
                     <div class="game-header">
                         <div class="game-icon">
@@ -1983,6 +2112,21 @@ function loadGamesSection() {
                     <p>Complete o quebra-cabeça resolvendo problemas de divisão.</p>
                     <div class="game-stats">
                         <span><i class="fas fa-star"></i> Nível: ${localStorage.getItem('mathkids_division_level') || 1}</span>
+                    </div>
+                    <button class="btn-game">Jogar Agora</button>
+                </div>
+                
+                <div class="game-card" id="rachacucaGame">
+                    <div class="game-header">
+                        <div class="game-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div class="game-badge">Clássico</div>
+                    </div>
+                    <h3>Racha Cuca</h3>
+                    <p>Quebra-cabeça numérico clássico. Organize os números de 1 a 15.</p>
+                    <div class="game-stats">
+                        <span><i class="fas fa-trophy"></i> Melhor tempo: ${localStorage.getItem('rachacuca_best_time') || '--'}</span>
                     </div>
                     <button class="btn-game">Jogar Agora</button>
                 </div>
@@ -2018,8 +2162,543 @@ function loadGamesSection() {
     document.querySelectorAll('.btn-game').forEach(button => {
         button.addEventListener('click', function() {
             const gameId = this.closest('.game-card').id;
-            startGame(gameId);
+            
+            if (gameId === 'rachacucaGame') {
+                startRachacucaGame();
+            } else {
+                startGame(gameId);
+            }
         });
+    });
+}
+
+// Iniciar jogo Racha Cuca
+function startRachacucaGame() {
+    // Ocultar a seção de jogos
+    const gamesSection = document.getElementById('games');
+    if (gamesSection) {
+        gamesSection.style.display = 'none';
+    }
+    
+    // Mostrar o container do Racha Cuca
+    if (DOM.rachacucaGameContainer) {
+        DOM.rachacucaGameContainer.style.display = 'block';
+        
+        // Inicializar o jogo
+        rachacucaInitGame();
+    }
+}
+
+// Voltar para a seção de jogos
+function rachacucaBackToGames() {
+    // Ocultar o container do Racha Cuca
+    if (DOM.rachacucaGameContainer) {
+        DOM.rachacucaGameContainer.style.display = 'none';
+        
+        // Parar o timer
+        if (rachacucaTimerInterval) {
+            clearInterval(rachacucaTimerInterval);
+            rachacucaTimerInterval = null;
+        }
+    }
+
+  // Mostrar a seção de jogos
+    const gamesSection = document.getElementById('games');
+    if (gamesSection) {
+        gamesSection.style.display = 'block';
+        loadGamesSection();
+    }
+}
+
+// Inicializar o jogo Racha Cuca
+function rachacucaInitGame() {
+    // Criar o tabuleiro
+    rachacucaCreateBoard();
+    
+    // Renderizar o tabuleiro
+    rachacucaRenderBoard();
+    
+    // Criar tabuleiro de solução
+    rachacucaCreateSolutionBoard();
+    
+    // Atualizar contadores
+    rachacucaUpdateMoveCounter();
+    rachacucaResetTimer();
+    
+    // Embaralhar o tabuleiro
+    rachacucaShuffleBoard();
+}
+
+// Criar o tabuleiro do Racha Cuca
+function rachacucaCreateBoard() {
+    rachacucaBoard = [];
+    for (let i = 1; i <= 15; i++) {
+        rachacucaBoard.push(i);
+    }
+    rachacucaBoard.push(null); // Espaço vazio
+    rachacucaEmptyTileIndex = 15;
+}
+
+// Renderizar o tabuleiro do Racha Cuca
+function rachacucaRenderBoard() {
+    if (!DOM.rachacucaPuzzleBoard) return;
+    
+    DOM.rachacucaPuzzleBoard.innerHTML = '';
+    
+    rachacucaBoard.forEach((value, index) => {
+        const tile = document.createElement('div');
+        tile.className = 'rachacuca-puzzle-tile';
+        
+        if (value === null) {
+            tile.classList.add('empty');
+            tile.textContent = '';
+            rachacucaEmptyTileIndex = index;
+        } else {
+            tile.textContent = value;
+            tile.dataset.index = index;
+            tile.dataset.value = value;
+            
+            // Verificar se a peça está na posição correta
+            if (value === index + 1) {
+                tile.classList.add('correct-position');
+            }
+            
+            // Verificar se a peça pode ser movida
+            if (rachacucaIsMovable(index)) {
+                tile.classList.add('movable');
+                tile.addEventListener('click', () => rachacucaMoveTile(index));
+            } else {
+                tile.style.cursor = 'default';
+            }
+        }
+        
+        DOM.rachacucaPuzzleBoard.appendChild(tile);
+    });
+}
+
+// Verificar se uma peça pode ser movida no Racha Cuca
+function rachacucaIsMovable(index) {
+    const row = Math.floor(index / 4);
+    const col = index % 4;
+    const emptyRow = Math.floor(rachacucaEmptyTileIndex / 4);
+    const emptyCol = rachacucaEmptyTileIndex % 4;
+    
+    // Verificar se está na mesma linha ou coluna adjacente ao espaço vazio
+    return (row === emptyRow && Math.abs(col - emptyCol) === 1) || 
+           (col === emptyCol && Math.abs(row - emptyRow) === 1);
+}
+
+// Mover uma peça no Racha Cuca
+function rachacucaMoveTile(index) {
+    if (rachacucaGameCompleted || !rachacucaIsMovable(index)) return;
+    
+    // Trocar a peça com o espaço vazio
+    [rachacucaBoard[index], rachacucaBoard[rachacucaEmptyTileIndex]] = [rachacucaBoard[rachacucaEmptyTileIndex], rachacucaBoard[index]];
+    
+    // Atualizar o índice do espaço vazio
+    rachacucaEmptyTileIndex = index;
+    
+    // Incrementar contador de movimentos
+    rachacucaMoves++;
+    rachacucaUpdateMoveCounter();
+    
+    // Iniciar o timer se for o primeiro movimento
+    if (!rachacucaGameStarted) {
+        rachacucaStartTimer();
+        rachacucaGameStarted = true;
+    }
+    
+    // Renderizar o tabuleiro atualizado
+    rachacucaRenderBoard();
+    
+    // Verificar se o jogo foi concluído
+    if (rachacucaCheckWin()) {
+        rachacucaCompleteGame();
+    }
+}
+
+// Embaralhar o tabuleiro do Racha Cuca
+function rachacucaShuffleBoard() {
+    if (rachacucaGameCompleted) {
+        rachacucaResetGame();
+        return;
+    }
+    
+    // Parar o timer se estiver rodando
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
+    
+    // Reiniciar variáveis
+    rachacucaMoves = 0;
+    rachacucaGameStarted = false;
+    rachacucaGameCompleted = false;
+    rachacucaUpdateMoveCounter();
+    rachacucaResetTimer();
+    
+    // Ocultar mensagem de conclusão
+    if (DOM.rachacucaCompletionMessage) {
+        DOM.rachacucaCompletionMessage.style.display = 'none';
+    }
+    
+    // Embaralhar o tabuleiro
+    let shuffleCount;
+    switch(rachacucaCurrentDifficulty) {
+        case 'easy':
+            shuffleCount = 20;
+            break;
+        case 'hard':
+            shuffleCount = 100;
+            break;
+        default: // normal
+            shuffleCount = 50;
+            break;
+    }
+    
+    // Fazer movimentos válidos aleatórios para embaralhar
+    for (let i = 0; i < shuffleCount; i++) {
+        const movableTiles = [];
+        
+        // Encontrar todas as peças que podem ser movidas
+        rachacucaBoard.forEach((_, index) => {
+            if (rachacucaIsMovable(index)) {
+                movableTiles.push(index);
+            }
+        });
+        
+        // Escolher uma peça aleatória para mover
+        if (movableTiles.length > 0) {
+            const randomIndex = Math.floor(Math.random() * movableTiles.length);
+            const tileToMove = movableTiles[randomIndex];
+            
+            // Mover a peça
+            [rachacucaBoard[tileToMove], rachacucaBoard[rachacucaEmptyTileIndex]] = [rachacucaBoard[rachacucaEmptyTileIndex], rachacucaBoard[tileToMove]];
+            rachacucaEmptyTileIndex = tileToMove;
+        }
+    }
+    
+    // Renderizar o tabuleiro embaralhado
+    rachacucaRenderBoard();
+}
+
+// Mostrar a solução do Racha Cuca
+function rachacucaShowSolution() {
+    // Criar tabuleiro ordenado
+    const solvedBoard = [];
+    for (let i = 1; i <= 15; i++) {
+        solvedBoard.push(i);
+    }
+    solvedBoard.push(null);
+    
+    // Atualizar o tabuleiro atual
+    rachacucaBoard = [...solvedBoard];
+    rachacucaEmptyTileIndex = 15;
+    rachacucaRenderBoard();
+    
+    // Parar o timer
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
+    
+    // Marcar jogo como concluído
+    rachacucaGameCompleted = true;
+    rachacucaGameStarted = false;
+    
+    // Mostrar mensagem de conclusão
+    if (DOM.rachacucaCompletionMessage) {
+        DOM.rachacucaCompletionMessage.style.display = 'block';
+    }
+}
+
+// Reiniciar o jogo Racha Cuca
+function rachacucaResetGame() {
+    rachacucaMoves = 0;
+    rachacucaGameStarted = false;
+    rachacucaGameCompleted = false;
+    rachacucaUpdateMoveCounter();
+    rachacucaResetTimer();
+    
+    // Ocultar mensagem de conclusão
+    if (DOM.rachacucaCompletionMessage) {
+        DOM.rachacucaCompletionMessage.style.display = 'none';
+    }
+    
+    // Criar tabuleiro ordenado
+    rachacucaCreateBoard();
+    rachacucaRenderBoard();
+}
+
+// Mostrar dica no Racha Cuca
+function rachacucaShowHint() {
+    // Encontrar a primeira peça fora do lugar que pode ser movida
+    for (let i = 0; i < rachacucaBoard.length; i++) {
+        if (rachacucaBoard[i] !== null && rachacucaBoard[i] !== i + 1 && rachacucaIsMovable(i)) {
+            const tile = document.querySelector(`.rachacuca-puzzle-tile[data-index="${i}"]`);
+            if (tile) {
+                tile.style.boxShadow = '0 0 15px 5px gold';
+                tile.style.transform = 'scale(1.05)';
+                
+                // Remover o efeito após 2 segundos
+                setTimeout(() => {
+                    tile.style.boxShadow = '';
+                    tile.style.transform = '';
+                }, 2000);
+                
+                break;
+            }
+        }
+    }
+}
+
+// Verificar vitória no Racha Cuca
+function rachacucaCheckWin() {
+    for (let i = 0; i < 15; i++) {
+        if (rachacucaBoard[i] !== i + 1) {
+            return false;
+        }
+    }
+    return rachacucaBoard[15] === null;
+}
+
+// Concluir o jogo Racha Cuca
+function rachacucaCompleteGame() {
+    rachacucaGameCompleted = true;
+    
+    // Parar o timer
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
+    
+    // Mostrar mensagem de conclusão
+    if (DOM.rachacucaCompletionMessage && DOM.rachacucaFinalMoves && DOM.rachacucaFinalTime) {
+        DOM.rachacucaFinalMoves.textContent = rachacucaMoves;
+        DOM.rachacucaFinalTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
+        DOM.rachacucaCompletionMessage.style.display = 'block';
+        
+        // Salvar melhor tempo
+        const bestTime = localStorage.getItem('rachacuca_best_time');
+        if (!bestTime || rachacucaTimerSeconds < parseInt(bestTime)) {
+            localStorage.setItem('rachacuca_best_time', rachacucaTimerSeconds.toString());
+        }
+    }
+    
+    // Adicionar atividade
+    addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos`, 'game');
+}
+
+// Atualizar contador de movimentos do Racha Cuca
+function rachacucaUpdateMoveCounter() {
+    if (DOM.rachacucaMoveCounter) {
+        DOM.rachacucaMoveCounter.textContent = rachacucaMoves;
+    }
+}
+
+// Iniciar timer do Racha Cuca
+function rachacucaStartTimer() {
+    rachacucaResetTimer();
+    rachacucaTimerInterval = setInterval(() => {
+        rachacucaTimerSeconds++;
+        if (DOM.rachacucaTimer) {
+            DOM.rachacucaTimer.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
+        }
+    }, 1000);
+}
+
+// Resetar timer do Racha Cuca
+function rachacucaResetTimer() {
+    rachacucaTimerSeconds = 0;
+    if (DOM.rachacucaTimer) {
+        DOM.rachacucaTimer.textContent = '00:00';
+    }
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
+}
+
+// Formatar tempo (MM:SS) para o Racha Cuca
+function rachacucaFormatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Criar tabuleiro de solução do Racha Cuca
+function rachacucaCreateSolutionBoard() {
+    const solutionBoard = document.querySelector('.solution-board');
+    if (!solutionBoard) return;
+    
+    solutionBoard.innerHTML = '';
+    
+    for (let i = 1; i <= 16; i++) {
+        const tile = document.createElement('div');
+        tile.className = 'rachacuca-solution-tile';
+        
+        if (i <= 15) {
+            tile.textContent = i;
+        } else {
+            tile.classList.add('empty');
+        }
+        
+        solutionBoard.appendChild(tile);
+    }
+}
+
+// Abrir modal para salvar pontuação do Racha Cuca
+function rachacucaOpenSaveScoreModal() {
+    if (!rachacucaGameCompleted) {
+        showToast('Complete o jogo primeiro para salvar sua pontuação!', 'error');
+        return;
+    }
+    
+    if (!db) {
+        showToast('Conecte o Firebase primeiro para salvar pontuações!', 'error');
+        return;
+    }
+    
+    // Atualizar informações no modal
+    if (DOM.rachacucaSaveMoves && DOM.rachacucaSaveTime && DOM.rachacucaSaveDifficulty) {
+        DOM.rachacucaSaveMoves.textContent = rachacucaMoves;
+        DOM.rachacucaSaveTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
+        DOM.rachacucaSaveDifficulty.textContent = 
+            rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
+            rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+    }
+    
+    // Preencher nome do jogador se já existir
+    if (DOM.rachacucaPlayerName) {
+        const playerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
+        DOM.rachacucaPlayerName.value = playerName;
+    }
+    
+    // Mostrar modal
+    if (DOM.rachacucaSaveScoreModal) {
+        DOM.rachacucaSaveScoreModal.classList.add('active');
+    }
+}
+
+// Salvar pontuação do Racha Cuca
+async function rachacucaSaveScore() {
+    if (!DOM.rachacucaPlayerName || !db) return;
+    
+    const playerName = DOM.rachacucaPlayerName.value.trim();
+    
+    if (!playerName) {
+        showToast('Por favor, digite seu nome!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    if (playerName.length > 20) {
+        showToast('O nome deve ter no máximo 20 caracteres!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    // Salvar nome do jogador no localStorage
+    localStorage.setItem('rachacuca_player_name', playerName);
+    
+    // Dados da pontuação
+    const scoreData = {
+        playerName: playerName,
+        moves: rachacucaMoves,
+        time: rachacucaTimerSeconds,
+        difficulty: rachacucaCurrentDifficulty,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        date: new Date().toISOString(),
+        userId: currentUser?.id || 'anonymous'
+    };
+  try {
+        // Adicionar documento ao Firestore
+        await db.collection('rachacuca_scores').add(scoreData);
+        
+        showToast('Pontuação salva com sucesso!', 'success');
+        
+        // Fechar modal
+        if (DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
+        
+        // Recarregar pontuações
+        rachacucaLoadScores('global');
+    } catch (error) {
+        console.error('Erro ao salvar pontuação:', error);
+        showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
+    }
+}
+
+// Carregar pontuações do Racha Cuca
+async function rachacucaLoadScores(difficulty = 'global') {
+    if (!DOM.rachacucaScoresList || !db) return;
+    
+    try {
+        let query = db.collection('rachacuca_scores');
+        
+        // Filtrar por dificuldade se não for "global"
+        if (difficulty !== 'global') {
+            query = query.where('difficulty', '==', difficulty);
+        }
+        
+        // Ordenar por menor número de movimentos e menor tempo
+        const snapshot = await query.orderBy('moves').orderBy('time').limit(10).get();
+        
+        if (snapshot.empty) {
+            DOM.rachacucaScoresList.innerHTML = '<p class="no-scores">Nenhuma pontuação salva ainda.</p>';
+            return;
+        }
+
+      // Processar resultados
+        const scores = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            scores.push({
+                id: doc.id,
+                playerName: data.playerName,
+                moves: data.moves,
+                time: data.time,
+                difficulty: data.difficulty,
+                date: data.date || data.timestamp?.toDate?.() || new Date()
+            });
+        });
+        
+        // Exibir pontuações
+        rachacucaDisplayScores(scores);
+    } catch (error) {
+        console.error('Erro ao carregar pontuações:', error);
+        DOM.rachacucaScoresList.innerHTML = `<p class="no-scores">Erro ao carregar pontuações: ${error.message}</p>`;
+    }
+}
+
+// Exibir pontuações do Racha Cuca
+function rachacucaDisplayScores(scores) {
+    if (!DOM.rachacucaScoresList) return;
+    
+    DOM.rachacucaScoresList.innerHTML = '';
+    
+    scores.forEach((score, index) => {
+        const scoreItem = document.createElement('div');
+        scoreItem.className = 'score-item';
+        
+        // Destacar pontuação do jogador atual
+        const currentPlayerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
+        if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
+            scoreItem.classList.add('highlight');
+        }
+        
+        scoreItem.innerHTML = `
+            <div class="score-rank">${index + 1}</div>
+            <div class="score-name">${score.playerName}</div>
+            <div class="score-details">
+                <span>${score.moves} movimentos</span>
+                <span>${rachacucaFormatTime(score.time)}</span>
+                <span>${score.difficulty === 'easy' ? 'Fácil' : score.difficulty === 'normal' ? 'Normal' : 'Difícil'}</span>
+            </div>
+        `;
+        
+        DOM.rachacucaScoresList.appendChild(scoreItem);
     });
 }
 
@@ -3988,3 +4667,4 @@ window.addEventListener('focus', function() {
 });
 
 console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
+
