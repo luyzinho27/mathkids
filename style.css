@@ -4584,3 +4584,520 @@ select:valid {
 [data-theme="dark"] .divider-text {
     background: var(--gray-900);
 }
+
+/* ===== ESTILOS DO RACHA CUCA ===== */
+.rachacuca-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--secondary-500) 100%);
+    z-index: var(--z-modal);
+    overflow-y: auto;
+    padding: var(--space-lg);
+}
+
+.rachacuca-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xl);
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-xl);
+    box-shadow: var(--shadow-xl);
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+}
+
+.rachacuca-logo h1 {
+    font-family: 'Rubik', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--primary-700);
+}
+
+.rachacuca-logo .subtitle {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-top: 5px;
+    color: var(--text-secondary);
+}
+
+.rachacuca-game-info {
+    display: flex;
+    gap: 25px;
+    flex-wrap: wrap;
+}
+
+.rachacuca-main-content {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.puzzle-container {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.puzzle-board {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-width: 500px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 8px;
+    background-color: var(--gray-100);
+    padding: 8px;
+    border-radius: var(--radius-xl);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.rachacuca-puzzle-tile {
+    background: linear-gradient(145deg, var(--primary-color), var(--primary-700));
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.rachacuca-puzzle-tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.rachacuca-puzzle-tile:active {
+    transform: translateY(0);
+}
+
+.rachacuca-puzzle-tile.empty {
+    background: var(--gray-200);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+    cursor: default;
+}
+
+.rachacuca-puzzle-tile.empty:hover {
+    transform: none;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.rachacuca-puzzle-tile.movable {
+    background: linear-gradient(145deg, var(--accent-color), #d63384);
+}
+
+.rachacuca-puzzle-tile.correct-position {
+    background: linear-gradient(145deg, var(--success-500), #36b9cc);
+}
+
+.puzzle-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.rachacuca-game-sidebar {
+    flex: 0 0 350px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.rachacuca-game-sidebar .instructions,
+.rachacuca-game-sidebar .solution-preview {
+    background-color: var(--bg-primary);
+    padding: 25px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+}
+
+.rachacuca-game-sidebar .instructions h2,
+.rachacuca-game-sidebar .solution-preview h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.5rem;
+}
+
+.rachacuca-game-sidebar .instructions p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.difficulty-selector {
+    margin-top: 20px;
+}
+
+.difficulty-selector h3 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    color: var(--secondary-color);
+}
+
+.difficulty-options {
+    display: flex;
+    gap: 10px;
+}
+
+.difficulty-btn {
+    flex: 1;
+    padding: 10px;
+    background-color: var(--bg-secondary);
+    border: 2px solid var(--border-light);
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    color: var(--text-secondary);
+}
+
+.difficulty-btn.active {
+    background-color: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+
+.difficulty-btn:hover:not(.active) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.solution-board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 5px;
+    background-color: var(--bg-secondary);
+    padding: 5px;
+    border-radius: 8px;
+}
+
+.rachacuca-solution-tile {
+    aspect-ratio: 1 / 1;
+    background: linear-gradient(145deg, var(--primary-500), var(--primary-700));
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.rachacuca-solution-tile.empty {
+    background-color: var(--gray-200);
+    color: transparent;
+}
+
+.completion-message {
+    margin-top: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--success-500), #36b9cc);
+    border-radius: var(--radius-xl);
+    color: white;
+}
+
+.completion-message h3 {
+    color: white;
+    margin-bottom: 10px;
+}
+
+/* Botões do Racha Cuca */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: var(--primary-500);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-600);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-light);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-tertiary);
+    transform: translateY(-2px);
+    border-color: var(--border-medium);
+}
+
+/* Estilos para o ranking */
+.ranking-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    color: var(--text-secondary);
+}
+
+.tab-btn.active {
+    border-bottom-color: var(--primary-500);
+    color: var(--primary-600);
+}
+
+.tab-btn:hover:not(.active) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#rachacucaScoresList {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-light);
+    align-items: center;
+}
+
+.score-item:nth-child(odd) {
+    background-color: var(--bg-secondary);
+}
+
+.score-item.highlight {
+    background-color: rgba(76, 201, 240, 0.1);
+    border-left: 3px solid var(--success-500);
+}
+
+.score-rank {
+    font-weight: 700;
+    color: var(--primary-500);
+    min-width: 40px;
+}
+
+.score-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.score-details {
+    display: flex;
+    gap: 20px;
+    min-width: 200px;
+    justify-content: flex-end;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.no-scores {
+    text-align: center;
+    padding: 30px;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+.score-summary {
+    background-color: var(--bg-secondary);
+    padding: 15px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    text-align: center;
+    color: var(--text-primary);
+}
+
+.player-input {
+    margin-bottom: 20px;
+}
+
+.player-input label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.player-input input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.player-input input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.player-input small {
+    display: block;
+    margin-top: 5px;
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+}
+
+/* Responsividade para o Racha Cuca */
+@media (max-width: 1100px) {
+    .rachacuca-main-content {
+        flex-direction: column;
+    }
+    
+    .rachacuca-game-sidebar {
+        flex: 1;
+        max-width: 100%;
+    }
+    
+    .puzzle-board {
+        max-width: 450px;
+    }
+}
+
+@media (max-width: 768px) {
+    .rachacuca-header {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+    }
+    
+    .rachacuca-logo h1 {
+        justify-content: center;
+    }
+    
+    .rachacuca-game-info {
+        justify-content: center;
+    }
+    
+    .puzzle-board {
+        max-width: 400px;
+    }
+    
+    .rachacuca-puzzle-tile {
+        font-size: 1.8rem;
+    }
+    
+    .score-details {
+        flex-direction: column;
+        gap: 5px;
+        align-items: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .rachacuca-container {
+        padding: var(--space-md);
+    }
+    
+    .rachacuca-header {
+        padding: var(--space-lg);
+    }
+    
+    .rachacuca-logo h1 {
+        font-size: 1.8rem;
+    }
+    
+    .puzzle-board {
+        gap: 5px;
+        padding: 5px;
+    }
+    
+    .rachacuca-puzzle-tile {
+        font-size: 1.5rem;
+    }
+    
+    .btn {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+    
+    .difficulty-options {
+        flex-direction: column;
+    }
+    
+    .ranking-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .tab-btn {
+        flex: 1;
+        min-width: 80px;
+    }
+}
+
+/* Tema escuro para o Racha Cuca */
+[data-theme="dark"] .rachacuca-container {
+    background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+}
+
+[data-theme="dark"] .rachacuca-header {
+    background: rgba(30, 41, 59, 0.95);
+}
+
+[data-theme="dark"] .rachacuca-puzzle-tile.empty {
+    background: var(--gray-700);
+}
+
+[data-theme="dark"] .rachacuca-game-sidebar .instructions,
+[data-theme="dark"] .rachacuca-game-sidebar .solution-preview {
+    background-color: var(--gray-800);
+}
+
+[data-theme="dark"] .solution-board {
+    background-color: var(--gray-700);
+}
+
+[data-theme="dark"] .rachacuca-solution-tile.empty {
+    background-color: var(--gray-700);
+}
