@@ -1,11 +1,11 @@
 // Configuração do Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
-    authDomain: "mathkids-de4a0.firebaseapp.com",
-    projectId: "mathkids-de4a0",
-    storageBucket: "mathkids-de4a0.firebasestorage.app",
-    messagingSenderId: "463966125316",
-    appId: "1:463966125316:web:6656af016d1c5a44da6451"
+  apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
+  authDomain: "mathkids-de4a0.firebaseapp.com",
+  projectId: "mathkids-de4a0",
+  storageBucket: "mathkids-de4a0.firebasestorage.app",
+  messagingSenderId: "463966125316",
+  appId: "1:463966125316:web:6656af016d1c5a44da6451"
 };
 
 // Inicializar Firebase
@@ -14,18 +14,9 @@ let currentUser = null;
 let userData = {};
 let adminExists = false;
 
-// Inicialização do Firebase
-try {
-    app = firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    analytics = firebase.analytics();
-    // Verificar estatísticas do sistema
-    loadSystemStats();
-} catch (error) {
-    console.log("Firebase não configurado. Modo de demonstração ativado.");
-    setupDemoMode();
-}
+// Configurar listeners do Firebase em tempo real
+let statsListener = null;
+let userProgressListener = null;
 
 // Estados da aplicação
 let currentSection = 'dashboard';
@@ -40,10 +31,12 @@ let gameScore = 0;
 let gameHighScore = 0;
 let systemStats = {
     totalStudents: 0,
-    averageRating: 4.8,
-    improvementRate: 98,
+    averageRating: 0,
+    improvementRate: 0,
     totalExercises: 0,
-    totalUsers: 0
+    totalUsers: 0,
+    systemAccuracy: 0,
+    lastUpdated: 0
 };
 
 // Dados do usuário
@@ -69,11 +62,25 @@ let userProgress = {
 // Variáveis globais para armazenamento de instâncias
 let operationsChartInstance = null;
 
+// Inicialização do Firebase
+try {
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    analytics = firebase.analytics();
+    
+    console.log('Firebase inicializado com sucesso');
+} catch (error) {
+    console.log("Firebase não configurado. Modo de demonstração ativado.");
+    setupDemoMode();
+}
+
 // Elementos DOM - consolidados para evitar duplicação
 const DOM = {
     // Telas
     authScreen: document.getElementById('authScreen'),
     appScreen: document.getElementById('appScreen'),
+    
     // Formulários de autenticação
     loginForm: document.getElementById('loginForm'),
     registerForm: document.getElementById('registerForm'),
@@ -81,18 +88,22 @@ const DOM = {
     loginFormElement: document.getElementById('loginFormElement'),
     registerFormElement: document.getElementById('registerFormElement'),
     recoverFormElement: document.getElementById('recoverFormElement'),
+    
     // Links de autenticação
     showRegister: document.getElementById('showRegister'),
     showLogin: document.getElementById('showLogin'),
     showLoginFromRecover: document.getElementById('showLoginFromRecover'),
     forgotPasswordLink: document.getElementById('forgotPasswordLink'),
+    
     // Opções de usuário
     adminOption: document.getElementById('adminOption'),
     userTypeSelect: document.getElementById('userType'),
+    
     // Estatísticas da tela inicial
     statsStudents: document.getElementById('statsStudents'),
     statsRating: document.getElementById('statsRating'),
     statsImprovement: document.getElementById('statsImprovement'),
+    
     // Navegação
     menuToggle: document.getElementById('menuToggle'),
     closeSidebar: document.getElementById('closeSidebar'),
@@ -103,9 +114,11 @@ const DOM = {
     notificationsToggle: document.getElementById('notificationsToggle'),
     notificationsPanel: document.getElementById('notificationsPanel'),
     clearNotifications: document.getElementById('clearNotifications'),
+    
     // Botões de logout
     logoutBtn: document.getElementById('logoutBtn'),
     mobileLogoutBtn: document.getElementById('mobileLogoutBtn'),
+    
     // Informações do usuário
     userName: document.getElementById('userName'),
     userRole: document.getElementById('userRole'),
@@ -119,43 +132,138 @@ const DOM = {
     welcomeUserName: document.getElementById('welcomeUserName'),
     adminNav: document.getElementById('adminNav'),
     mobileAdminLink: document.getElementById('mobileAdminLink'),
+    
     // Estatísticas do dashboard
     statExercises: document.getElementById('statExercises'),
     statAccuracy: document.getElementById('statAccuracy'),
     statTime: document.getElementById('statTime'),
     statLevel: document.getElementById('statLevel'),
+    
     // Elementos de seções
     activitiesList: document.getElementById('activitiesList'),
     challengesList: document.getElementById('challengesList'),
     lessonsGrid: document.getElementById('lessonsGrid'),
     activeLesson: document.getElementById('activeLesson'),
+    
     // Modais
     termsModal: document.getElementById('termsModal'),
     privacyModal: document.getElementById('privacyModal'),
     contactModal: document.getElementById('contactModal'),
     profileModal: document.getElementById('profileModal'),
     settingsModal: document.getElementById('settingsModal'),
+    
     // Links de modais
     termsLink: document.getElementById('termsLink'),
     privacyLink: document.getElementById('privacyLink'),
     termsLinkFooter: document.getElementById('termsLinkFooter'),
     privacyLinkFooter: document.getElementById('privacyLinkFooter'),
     contactLink: document.getElementById('contactLink'),
+    
     // Containers
     toastContainer: document.getElementById('toastContainer'),
     loadingOverlay: document.getElementById('loadingOverlay')
 };
 
-// Racha Cuca
-let rachaCucaBoard = [];
-let rachaCucaEmptyTileIndex = 15;
-let rachaCucaMoves = 0;
-let rachaCucaTimer = 0;
-let rachaCucaTimerInterval = null;
-let rachaCucaGameStarted = false;
-let rachaCucaGameCompleted = false;
-let rachaCucaCurrentDifficulty = 'normal';
-let rachaCucaPlayerName = '';
+// Configurar listeners do Firebase em tempo real
+function setupFirebaseListeners() {
+    if (!db) return;
+    
+    // Remover listener anterior se existir
+    if (statsListener) {
+        statsListener();
+        statsListener = null;
+    }
+    
+    // Configurar listener em tempo real para usuários (estatísticas gerais)
+    statsListener = db.collection('users').onSnapshot(
+        (snapshot) => {
+            console.log('📊 Dados do Firebase atualizados em tempo real');
+            loadSystemStats(true); // Forçar atualização
+        },
+        (error) => {
+            console.error('❌ Erro no listener do Firebase:', error);
+            // Tentar reconectar após 5 segundos
+            setTimeout(() => setupFirebaseListeners(), 5000);
+        }
+    );
+    
+    // Configurar listener para progresso do usuário atual
+    if (currentUser && currentUser.id) {
+        setupUserProgressListener();
+    }
+}
+
+// Configurar listener para progresso do usuário
+function setupUserProgressListener() {
+    if (!db || !currentUser || !currentUser.id) return;
+    
+    // Remover listener anterior se existir
+    if (userProgressListener) {
+        userProgressListener();
+        userProgressListener = null;
+    }
+    
+    userProgressListener = db.collection('users').doc(currentUser.id).onSnapshot(
+        (doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.progress) {
+                    userProgress = data.progress;
+                    updateProgressUI();
+                }
+            }
+        },
+        (error) => {
+            console.error('❌ Erro no listener de progresso:', error);
+        }
+    );
+}
+
+// Quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 MathKids Pro inicializando...');
+    
+    // Inicializar elementos DOM
+    initializeElements();
+    
+    // Configurar eventos
+    setupEventListeners();
+    
+    // Configurar Firebase Auth state observer
+    if (auth) {
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('👤 Usuário autenticado:', user.email);
+                await loadUserDataFromFirebase(user.uid);
+                showApp();
+                // Configurar listeners após login
+                setupFirebaseListeners();
+                setupUserProgressListener();
+            } else {
+                console.log('👤 Nenhum usuário autenticado');
+                // Usuário não autenticado, garantir que mostre a tela de auth
+                DOM.authScreen.style.display = 'flex';
+                DOM.appScreen.style.display = 'none';
+            }
+            // SEMPRE carregar estatísticas, independente do login
+            loadSystemStats(true);
+        });
+    } else {
+        // Sem Firebase, usar modo demo
+        console.log('🎮 Modo demonstração ativado');
+        checkAuthState();
+    }
+    
+    // Inicializar componentes
+    initializeComponents();
+    
+    // Carregar estatísticas IMEDIATAMENTE (não esperar pelo auth)
+    setTimeout(() => {
+        loadSystemStats(true);
+        // Configurar listeners do Firebase
+        setupFirebaseListeners();
+    }, 500);
+});
 
 // Função auxiliar para inicializar elementos
 function initializeElements() {
@@ -169,57 +277,13 @@ function initializeElements() {
     DOM.quickPractice = document.getElementById('quickPractice');
     DOM.quickGame = document.getElementById('quickGame');
     DOM.refreshDashboard = document.getElementById('refreshDashboard');
-    
-    // Elementos do Racha Cuca
-    DOM.rachaCucaGameCard = document.getElementById('rachacucaGame');
-    DOM.rachaCucaContainer = document.getElementById('rachacucaContainer');
-    DOM.rachaCucaBoard = document.getElementById('puzzle-board');
-    DOM.rachaCucaMoveCounter = document.getElementById('rachacucaMoves');
-    DOM.rachaCucaTimerElement = document.getElementById('rachacucaTimer');
-    DOM.rachaCucaShuffleBtn = document.getElementById('rachacuca-shuffle-btn');
-    DOM.rachaCucaSolveBtn = document.getElementById('rachacuca-solve-btn');
-    DOM.rachaCucaResetBtn = document.getElementById('rachacuca-reset-btn');
-    DOM.rachaCucaHintBtn = document.getElementById('rachacuca-hint-btn');
-    DOM.rachaCucaPlayAgainBtn = document.getElementById('play-again-btn');
-    DOM.rachaCucaCompletionMessage = document.getElementById('completion-message');
-    DOM.rachaCucaFinalMoves = document.getElementById('final-moves');
-    DOM.rachaCucaFinalTime = document.getElementById('final-time');
-    DOM.rachaCucaDifficultyBtns = document.querySelectorAll('.difficulty-btn');
-    DOM.rachaCucaSolutionBoard = document.querySelector('.solution-board');
-    DOM.rachaCucaHighScoreElement = document.getElementById('rachacucaHighScore');
 }
-
-// Quando o DOM estiver carregado
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar elementos DOM
-    initializeElements();
-    
-    // Configurar eventos
-    setupEventListeners();
-    
-    // Verificar autenticação
-    checkAuthState();
-    
-    // Inicializar componentes
-    initializeComponents();
-    
-    // Inicializar o jogo Racha Cuca
-    initializeRachaCuca();
-    
-    // Configurar Firebase Auth state observer
-    if (auth) {
-        auth.onAuthStateChanged(handleAuthStateChange);
-    }
-    
-    // Carregar high score do Racha Cuca
-    loadRachaCucaHighScore();
-});
 
 // Configurar todos os event listeners
 function setupEventListeners() {
     // Verificar se os elementos existem antes de adicionar listeners
     if (!DOM || !DOM.showRegister) {
-        console.error('Elementos DOM não encontrados');
+        console.error('❌ Elementos DOM não encontrados');
         return;
     }
     
@@ -256,6 +320,7 @@ function setupEventListeners() {
     DOM.menuToggle.addEventListener('click', openMobileSidebar);
     DOM.closeSidebar.addEventListener('click', closeMobileSidebar);
     DOM.sidebarOverlay.addEventListener('click', closeMobileSidebar);
+    
     DOM.userDropdownToggle.addEventListener('click', toggleUserDropdown);
     
     // Fechar dropdown ao clicar fora
@@ -286,8 +351,10 @@ function setupEventListeners() {
             e.preventDefault();
             const sectionId = this.getAttribute('href').substring(1);
             switchSection(sectionId);
+            
             // Atualizar navegação ativa - FIX: Agora inclui todas as abas
             updateActiveNavigation(sectionId);
+            
             // Fechar sidebar mobile se aberto
             closeMobileSidebar();
         });
@@ -315,12 +382,13 @@ function setupEventListeners() {
         });
     });
     
-    // Botões de ação rápida - FIX: Adicionar classe ativa quando clicados
+    // Botões de ação rápida
     if (DOM.quickPractice) {
         DOM.quickPractice.addEventListener('click', function() {
             // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
+            
             const operations = ['addition', 'subtraction', 'multiplication', 'division'];
             const randomOperation = operations[Math.floor(Math.random() * operations.length)];
             switchSection('practice');
@@ -333,7 +401,8 @@ function setupEventListeners() {
             // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
-            const games = ['lightningGame', 'divisionPuzzle', 'mathChampionship', 'rachacucaGame'];
+            
+            const games = ['lightningGame', 'divisionPuzzle', 'mathChampionship'];
             const randomGame = games[Math.floor(Math.random() * games.length)];
             switchSection('games');
             startGame(randomGame);
@@ -355,12 +424,12 @@ function setupEventListeners() {
         });
     }
     
-    // Blocos de recursos na tela inicial - FIX: Recarregar página ao clicar
+    // Blocos de recursos na tela inicial
     document.querySelectorAll('.feature').forEach(feature => {
         feature.addEventListener('click', function(e) {
             e.preventDefault();
-            // Recarregar a página
-            // window.location.reload();
+            // Recarregar estatísticas
+            loadSystemStats(true);
         });
     });
     
@@ -420,13 +489,6 @@ function setupEventListeners() {
             }
         });
     });
-    
-    // Carregar o jogo Racha Cuca
-    if (DOM.rachaCucaGameCard) {
-        DOM.rachaCucaGameCard.addEventListener('click', function() {
-            startRachaCuca();
-        });
-    }
 }
 
 // Configurar toggles de senha
@@ -440,6 +502,7 @@ function setupPasswordToggles() {
     toggleButtons.forEach(({ button, input }) => {
         const toggleBtn = document.getElementById(button);
         const passwordInput = document.getElementById(input);
+        
         if (toggleBtn && passwordInput) {
             toggleBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -451,71 +514,237 @@ function setupPasswordToggles() {
     });
 }
 
-// Carregar estatísticas do sistema - FIX: Atualizar em tempo real
-async function loadSystemStats() {
+// Carregar estatísticas do sistema - CORRIGIDO: Carregar sempre, mesmo sem login
+async function loadSystemStats(forceUpdate = false) {
+    console.log('📊 Carregando estatísticas do sistema...', { forceUpdate, dbExists: !!db });
+    
+    // Mostrar estado de carregamento
+    updateSystemStatsUI(true);
+    
     if (!db) {
-        updateSystemStatsUI();
+        // Modo demo
+        console.log('🎮 Usando dados de demonstração');
+        systemStats = {
+            totalStudents: 1250,
+            averageRating: 4.8,
+            improvementRate: 98,
+            totalExercises: 12450,
+            totalUsers: 1260,
+            systemAccuracy: 78,
+            lastUpdated: Date.now()
+        };
+        updateSystemStatsUI(false);
         return;
     }
     
     try {
-        // Contar usuários estudantes
-        const usersSnapshot = await db.collection('users').where('role', '==', 'student').get();
-        const totalStudents = usersSnapshot.size;
+        // Verificar cache (5 minutos)
+        const cacheKey = 'mathkids_system_stats_cache';
+        const cacheDuration = 5 * 60 * 1000; // 5 minutos
         
-        // Calcular estatísticas agregadas
+        if (!forceUpdate) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const { stats, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < cacheDuration) {
+                        console.log('💾 Usando estatísticas em cache');
+                        systemStats = { ...stats, lastUpdated: timestamp };
+                        updateSystemStatsUI(false);
+                        
+                        // Atualizar em segundo plano (forçar atualização)
+                        setTimeout(() => loadSystemStats(true), 1000);
+                        return;
+                    }
+                } catch (cacheError) {
+                    console.warn('⚠️ Erro ao ler cache, buscando dados frescos');
+                }
+            }
+        }
+        
+        console.log('🔥 Buscando estatísticas do Firebase...');
+        
+        // Buscar todos os usuários
+        const usersSnapshot = await db.collection('users').get();
+        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Calcular estatísticas
+        const studentUsers = users.filter(user => user.role === 'student');
+        const totalStudents = studentUsers.length;
+        const totalUsers = users.length;
+        
         let totalExercises = 0;
-        let totalUsers = usersSnapshot.size;
+        let totalCorrect = 0;
+        let totalAttempts = 0;
         
-        usersSnapshot.forEach(doc => {
-            const user = doc.data();
+        studentUsers.forEach(user => {
             if (user.progress) {
                 totalExercises += user.progress.exercisesCompleted || 0;
+                totalCorrect += user.progress.correctAnswers || 0;
+                totalAttempts += user.progress.totalAnswers || 0;
             }
         });
         
+        // Calcular métricas
+        const systemAccuracy = totalAttempts > 0 ? 
+            Math.round((totalCorrect / totalAttempts) * 100) : 78;
+        
         // Verificar se há admin
-        const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-        adminExists = !adminSnapshot.empty;
+        const adminExists = users.some(user => user.role === 'admin');
+        window.adminExists = adminExists;
+        
+        // Atualizar opção de admin se o formulário estiver visível
+        if (DOM.adminOption) {
+            if (adminExists) {
+                DOM.adminOption.disabled = true;
+                DOM.adminOption.title = "Já existe um administrador. Contate o administrador atual para acesso.";
+            } else {
+                DOM.adminOption.disabled = false;
+                DOM.adminOption.title = "Se torne o administrador principal";
+            }
+        }
+        
+        // Calcular avaliação média (simulado - pode ser substituído por dados reais)
+        const averageRating = 4.8;
+        
+        // Calcular taxa de melhoria (simulado baseado na acurácia)
+        const improvementRate = Math.min(98, systemAccuracy + 20);
         
         // Atualizar estatísticas do sistema
         systemStats = {
             totalStudents,
-            averageRating: 4.8,
-            improvementRate: 98,
+            averageRating,
+            improvementRate,
             totalExercises,
-            totalUsers
+            totalUsers,
+            systemAccuracy,
+            lastUpdated: Date.now()
         };
         
-        // Atualizar UI - FIX: Atualizar em tempo real
-        updateSystemStatsUI();
+        console.log('✅ Estatísticas carregadas:', systemStats);
+        
+        // Salvar no cache
+        try {
+            const cacheData = {
+                stats: {
+                    totalStudents,
+                    averageRating,
+                    improvementRate,
+                    totalExercises,
+                    totalUsers,
+                    systemAccuracy
+                },
+                timestamp: Date.now()
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (cacheError) {
+            console.warn('⚠️ Não foi possível salvar cache:', cacheError);
+        }
+        
+        // Atualizar UI
+        updateSystemStatsUI(false);
+        
+        // Se estiver na seção Admin, atualizar também
+        if (currentSection === 'admin' && currentUser?.role === 'admin') {
+            updateAdminStatsUI();
+        }
+        
     } catch (error) {
-        console.error('Erro ao carregar estatísticas do sistema:', error);
-        updateSystemStatsUI();
+        console.error('❌ Erro ao carregar estatísticas do sistema:', error);
+        
+        // Tentar usar cache em caso de erro
+        try {
+            const cacheKey = 'mathkids_system_stats_cache';
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { stats } = JSON.parse(cached);
+                systemStats = { ...stats, lastUpdated: Date.now() };
+                console.log('🔄 Usando cache devido ao erro');
+            }
+        } catch (cacheError) {
+            // Fallback para dados demo
+            systemStats = {
+                totalStudents: 1250,
+                averageRating: 4.8,
+                improvementRate: 98,
+                totalExercises: 12450,
+                totalUsers: 1260,
+                systemAccuracy: 78,
+                lastUpdated: Date.now()
+            };
+            console.log('🎮 Usando dados de demonstração devido ao erro');
+        }
+        
+        updateSystemStatsUI(false);
     }
 }
 
-// Atualizar UI das estatísticas do sistema - FIX: Atualizar contador de alunos
-function updateSystemStatsUI() {
+// Atualizar UI das estatísticas do sistema
+function updateSystemStatsUI(loading = false) {
+    // Aplicar classe de loading aos cards
+    const statCards = document.querySelectorAll('.stat-card');
+    
+    if (loading) {
+        statCards.forEach(card => card.classList.add('loading'));
+    } else {
+        statCards.forEach(card => card.classList.remove('loading'));
+    }
+    
+    // Atualizar valores
     if (DOM.statsStudents) {
-        DOM.statsStudents.textContent = systemStats.totalStudents.toLocaleString();
+        DOM.statsStudents.textContent = loading ? '...' : systemStats.totalStudents.toLocaleString();
     }
     if (DOM.statsRating) {
-        DOM.statsRating.textContent = systemStats.averageRating.toFixed(1);
+        DOM.statsRating.textContent = loading ? '...' : systemStats.averageRating.toFixed(1);
     }
     if (DOM.statsImprovement) {
-        DOM.statsImprovement.textContent = systemStats.improvementRate + '%';
+        DOM.statsImprovement.textContent = loading ? '...' : systemStats.improvementRate + '%';
     }
+    
+    // Atualizar também na seção Admin se estiver ativa
+    if (currentSection === 'admin' && currentUser?.role === 'admin') {
+        updateAdminStatsUI();
+    }
+}
+
+// Atualizar estatísticas da seção Admin
+function updateAdminStatsUI() {
+    const totalUsersEl = document.getElementById('totalUsers');
+    const activeStudentsEl = document.getElementById('activeStudents');
+    const totalExercisesEl = document.getElementById('totalExercises');
+    const systemAccuracyEl = document.getElementById('systemAccuracy');
+    
+    if (totalUsersEl) totalUsersEl.textContent = systemStats.totalUsers;
+    if (activeStudentsEl) activeStudentsEl.textContent = systemStats.totalStudents;
+    if (totalExercisesEl) totalExercisesEl.textContent = systemStats.totalExercises;
+    if (systemAccuracyEl) systemAccuracyEl.textContent = systemStats.systemAccuracy + '%';
 }
 
 // Verificar estado de autenticação
 function checkAuthState() {
+    // SEMPRE carregar estatísticas, independente do login
+    loadSystemStats(true);
+    
     const savedUser = localStorage.getItem('mathkids_user');
     if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (user.email && user.lastLogin && (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
-            loadUserData(user);
-            showApp();
+        try {
+            const user = JSON.parse(savedUser);
+            if (user.email && user.lastLogin && 
+                (Date.now() - new Date(user.lastLogin).getTime()) < 7 * 24 * 60 * 60 * 1000) {
+                loadUserData(user);
+                showApp();
+                
+                // Configurar listeners após carregar usuário
+                setupFirebaseListeners();
+                setupUserProgressListener();
+            } else {
+                // Token expirado, fazer logout
+                console.log('⏰ Sessão expirada');
+                logoutLocal();
+            }
+        } catch (e) {
+            console.error('❌ Erro ao carregar usuário salvo:', e);
+            logoutLocal();
         }
     }
 }
@@ -535,6 +764,8 @@ function switchAuthForm(formType) {
         case 'register':
             DOM.registerForm.classList.add('active');
             checkAdminOption();
+            // Atualizar estatísticas ao mostrar formulário de registro
+            loadSystemStats(false);
             break;
         case 'recover':
             DOM.recoverForm.classList.add('active');
@@ -544,6 +775,30 @@ function switchAuthForm(formType) {
 
 // Verificar se deve mostrar opção de admin
 async function checkAdminOption() {
+    if (!DOM.adminOption) return;
+    
+    // Se já temos o valor, usar ele
+    if (typeof adminExists !== 'undefined') {
+        updateAdminOption();
+        return;
+    }
+    
+    // Buscar do Firebase se disponível
+    if (db) {
+        try {
+            const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
+            adminExists = !adminSnapshot.empty;
+            updateAdminOption();
+        } catch (error) {
+            console.error('❌ Erro ao verificar admin:', error);
+            updateAdminOption();
+        }
+    } else {
+        updateAdminOption();
+    }
+}
+
+function updateAdminOption() {
     if (!DOM.adminOption) return;
     
     if (adminExists) {
@@ -558,6 +813,7 @@ async function checkAdminOption() {
 // Manipular login
 async function handleLogin(e) {
     e.preventDefault();
+    
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     const rememberMe = document.getElementById('rememberMe').checked;
@@ -580,6 +836,10 @@ async function handleLogin(e) {
         showLoading(false);
         showToast('Login realizado com sucesso!', 'success');
         showApp();
+        
+        // Atualizar estatísticas após login
+        setTimeout(() => loadSystemStats(true), 1000);
+        
     } catch (error) {
         showLoading(false);
         handleAuthError(error);
@@ -589,6 +849,7 @@ async function handleLogin(e) {
 // Manipular cadastro
 async function handleRegister(e) {
     e.preventDefault();
+    
     const name = document.getElementById('registerName').value.trim();
     const email = document.getElementById('registerEmail').value.trim();
     const password = document.getElementById('registerPassword').value;
@@ -626,6 +887,7 @@ async function handleRegister(e) {
     
     try {
         let userId;
+        
         if (auth) {
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             userId = userCredential.user.uid;
@@ -653,13 +915,15 @@ async function handleRegister(e) {
         
         if (db) {
             await db.collection('users').doc(userId).set(userData);
-            // Atualizar estatísticas do sistema após cadastro
-            await loadSystemStats();
+            
+            // ATUALIZAR ESTATÍSTICAS IMEDIATAMENTE após cadastro
+            setTimeout(() => loadSystemStats(true), 1500);
         } else {
             localStorage.setItem('mathkids_user', JSON.stringify({
                 ...userData,
                 id: userId
             }));
+            
             // Atualizar estatísticas locais
             systemStats.totalStudents++;
             systemStats.totalUsers++;
@@ -674,6 +938,7 @@ async function handleRegister(e) {
         showLoading(false);
         showToast('Conta criada com sucesso! Verifique seu email.', 'success');
         switchAuthForm('login');
+        
     } catch (error) {
         showLoading(false);
         handleAuthError(error);
@@ -683,6 +948,7 @@ async function handleRegister(e) {
 // Manipular recuperação de senha
 async function handlePasswordRecovery(e) {
     e.preventDefault();
+    
     const email = document.getElementById('recoverEmail').value.trim();
     
     if (!email) {
@@ -714,7 +980,7 @@ function handleLogout() {
         auth.signOut().then(() => {
             logoutLocal();
         }).catch(error => {
-            console.error('Logout error:', error);
+            console.error('❌ Logout error:', error);
             logoutLocal();
         });
     } else {
@@ -723,15 +989,32 @@ function handleLogout() {
 }
 
 function logoutLocal() {
+    // Remover listeners do Firebase
+    if (statsListener) {
+        statsListener();
+        statsListener = null;
+    }
+    if (userProgressListener) {
+        userProgressListener();
+        userProgressListener = null;
+    }
+    
     localStorage.removeItem('mathkids_user');
     currentUser = null;
     userData = {};
+    
     DOM.authScreen.style.display = 'flex';
     DOM.appScreen.style.display = 'none';
+    
     DOM.loginFormElement.reset();
     DOM.registerFormElement.reset();
     DOM.recoverFormElement.reset();
+    
     switchAuthForm('login');
+    
+    // Atualizar estatísticas após logout
+    setTimeout(() => loadSystemStats(true), 500);
+    
     showToast('Logout realizado com sucesso.', 'info');
 }
 
@@ -740,6 +1023,9 @@ function handleAuthStateChange(user) {
     if (user) {
         loadUserDataFromFirebase(user.uid);
         showApp();
+        // Configurar listeners após login
+        setupFirebaseListeners();
+        setupUserProgressListener();
     }
 }
 
@@ -747,10 +1033,12 @@ function handleAuthStateChange(user) {
 async function loadUserDataFromFirebase(userId) {
     try {
         const doc = await db.collection('users').doc(userId).get();
+        
         if (doc.exists) {
             const data = doc.data();
             currentUser = { id: userId, ...data };
             
+            // Atualizar último login
             await db.collection('users').doc(userId).update({
                 lastLogin: new Date().toISOString()
             });
@@ -764,7 +1052,7 @@ async function loadUserDataFromFirebase(userId) {
             loadUserData(currentUser);
         }
     } catch (error) {
-        console.error('Error loading user data:', error);
+        console.error('❌ Error loading user data:', error);
         showToast('Erro ao carregar dados do usuário.', 'error');
     }
 }
@@ -773,6 +1061,7 @@ async function loadUserDataFromFirebase(userId) {
 function loadUserData(user) {
     currentUser = user;
     userData = user;
+    
     updateUserInfo();
     
     if (user.progress) {
@@ -812,6 +1101,7 @@ function updateUserInfo() {
     if (DOM.mobileUserRole) DOM.mobileUserRole.textContent = role;
     if (DOM.mobileAvatarInitials) DOM.mobileAvatarInitials.textContent = initials;
     if (DOM.welcomeUserName) DOM.welcomeUserName.textContent = name;
+    
     if (DOM.dropdownUserRole) {
         const badge = DOM.dropdownUserRole;
         badge.textContent = role;
@@ -836,8 +1126,8 @@ function updateProgressUI() {
         DOM.statExercises.textContent = userProgress.exercisesCompleted || 0;
     }
     
-    const accuracy = userProgress.totalAnswers > 0
-        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100)
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
     if (DOM.statAccuracy) {
@@ -891,8 +1181,17 @@ function clearAllNotifications() {
     showToast('Notificações limpas.', 'success');
 }
 
-// Alternar seção - FIX: Marcar todas as abas corretamente
+// Alternar seção
 function switchSection(sectionId) {
+    // Remover listener do Admin se estiver saindo da seção
+    if (currentSection === 'admin' && sectionId !== 'admin') {
+        // Remover listener específico do admin se existir
+        if (window.adminTabListener) {
+            window.adminTabListener();
+            window.adminTabListener = null;
+        }
+    }
+    
     document.querySelectorAll('.app-section').forEach(section => {
         section.classList.remove('active');
     });
@@ -901,13 +1200,43 @@ function switchSection(sectionId) {
     if (targetSection) {
         targetSection.classList.add('active');
         currentSection = sectionId;
+        
         // Atualizar navegação ativa
         updateActiveNavigation(sectionId);
+        
         loadSectionContent(sectionId);
+        
+        // Se for a seção Admin, carregar dados em tempo real
+        if (sectionId === 'admin' && currentUser?.role === 'admin') {
+            loadSystemStats(true);
+            // Configurar listener específico para admin
+            setupAdminFirebaseListener();
+        }
     }
 }
 
-// Atualizar navegação ativa - FIX: Incluir todas as abas
+// Configurar listener do Firebase para Admin
+function setupAdminFirebaseListener() {
+    if (!db || currentUser?.role !== 'admin') return;
+    
+    // Remover listener anterior se existir
+    if (window.adminTabListener) {
+        window.adminTabListener();
+    }
+    
+    // Configurar listener em tempo real para a seção Admin
+    window.adminTabListener = db.collection('users').onSnapshot(
+        () => {
+            loadUsersTable();
+            loadSystemStats(true);
+        },
+        (error) => {
+            console.error('❌ Erro no listener do Admin:', error);
+        }
+    );
+}
+
+// Atualizar navegação ativa
 function updateActiveNavigation(sectionId) {
     // Atualizar nav principal
     const navLinks = document.querySelectorAll('.nav-link');
@@ -973,24 +1302,26 @@ function loadRecentActivities() {
     } else {
         activities.forEach(activity => {
             const icon = activity.type === 'correct' ? 'fa-check-circle' :
-                activity.type === 'wrong' ? 'fa-times-circle' :
-                activity.type === 'game' ? 'fa-gamepad' : 'fa-info-circle';
+                        activity.type === 'wrong' ? 'fa-times-circle' :
+                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info-circle';
+            
             const scoreClass = activity.type === 'correct' ? 'correct' :
-                activity.type === 'wrong' ? 'wrong' : '';
+                              activity.type === 'wrong' ? 'wrong' : '';
+            
             const score = activity.type === 'correct' ? '+10' :
-                activity.type === 'wrong' ? '-5' : '';
-                
+                         activity.type === 'wrong' ? '-5' : '';
+            
             html += `
-            <div class="activity-item ${activity.type}">
-                <div class="activity-icon">
-                    <i class="fas ${icon}"></i>
+                <div class="activity-item ${activity.type}">
+                    <div class="activity-icon">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div class="activity-details">
+                        <p>${activity.description}</p>
+                        <small>${formatTimeAgo(activity.timestamp)}</small>
+                    </div>
+                    ${score ? `<span class="activity-score ${scoreClass}">${score}</span>` : ''}
                 </div>
-                <div class="activity-details">
-                    <p>${activity.description}</p>
-                    <small>${formatTimeAgo(activity.timestamp)}</small>
-                </div>
-                ${score ? `<span class="activity-score ${scoreClass}">${score}</span>` : ''}
-            </div>
             `;
         });
     }
@@ -1030,21 +1361,21 @@ function loadChallenges() {
     challenges.forEach(challenge => {
         const percentage = (challenge.progress / challenge.total) * 100;
         html += `
-        <div class="challenge-item">
-            <div class="challenge-icon">
-                <i class="fas ${challenge.icon}"></i>
-            </div>
-            <div class="challenge-info">
-                <h4>${challenge.title}</h4>
-                <p>${challenge.description}</p>
-                <div class="challenge-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${percentage}%"></div>
+            <div class="challenge-item">
+                <div class="challenge-icon">
+                    <i class="fas ${challenge.icon}"></i>
+                </div>
+                <div class="challenge-info">
+                    <h4>${challenge.title}</h4>
+                    <p>${challenge.description}</p>
+                    <div class="challenge-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <span>${challenge.progress}/${challenge.total}</span>
                     </div>
-                    <span>${challenge.progress}/${challenge.total}</span>
                 </div>
             </div>
-        </div>
         `;
     });
     
@@ -1101,21 +1432,21 @@ function loadLessons() {
     let html = '';
     lessons.forEach(lesson => {
         html += `
-        <div class="lesson-card ${lesson.featured ? 'featured' : ''}" data-operation="${lesson.operation}">
-            <div class="lesson-header">
-                <div class="lesson-icon">
-                    <i class="fas ${lesson.icon}"></i>
+            <div class="lesson-card ${lesson.featured ? 'featured' : ''}" data-operation="${lesson.operation}">
+                <div class="lesson-header">
+                    <div class="lesson-icon">
+                        <i class="fas ${lesson.icon}"></i>
+                    </div>
+                    <div class="lesson-badge">${lesson.difficulty}</div>
                 </div>
-                <div class="lesson-badge">${lesson.difficulty}</div>
+                <h3>${lesson.title}</h3>
+                <p>${lesson.description}</p>
+                <div class="lesson-stats">
+                    <span><i class="fas fa-check-circle"></i> ${lesson.lessonsCount} lições</span>
+                    <span><i class="fas fa-clock"></i> ${lesson.duration} min</span>
+                </div>
+                <button class="btn-lesson">Começar Lição</button>
             </div>
-            <h3>${lesson.title}</h3>
-            <p>${lesson.description}</p>
-            <div class="lesson-stats">
-                <span><i class="fas fa-check-circle"></i> ${lesson.lessonsCount} lições</span>
-                <span><i class="fas fa-clock"></i> ${lesson.duration} min</span>
-            </div>
-            <button class="btn-lesson">Começar Lição</button>
-        </div>
         `;
     });
     
@@ -1140,132 +1471,146 @@ function loadLesson(operation) {
         addition: {
             title: 'Lição: Adição',
             content: `
-            <div class="lesson-content">
-                <h3>O que é Adição?</h3>
-                <p>A adição é uma das quatro operações básicas da matemática. Ela representa a combinação de dois ou mais números para obter um total.</p>
-                <div class="lesson-example">
-                    <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
-                    <p>Se você tem 3 maçãs e compra mais 5 maçãs, quantas maçãs você tem agora?</p>
-                    <div class="example-display">
-                        <span class="example-number">3</span>
-                        <span class="example-symbol">+</span>
-                        <span class="example-number">5</span>
-                        <span class="example-symbol">=</span>
-                        <span class="example-number">8</span>
+                <div class="lesson-content">
+                    <h3>O que é Adição?</h3>
+                    <p>A adição é uma das quatro operações básicas da matemática. Ela representa a combinação de dois ou mais números para obter um total.</p>
+                    
+                    <div class="lesson-example">
+                        <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
+                        <p>Se você tem 3 maçãs e compra mais 5 maçãs, quantas maçãs você tem agora?</p>
+                        <div class="example-display">
+                            <span class="example-number">3</span>
+                            <span class="example-symbol">+</span>
+                            <span class="example-number">5</span>
+                            <span class="example-symbol">=</span>
+                            <span class="example-number">8</span>
+                        </div>
+                        <p>Resposta: Você tem 8 maçãs no total.</p>
                     </div>
-                    <p>Resposta: Você tem 8 maçãs no total.</p>
+                    
+                    <div class="lesson-tip">
+                        <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
+                        <p>Para somar números grandes, você pode quebrá-los em partes menores. Por exemplo:</p>
+                        <p>47 + 25 = (40 + 20) + (7 + 5) = 60 + 12 = 72</p>
+                    </div>
+                    
+                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('addition')">
+                        <i class="fas fa-dumbbell"></i> Praticar Adição
+                    </button>
                 </div>
-                <div class="lesson-tip">
-                    <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
-                    <p>Para somar números grandes, você pode quebrá-los em partes menores. Por exemplo:</p>
-                    <p>47 + 25 = (40 + 20) + (7 + 5) = 60 + 12 = 72</p>
-                </div>
-                <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('addition')">
-                    <i class="fas fa-dumbbell"></i> Praticar Adição
-                </button>
-            </div>
             `
         },
         subtraction: {
             title: 'Lição: Subtração',
             content: `
-            <div class="lesson-content">
-                <h3>O que é Subtração?</h3>
-                <p>A subtração é a operação inversa da adição. Ela representa a remoção de uma quantidade de outra.</p>
-                <div class="lesson-example">
-                    <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
-                    <p>Se você tinha 10 reais e gastou 4 reais, quanto dinheiro sobrou?</p>
-                    <div class="example-display">
-                        <span class="example-number">10</span>
-                        <span class="example-symbol">-</span>
-                        <span class="example-number">4</span>
-                        <span class="example-symbol">=</span>
-                        <span class="example-number">6</span>
+                <div class="lesson-content">
+                    <h3>O que é Subtração?</h3>
+                    <p>A subtração é a operação inversa da adição. Ela representa a remoção de uma quantidade de outra.</p>
+                    
+                    <div class="lesson-example">
+                        <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
+                        <p>Se você tinha 10 reais e gastou 4 reais, quanto dinheiro sobrou?</p>
+                        <div class="example-display">
+                            <span class="example-number">10</span>
+                            <span class="example-symbol">-</span>
+                            <span class="example-number">4</span>
+                            <span class="example-symbol">=</span>
+                            <span class="example-number">6</span>
+                        </div>
+                        <p>Resposta: Sobraram 6 reais.</p>
                     </div>
-                    <p>Resposta: Sobraram 6 reais.</p>
+                    
+                    <div class="lesson-tip">
+                        <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
+                        <p>Você pode pensar na subtração como "quanto falta". Por exemplo:</p>
+                        <p>15 - 7 = ? (Pense: 7 + ? = 15 → 7 + 8 = 15, então 15 - 7 = 8)</p>
+                    </div>
+                    
+                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('subtraction')">
+                        <i class="fas fa-dumbbell"></i> Praticar Subtração
+                    </button>
                 </div>
-                <div class="lesson-tip">
-                    <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
-                    <p>Você pode pensar na subtração como "quanto falta". Por exemplo:</p>
-                    <p>15 - 7 = ? (Pense: 7 + ? = 15 → 7 + 8 = 15, então 15 - 7 = 8)</p>
-                </div>
-                <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('subtraction')">
-                    <i class="fas fa-dumbbell"></i> Praticar Subtração
-                </button>
-            </div>
             `
         },
         multiplication: {
             title: 'Lição: Multiplicação',
             content: `
-            <div class="lesson-content">
-                <h3>O que é Multiplicação?</h3>
-                <p>A multiplicação é uma adição repetida. É uma forma mais rápida de somar o mesmo número várias vezes.</p>
-                <div class="lesson-example">
-                    <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
-                    <p>Se cada pacote tem 4 bolinhas e você tem 3 pacotes, quantas bolinhas você tem no total?</p>
-                    <div class="example-display">
-                        <span class="example-number">4</span>
-                        <span class="example-symbol">×</span>
-                        <span class="example-number">3</span>
-                        <span class="example-symbol">=</span>
-                        <span class="example-number">12</span>
+                <div class="lesson-content">
+                    <h3>O que é Multiplicação?</h3>
+                    <p>A multiplicação é uma adição repetida. É uma forma mais rápida de somar o mesmo número várias vezes.</p>
+                    
+                    <div class="lesson-example">
+                        <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
+                        <p>Se cada pacote tem 4 bolinhas e você tem 3 pacotes, quantas bolinhas você tem no total?</p>
+                        <div class="example-display">
+                            <span class="example-number">4</span>
+                            <span class="example-symbol">×</span>
+                            <span class="example-number">3</span>
+                            <span class="example-symbol">=</span>
+                            <span class="example-number">12</span>
+                        </div>
+                        <p>Resposta: Você tem 12 bolinhas (4 + 4 + 4 = 12).</p>
                     </div>
-                    <p>Resposta: Você tem 12 bolinhas (4 + 4 + 4 = 12).</p>
-                </div>
-                <div class="lesson-tip">
-                    <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
-                    <p>Aprenda as tabuadas aos poucos. Comece com a tabuada do 2, depois do 5, do 10, e assim por diante.</p>
-                    <p>Use a propriedade comutativa: 3 × 4 = 4 × 3 = 12</p>
-                </div>
-                <div class="multiplication-table">
-                    <h4>Tabuada do 5</h4>
-                    <div class="table-grid">
-                        <span>5 × 1 = 5</span>
-                        <span>5 × 2 = 10</span>
-                        <span>5 × 3 = 15</span>
-                        <span>5 × 4 = 20</span>
-                        <span>5 × 5 = 25</span>
+                    
+                    <div class="lesson-tip">
+                        <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
+                        <p>Aprenda as tabuadas aos poucos. Comece com a tabuada do 2, depois do 5, do 10, e assim por diante.</p>
+                        <p>Use a propriedade comutativa: 3 × 4 = 4 × 3 = 12</p>
                     </div>
+                    
+                    <div class="multiplication-table">
+                        <h4>Tabuada do 5</h4>
+                        <div class="table-grid">
+                            <span>5 × 1 = 5</span>
+                            <span>5 × 2 = 10</span>
+                            <span>5 × 3 = 15</span>
+                            <span>5 × 4 = 20</span>
+                            <span>5 × 5 = 25</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('multiplication')">
+                        <i class="fas fa-dumbbell"></i> Praticar Multiplicação
+                    </button>
                 </div>
-                <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('multiplication')">
-                    <i class="fas fa-dumbbell"></i> Praticar Multiplicação
-                </button>
-            </div>
             `
         },
         division: {
             title: 'Lição: Divisão',
             content: `
-            <div class="lesson-content">
-                <h3>O que é Divisão?</h3>
-                <p>A divisão é a operação inversa da multiplicação. Ela representa a distribuição igualitária de uma quantidade.</p>
-                <div class="lesson-example">
-                    <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
-                    <p>Se você tem 12 chocolates para dividir igualmente entre 4 amigos, quantos chocolates cada um recebe?</p>
-                    <div class="example-display">
-                        <span class="example-number">12</span>
-                        <span class="example-symbol">÷</span>
-                        <span class="example-number">4</span>
-                        <span class="example-symbol">=</span>
-                        <span class="example-number">3</span>
+                <div class="lesson-content">
+                    <h3>O que é Divisão?</h3>
+                    <p>A divisão é a operação inversa da multiplicação. Ela representa a distribuição igualitária de uma quantidade.</p>
+                    
+                    <div class="lesson-example">
+                        <h4><i class="fas fa-lightbulb"></i> Exemplo Prático</h4>
+                        <p>Se você tem 12 chocolates para dividir igualmente entre 4 amigos, quantos chocolates cada um recebe?</p>
+                        <div class="example-display">
+                            <span class="example-number">12</span>
+                            <span class="example-symbol">÷</span>
+                            <span class="example-number">4</span>
+                            <span class="example-symbol">=</span>
+                            <span class="example-number">3</span>
+                        </div>
+                        <p>Resposta: Cada amigo recebe 3 chocolates.</p>
                     </div>
-                    <p>Resposta: Cada amigo recebe 3 chocolates.</p>
+                    
+                    <div class="lesson-tip">
+                        <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
+                        <p>Pense na divisão como "quantos grupos iguais". Por exemplo:</p>
+                        <p>20 ÷ 4 = ? (Pense: Quantos grupos de 4 cabem em 20? → 5 grupos)</p>
+                    </div>
+                    
+                    <div class="division-types">
+                        <h4>Tipos de Divisão</h4>
+                        <p><strong>Divisão exata:</strong> Quando não sobra resto (ex: 15 ÷ 3 = 5)</p>
+                        <p><strong>Divisão com resto:</strong> Quando sobra um resto (ex: 17 ÷ 5 = 3, resto 2)</p>
+                    </div>
+                    
+                    <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('division')">
+                        <i class="fas fa-dumbbell"></i> Praticar Divisão
+                    </button>
                 </div>
-                <div class="lesson-tip">
-                    <h4><i class="fas fa-tips"></i> Dica de Aprendizado</h4>
-                    <p>Pense na divisão como "quantos grupos iguais". Por exemplo:</p>
-                    <p>20 ÷ 4 = ? (Pense: Quantos grupos de 4 cabem em 20? → 5 grupos)</p>
-                </div>
-                <div class="division-types">
-                    <h4>Tipos de Divisão</h4>
-                    <p><strong>Divisão exata:</strong> Quando não sobra resto (ex: 15 ÷ 3 = 5)</p>
-                    <p><strong>Divisão com resto:</strong> Quando sobra um resto (ex: 17 ÷ 5 = 3, resto 2)</p>
-                </div>
-                <button class="btn-lesson-start" onclick="switchSection('practice'); loadPracticeSection('division')">
-                    <i class="fas fa-dumbbell"></i> Praticar Divisão
-                </button>
-            </div>
             `
         }
     };
@@ -1287,89 +1632,98 @@ function loadPracticeSection(operation = null) {
     }
     
     const operationName = getOperationName(currentOperation);
+    
     const content = `
-    <div class="section-header">
-        <div class="header-content">
-            <h2><i class="fas fa-dumbbell"></i> Praticar</h2>
-            <p>Escolha uma operação e pratique com exercícios interativos.</p>
+        <div class="section-header">
+            <div class="header-content">
+                <h2><i class="fas fa-dumbbell"></i> Praticar</h2>
+                <p>Escolha uma operação e pratique com exercícios interativos.</p>
+            </div>
         </div>
-    </div>
-    <div class="practice-content">
-        <div class="operations-selector">
-            <div class="operations-grid">
-                <div class="operation-selector ${currentOperation === 'addition' ? 'active' : ''}" data-operation="addition">
-                    <div class="operation-icon">
-                        <i class="fas fa-plus"></i>
+        
+        <div class="practice-content">
+            <div class="operations-selector">
+                <div class="operations-grid">
+                    <div class="operation-selector ${currentOperation === 'addition' ? 'active' : ''}" data-operation="addition">
+                        <div class="operation-icon">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <h3>Adição</h3>
+                        <p>Some números e encontre o total</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.addition.correct || 0}/${userProgress.addition.total || 0}</span>
+                        </div>
                     </div>
-                    <h3>Adição</h3>
-                    <p>Some números e encontre o total</p>
-                    <div class="operation-stats">
-                        <span>Acertos: ${userProgress.addition.correct || 0}/${userProgress.addition.total || 0}</span>
+                    
+                    <div class="operation-selector ${currentOperation === 'subtraction' ? 'active' : ''}" data-operation="subtraction">
+                        <div class="operation-icon">
+                            <i class="fas fa-minus"></i>
+                        </div>
+                        <h3>Subtração</h3>
+                        <p>Encontre a diferença entre números</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.subtraction.correct || 0}/${userProgress.subtraction.total || 0}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="operation-selector ${currentOperation === 'subtraction' ? 'active' : ''}" data-operation="subtraction">
-                    <div class="operation-icon">
-                        <i class="fas fa-minus"></i>
+                    
+                    <div class="operation-selector ${currentOperation === 'multiplication' ? 'active' : ''}" data-operation="multiplication">
+                        <div class="operation-icon">
+                            <i class="fas fa-times"></i>
+                        </div>
+                        <h3>Multiplicação</h3>
+                        <p>Domine as tabuadas e multiplicações</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.multiplication.correct || 0}/${userProgress.multiplication.total || 0}</span>
+                        </div>
                     </div>
-                    <h3>Subtração</h3>
-                    <p>Encontre a diferença entre números</p>
-                    <div class="operation-stats">
-                        <span>Acertos: ${userProgress.subtraction.correct || 0}/${userProgress.subtraction.total || 0}</span>
-                    </div>
-                </div>
-                <div class="operation-selector ${currentOperation === 'multiplication' ? 'active' : ''}" data-operation="multiplication">
-                    <div class="operation-icon">
-                        <i class="fas fa-times"></i>
-                    </div>
-                    <h3>Multiplicação</h3>
-                    <p>Domine as tabuadas e multiplicações</p>
-                    <div class="operation-stats">
-                        <span>Acertos: ${userProgress.multiplication.correct || 0}/${userProgress.multiplication.total || 0}</span>
-                    </div>
-                </div>
-                <div class="operation-selector ${currentOperation === 'division' ? 'active' : ''}" data-operation="division">
-                    <div class="operation-icon">
-                        <i class="fas fa-divide"></i>
-                    </div>
-                    <h3>Divisão</h3>
-                    <p>Aprenda a dividir igualmente</p>
-                    <div class="operation-stats">
-                        <span>Acertos: ${userProgress.division.correct || 0}/${userProgress.division.total || 0}</span>
+                    
+                    <div class="operation-selector ${currentOperation === 'division' ? 'active' : ''}" data-operation="division">
+                        <div class="operation-icon">
+                            <i class="fas fa-divide"></i>
+                        </div>
+                        <h3>Divisão</h3>
+                        <p>Aprenda a dividir igualmente</p>
+                        <div class="operation-stats">
+                            <span>Acertos: ${userProgress.division.correct || 0}/${userProgress.division.total || 0}</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        ${currentOperation ? `
-        <div class="practice-exercise">
-            <div class="exercise-header">
-                <h3><i class="fas fa-${getOperationIcon(currentOperation)}"></i> Praticando ${operationName}</h3>
-                <div class="difficulty-selector">
-                    <span>Dificuldade:</span>
-                    <div class="difficulty-buttons">
-                        <button class="btn-difficulty ${currentDifficulty === 'easy' ? 'active' : ''}" data-level="easy">Fácil</button>
-                        <button class="btn-difficulty ${currentDifficulty === 'medium' ? 'active' : ''}" data-level="medium">Médio</button>
-                        <button class="btn-difficulty ${currentDifficulty === 'hard' ? 'active' : ''}" data-level="hard">Difícil</button>
+            
+            ${currentOperation ? `
+            <div class="practice-exercise">
+                <div class="exercise-header">
+                    <h3><i class="fas fa-${getOperationIcon(currentOperation)}"></i> Praticando ${operationName}</h3>
+                    <div class="difficulty-selector">
+                        <span>Dificuldade:</span>
+                        <div class="difficulty-buttons">
+                            <button class="btn-difficulty ${currentDifficulty === 'easy' ? 'active' : ''}" data-level="easy">Fácil</button>
+                            <button class="btn-difficulty ${currentDifficulty === 'medium' ? 'active' : ''}" data-level="medium">Médio</button>
+                            <button class="btn-difficulty ${currentDifficulty === 'hard' ? 'active' : ''}" data-level="hard">Difícil</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="exercise-container">
+                    <div class="exercise-display">
+                        <div class="numbers" id="exerciseNum1">?</div>
+                        <div class="operation-symbol" id="exerciseSymbol">${getOperationSymbol(currentOperation)}</div>
+                        <div class="numbers" id="exerciseNum2">?</div>
+                        <div class="equals">=</div>
+                        <input type="number" id="exerciseAnswer" placeholder="?" autofocus>
+                    </div>
+                    
+                    <div class="exercise-feedback" id="exerciseFeedback"></div>
+                    
+                    <div class="exercise-controls">
+                        <button class="btn-exercise" id="checkExercise">Verificar Resposta</button>
+                        <button class="btn-exercise secondary" id="newExercise">Novo Exercício</button>
+                        <button class="btn-exercise outline" id="showHint">Mostrar Dica</button>
                     </div>
                 </div>
             </div>
-            <div class="exercise-container">
-                <div class="exercise-display">
-                    <div class="numbers" id="exerciseNum1">?</div>
-                    <div class="operation-symbol" id="exerciseSymbol">${getOperationSymbol(currentOperation)}</div>
-                    <div class="numbers" id="exerciseNum2">?</div>
-                    <div class="equals">=</div>
-                    <input type="number" id="exerciseAnswer" placeholder="?" autofocus>
-                </div>
-                <div class="exercise-feedback" id="exerciseFeedback"></div>
-                <div class="exercise-controls">
-                    <button class="btn-exercise" id="checkExercise">Verificar Resposta</button>
-                    <button class="btn-exercise secondary" id="newExercise">Novo Exercício</button>
-                    <button class="btn-exercise outline" id="showHint">Mostrar Dica</button>
-                </div>
-            </div>
+            ` : '<p class="text-center">Selecione uma operação para começar a praticar.</p>'}
         </div>
-        ` : '<p class="text-center">Selecione uma operação para começar a praticar.</p>'}
-    </div>
     `;
     
     section.innerHTML = content;
@@ -1401,6 +1755,7 @@ function setupPracticeEvents() {
     document.getElementById('checkExercise')?.addEventListener('click', checkPracticeAnswer);
     document.getElementById('newExercise')?.addEventListener('click', generateExercise);
     document.getElementById('showHint')?.addEventListener('click', showPracticeHint);
+    
     document.getElementById('exerciseAnswer')?.addEventListener('keyup', function(e) {
         if (e.key === 'Enter') {
             checkPracticeAnswer();
@@ -1414,11 +1769,13 @@ function generateExercise() {
     
     let num1, num2, answer;
     const symbol = getOperationSymbol(currentOperation);
+    
     const ranges = {
         'easy': { min: 1, max: 20 },
         'medium': { min: 10, max: 100 },
         'hard': { min: 50, max: 500 }
     };
+    
     const range = ranges[currentDifficulty];
     
     switch(currentOperation) {
@@ -1427,11 +1784,13 @@ function generateExercise() {
             num2 = getRandomInt(range.min, range.max);
             answer = num1 + num2;
             break;
+            
         case 'subtraction':
             num1 = getRandomInt(range.min, range.max);
             num2 = getRandomInt(range.min, num1);
             answer = num1 - num2;
             break;
+            
         case 'multiplication':
             const multRange = {
                 'easy': { min: 1, max: 10 },
@@ -1443,6 +1802,7 @@ function generateExercise() {
             num2 = getRandomInt(multR.min, multR.max);
             answer = num1 * num2;
             break;
+            
         case 'division':
             num2 = getRandomInt(1, 12);
             const quotient = getRandomInt(range.min, Math.floor(range.max / num2));
@@ -1501,23 +1861,35 @@ function checkPracticeAnswer() {
         feedback.className = 'exercise-feedback correct';
         userProgress.correctAnswers++;
         userProgress[currentExercise.operation].correct++;
+        
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} concluído`, 'correct');
+        
         userProgress.dailyProgress.exercises++;
         userProgress.dailyProgress.correct++;
+        
         setTimeout(generateExercise, 1500);
+        
         showToast('Resposta correta! +10 pontos', 'success');
     } else {
         feedback.textContent = `❌ Ops! A resposta correta é ${currentExercise.answer}. Tente novamente!`;
         feedback.className = 'exercise-feedback error';
+        
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} errado`, 'wrong');
+        
         userProgress.dailyProgress.exercises++;
+        
         showToast('Resposta incorreta. Tente novamente!', 'error');
     }
     
     updateProgressUI();
     saveUserProgress();
+    
+    // Atualizar estatísticas do sistema
     systemStats.totalExercises++;
     updateSystemStatsUI();
+    
+    // Salvar cache atualizado
+    saveSystemStatsCache();
 }
 
 // Mostrar dica na prática
@@ -1526,6 +1898,7 @@ function showPracticeHint() {
     
     const { num1, num2, operation, answer } = currentExercise;
     const feedback = document.getElementById('exerciseFeedback');
+    
     if (!feedback) return;
     
     let hint = '';
@@ -1548,90 +1921,96 @@ function showPracticeHint() {
     feedback.className = 'exercise-feedback info';
 }
 
-// Carregar seção de jogos - FIX: Estilizar input de resposta
+// Salvar cache das estatísticas do sistema
+function saveSystemStatsCache() {
+    try {
+        const cacheKey = 'mathkids_system_stats_cache';
+        const cacheData = {
+            stats: {
+                totalStudents: systemStats.totalStudents,
+                averageRating: systemStats.averageRating,
+                improvementRate: systemStats.improvementRate,
+                totalExercises: systemStats.totalExercises,
+                totalUsers: systemStats.totalUsers,
+                systemAccuracy: systemStats.systemAccuracy
+            },
+            timestamp: Date.now()
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (error) {
+        console.warn('⚠️ Não foi possível salvar cache:', error);
+    }
+}
+
+// Carregar seção de jogos
 function loadGamesSection() {
     const section = document.getElementById('games');
     if (!section) return;
     
     const content = `
-    <div class="section-header">
-        <div class="header-content">
-            <h2><i class="fas fa-gamepad"></i> Jogos Educativos</h2>
-            <p>Aprenda matemática de forma divertida com nossos jogos!</p>
-        </div>
-    </div>
-    <div class="games-content">
-        <div class="games-grid">
-            <div class="game-card" id="lightningGame">
-                <div class="game-header">
-                    <div class="game-icon">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                    <div class="game-badge">Popular</div>
-                </div>
-                <h3>Desafio Relâmpago</h3>
-                <p>Resolva o máximo de multiplicações em 60 segundos!</p>
-                <div class="game-stats">
-                    <span><i class="fas fa-trophy"></i> Seu recorde: ${localStorage.getItem('mathkids_highscore_lightning') || 0}</span>
-                </div>
-                <button class="btn-game">Jogar Agora</button>
-            </div>
-            <div class="game-card" id="divisionPuzzle">
-                <div class="game-header">
-                    <div class="game-icon">
-                        <i class="fas fa-puzzle-piece"></i>
-                    </div>
-                    <div class="game-badge">Novo</div>
-                </div>
-                <h3>Quebra-cabeça da Divisão</h3>
-                <p>Complete o quebra-cabeça resolvendo problemas de divisão.</p>
-                <div class="game-stats">
-                    <span><i class="fas fa-star"></i> Nível: ${localStorage.getItem('mathkids_division_level') || 1}</span>
-                </div>
-                <button class="btn-game">Jogar Agora</button>
-            </div>
-            <div class="game-card" id="mathChampionship">
-                <div class="game-header">
-                    <div class="game-icon">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <div class="game-badge">Competitivo</div>
-                </div>
-                <h3>Campeonato MathKids</h3>
-                <p>Enfrente operações mistas e suba no ranking.</p>
-                <div class="game-stats">
-                    <span><i class="fas fa-medal"></i> Posição: #${localStorage.getItem('mathkids_ranking') || '--'}</span>
-                </div>
-                <button class="btn-game">Jogar Agora</button>
-            </div>
-            <!-- Novo Jogo Racha Cuca -->
-            <div class="game-card" id="rachacucaGame">
-                <div class="game-header">
-                    <div class="game-icon">
-                        <i class="fas fa-brain"></i>
-                    </div>
-                    <div class="game-badge">Lógica</div>
-                </div>
-                <h3>Racha Cuca</h3>
-                <p>Quebra-cabeça clássico para estimular o raciocínio lógico e a concentração.</p>
-                <div class="game-stats">
-                    <span><i class="fas fa-trophy"></i> Seu recorde: ${localStorage.getItem('mathkids_rachacuca_highscore') || 0}</span>
-                </div>
-                <button class="btn-game">Jogar Agora</button>
+        <div class="section-header">
+            <div class="header-content">
+                <h2><i class="fas fa-gamepad"></i> Jogos Educativos</h2>
+                <p>Aprenda matemática de forma divertida com nossos jogos!</p>
             </div>
         </div>
-        <div class="game-container" id="gameContainer">
-            <div class="game-welcome">
-                <h3>Selecione um jogo para começar!</h3>
-                <p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
-                <p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
+        
+        <div class="games-content">
+            <div class="games-grid">
+                <div class="game-card" id="lightningGame">
+                    <div class="game-header">
+                        <div class="game-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="game-badge">Popular</div>
+                    </div>
+                    <h3>Desafio Relâmpago</h3>
+                    <p>Resolva o máximo de multiplicações em 60 segundos!</p>
+                    <div class="game-stats">
+                        <span><i class="fas fa-trophy"></i> Seu recorde: ${localStorage.getItem('mathkids_highscore_lightning') || 0}</span>
+                    </div>
+                    <button class="btn-game">Jogar Agora</button>
+                </div>
+                
+                <div class="game-card" id="divisionPuzzle">
+                    <div class="game-header">
+                        <div class="game-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div class="game-badge">Novo</div>
+                    </div>
+                    <h3>Quebra-cabeça da Divisão</h3>
+                    <p>Complete o quebra-cabeça resolvendo problemas de divisão.</p>
+                    <div class="game-stats">
+                        <span><i class="fas fa-star"></i> Nível: ${localStorage.getItem('mathkids_division_level') || 1}</span>
+                    </div>
+                    <button class="btn-game">Jogar Agora</button>
+                </div>
+                
+                <div class="game-card" id="mathChampionship">
+                    <div class="game-header">
+                        <div class="game-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <div class="game-badge">Competitivo</div>
+                    </div>
+                    <h3>Campeonato MathKids</h3>
+                    <p>Enfrente operações mistas e suba no ranking.</p>
+                    <div class="game-stats">
+                        <span><i class="fas fa-medal"></i> Posição: #${localStorage.getItem('mathkids_ranking') || '--'}</span>
+                    </div>
+                    <button class="btn-game">Jogar Agora</button>
+                </div>
+            </div>
+            
+            <div class="game-container" id="gameContainer">
+                <div class="game-welcome">
+                    <h3>Selecione um jogo para começar!</h3>
+                    <p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
+                    <p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
+                </div>
             </div>
         </div>
-        <!-- Container específico para o jogo Racha Cuca - será inicializado via JS -->
-        <div class="game-container" id="rachacucaContainer" style="display: none;">
-            <!-- Será populado pela função de inicialização -->
-        </div>
-    </div>
     `;
     
     section.innerHTML = content;
@@ -1644,56 +2023,42 @@ function loadGamesSection() {
     });
 }
 
-// Iniciar jogo - FIX: Estilizar input de resposta
+// Iniciar jogo
 function startGame(gameId) {
     currentGame = gameId;
     const gameContainer = document.getElementById('gameContainer');
-    const rachaCucaContainer = document.getElementById('rachacucaContainer');
+    if (!gameContainer) return;
     
-    if (!gameContainer || !rachaCucaContainer) return;
+    const games = {
+        lightningGame: {
+            title: 'Desafio Relâmpago',
+            description: 'Resolva o máximo de multiplicações em 60 segundos!',
+            instructions: 'Digite a resposta correta para cada multiplicação o mais rápido possível.',
+            timeLimit: 60
+        },
+        divisionPuzzle: {
+            title: 'Quebra-cabeça da Divisão',
+            description: 'Complete o quebra-cabeça resolvendo problemas de divisão.',
+            instructions: 'Arraste as peças para os lugares corretos baseado nos resultados da divisão.',
+            timeLimit: 120
+        },
+        mathChampionship: {
+            title: 'Campeonato MathKids',
+            description: 'Enfrente operações mistas e suba no ranking.',
+            instructions: 'Resolva diferentes tipos de operações matemáticas para ganhar pontos.',
+            timeLimit: 90
+        }
+    };
     
-    // Esconder ambos os containers primeiro
-    gameContainer.style.display = 'none';
+    const game = games[gameId];
+    if (!game) return;
     
-    if (gameId === 'rachacucaGame') {
-        // Mostrar o container do Racha Cuca
-        rachaCucaContainer.style.display = 'block';
-        // Iniciar o jogo
-        startRachaCuca();
-    } else {
-        // Mostrar o container normal de jogos
-        gameContainer.style.display = 'block';
-        
-        const games = {
-            lightningGame: {
-                title: 'Desafio Relâmpago',
-                description: 'Resolva o máximo de multiplicações em 60 segundos!',
-                instructions: 'Digite a resposta correta para cada multiplicação o mais rápido possível.',
-                timeLimit: 60
-            },
-            divisionPuzzle: {
-                title: 'Quebra-cabeça da Divisão',
-                description: 'Complete o quebra-cabeça resolvendo problemas de divisão.',
-                instructions: 'Arraste as peças para os lugares corretos baseado nos resultados da divisão.',
-                timeLimit: 120
-            },
-            mathChampionship: {
-                title: 'Campeonato MathKids',
-                description: 'Enfrente operações mistas e suba no ranking.',
-                instructions: 'Resolva diferentes tipos de operações matemáticas para ganhar pontos.',
-                timeLimit: 90
-            }
-        };
-        
-        const game = games[gameId];
-        if (!game) return;
-        
-        gameScore = 0;
-        gameTimeLeft = game.timeLimit;
-        gameActive = true;
-        gameHighScore = localStorage.getItem(`mathkids_highscore_${gameId}`) || 0;
-        
-        gameContainer.innerHTML = `
+    gameScore = 0;
+    gameTimeLeft = game.timeLimit;
+    gameActive = true;
+    gameHighScore = localStorage.getItem(`mathkids_highscore_${gameId}`) || 0;
+    
+    gameContainer.innerHTML = `
         <div class="game-header">
             <h3><i class="fas fa-${gameId === 'lightningGame' ? 'bolt' : gameId === 'divisionPuzzle' ? 'puzzle-piece' : 'trophy'}"></i> ${game.title}</h3>
             <div class="game-stats">
@@ -1711,16 +2076,19 @@ function startGame(gameId) {
                 </div>
             </div>
         </div>
+        
         <div class="game-content">
             <div class="game-info">
                 <h4>${game.description}</h4>
                 <p>${game.instructions}</p>
             </div>
+            
             <div class="game-exercise" id="gameExercise">
                 <div class="game-question" id="gameQuestion">
                     <p>Preparado? Clique em "Iniciar Jogo" para começar!</p>
                 </div>
             </div>
+            
             <div class="game-controls">
                 <button class="btn-game-control" id="startGameBtn">
                     <i class="fas fa-play"></i> Iniciar Jogo
@@ -1732,15 +2100,15 @@ function startGame(gameId) {
                     <i class="fas fa-question-circle"></i> Como Jogar
                 </button>
             </div>
+            
             <div class="game-feedback" id="gameFeedback"></div>
         </div>
-        `;
-        
-        setupGameEvents(gameId);
-    }
+    `;
+    
+    setupGameEvents(gameId);
 }
 
-// Configurar eventos do jogo - FIX: Adicionar estilização ao input
+// Configurar eventos do jogo
 function setupGameEvents(gameId) {
     document.getElementById('startGameBtn')?.addEventListener('click', () => startGameSession(gameId));
     document.getElementById('endGameBtn')?.addEventListener('click', endGame);
@@ -1770,7 +2138,6 @@ function startGameSession(gameId) {
 function updateGameTimer() {
     gameTimeLeft--;
     const timerElement = document.getElementById('gameTimer');
-    
     if (timerElement) timerElement.textContent = gameTimeLeft + 's';
     
     if (gameTimeLeft <= 0) {
@@ -1778,12 +2145,13 @@ function updateGameTimer() {
     }
 }
 
-// Gerar exercício do jogo - FIX: Estilizar input de resposta
+// Gerar exercício do jogo
 function generateGameExercise(gameId) {
     if (!gameActive) return;
     
     let question, answer;
     const gameQuestion = document.getElementById('gameQuestion');
+    
     if (!gameQuestion) return;
     
     switch(gameId) {
@@ -1793,6 +2161,7 @@ function generateGameExercise(gameId) {
             question = `${num1} × ${num2} = ?`;
             answer = num1 * num2;
             break;
+            
         case 'divisionPuzzle':
             const divisor = getRandomInt(2, 12);
             const quotient = getRandomInt(2, 12);
@@ -1800,9 +2169,11 @@ function generateGameExercise(gameId) {
             question = `${dividend} ÷ ${divisor} = ?`;
             answer = quotient;
             break;
+            
         case 'mathChampionship':
             const operations = ['+', '-', '×', '÷'];
             const operation = operations[Math.floor(Math.random() * operations.length)];
+            
             if (operation === '÷') {
                 const divisor = getRandomInt(2, 12);
                 const quotient = getRandomInt(2, 12);
@@ -1814,6 +2185,7 @@ function generateGameExercise(gameId) {
                 const num1 = getRandomInt(1, 100);
                 const num2 = getRandomInt(1, 100);
                 question = `${num1} ${operation} ${num2} = ?`;
+                
                 switch(operation) {
                     case '+': answer = num1 + num2; break;
                     case '-': answer = num1 - num2; break;
@@ -1829,70 +2201,77 @@ function generateGameExercise(gameId) {
         gameId: gameId
     };
     
-    // FIX: Estilizar input de resposta semelhante à seção de prática
     gameQuestion.innerHTML = `
-    <h4>${question}</h4>
-    <div class="game-answer-container">
-        <div class="game-answer-input">
-            <input type="number" id="gameAnswerInput" placeholder="Digite sua resposta" autofocus>
+        <h4>${question}</h4>
+        <div class="game-answer-container">
+            <div class="game-answer-input">
+                <input type="number" id="gameAnswerInput" placeholder="Digite sua resposta" autofocus>
+            </div>
+            <button id="submitGameAnswer" class="btn-exercise">Responder</button>
         </div>
-        <button id="submitGameAnswer" class="btn-exercise">Responder</button>
-    </div>
     `;
     
     // Adicionar estilos ao input
     const style = document.createElement('style');
     style.textContent = `
-    .game-answer-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--space-lg);
-        margin-top: var(--space-xl);
-    }
-    .game-answer-input {
-        width: 100%;
-        max-width: 300px;
-    }
-    #gameAnswerInput {
-        width: 100%;
-        min-height: 4rem;
-        border-radius: var(--radius-xl);
-        border: 3px solid var(--primary-500);
-        font-size: 2rem;
-        font-weight: 700;
-        text-align: center;
-        color: var(--primary-600);
-        background: var(--bg-primary);
-        transition: all var(--transition-fast);
-        padding: var(--space-md);
-    }
-    #gameAnswerInput:focus {
-        outline: none;
-        box-shadow: 0 0 0 4px var(--primary-100);
-        border-color: var(--primary-600);
-    }
-    #gameAnswerInput::placeholder {
-        color: var(--text-tertiary);
-        font-size: 1.5rem;
-    }
-    [data-theme="dark"] #gameAnswerInput {
-        background: var(--gray-700);
-        border-color: var(--primary-500);
-        color: var(--primary-300);
-    }
-    [data-theme="dark"] #gameAnswerInput:focus {
-        background: var(--gray-800);
-        border-color: var(--primary-400);
-        box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
-    }
+        .game-answer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-lg);
+            margin-top: var(--space-xl);
+        }
+        
+        .game-answer-input {
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        #gameAnswerInput {
+            width: 100%;
+            min-height: 4rem;
+            border-radius: var(--radius-xl);
+            border: 3px solid var(--primary-500);
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            color: var(--primary-600);
+            background: var(--bg-primary);
+            transition: all var(--transition-fast);
+            padding: var(--space-md);
+        }
+        
+        #gameAnswerInput:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--primary-100);
+            border-color: var(--primary-600);
+        }
+        
+        #gameAnswerInput::placeholder {
+            color: var(--text-tertiary);
+            font-size: 1.5rem;
+        }
+        
+        [data-theme="dark"] #gameAnswerInput {
+            background: var(--gray-700);
+            border-color: var(--primary-500);
+            color: var(--primary-300);
+        }
+        
+        [data-theme="dark"] #gameAnswerInput:focus {
+            background: var(--gray-800);
+            border-color: var(--primary-400);
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
+        }
     `;
+    
     document.head.appendChild(style);
     
     document.getElementById('submitGameAnswer')?.addEventListener('click', checkGameAnswer);
     document.getElementById('gameAnswerInput')?.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') checkGameAnswer();
     });
+    
     document.getElementById('gameAnswerInput')?.focus();
 }
 
@@ -1916,8 +2295,10 @@ function checkGameAnswer() {
         gameScore += 10;
         const gameScoreElement = document.getElementById('gameScore');
         if (gameScoreElement) gameScoreElement.textContent = gameScore;
+        
         feedback.textContent = '🎉 Correto! +10 pontos';
         feedback.className = 'game-feedback success';
+        
         if (gameTimeLeft < 60) {
             gameTimeLeft += 2;
             feedback.textContent += ' (+2s)';
@@ -1925,6 +2306,7 @@ function checkGameAnswer() {
     } else {
         feedback.textContent = `❌ Errado! A resposta correta é ${currentExercise.answer}`;
         feedback.className = 'game-feedback error';
+        
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
     }
@@ -1943,14 +2325,14 @@ function showHowToPlay() {
     if (!feedback) return;
     
     feedback.innerHTML = `
-    <h4>Como Jogar:</h4>
-    <ul>
-        <li>Resolva os exercícios matemáticos o mais rápido possível</li>
-        <li>Cada resposta correta vale 10 pontos</li>
-        <li>Respostas rápidas podem ganhar tempo extra</li>
-        <li>Respostas erradas perdem 5 segundos</li>
-        <li>Tente bater seu recorde!</li>
-    </ul>
+        <h4>Como Jogar:</h4>
+        <ul>
+            <li>Resolva os exercícios matemáticos o mais rápido possível</li>
+            <li>Cada resposta correta vale 10 pontos</li>
+            <li>Respostas rápidas podem ganhar tempo extra</li>
+            <li>Respostas erradas perdem 5 segundos</li>
+            <li>Tente bater seu recorde!</li>
+        </ul>
     `;
     feedback.className = 'game-feedback info';
 }
@@ -1970,12 +2352,12 @@ function endGame() {
     
     if (gameExercise) {
         gameExercise.innerHTML = `
-        <div class="game-result">
-            <h4>Fim do Jogo!</h4>
-            <p>Sua pontuação: <strong>${gameScore}</strong> pontos</p>
-            <p>Respostas corretas: <strong>${Math.floor(gameScore / 10)}</strong></p>
-            <p>Tempo restante: <strong>${gameTimeLeft}</strong> segundos</p>
-        </div>
+            <div class="game-result">
+                <h4>Fim do Jogo!</h4>
+                <p>Sua pontuação: <strong>${gameScore}</strong> pontos</p>
+                <p>Respostas corretas: <strong>${Math.floor(gameScore / 10)}</strong></p>
+                <p>Tempo restante: <strong>${gameTimeLeft}</strong> segundos</p>
+            </div>
         `;
     }
     
@@ -1998,59 +2380,64 @@ function endGame() {
 // Carregar seção de progresso
 function loadProgressSection() {
     const section = document.getElementById('progress');
-    const accuracy = userProgress.totalAnswers > 0
-        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100)
+    
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
     const content = `
-    <div class="section-header">
-        <div class="header-content">
-            <h2><i class="fas fa-chart-line"></i> Meu Progresso</h2>
-            <p>Acompanhe sua evolução no aprendizado de matemática.</p>
+        <div class="section-header">
+            <div class="header-content">
+                <h2><i class="fas fa-chart-line"></i> Meu Progresso</h2>
+                <p>Acompanhe sua evolução no aprendizado de matemática.</p>
+            </div>
         </div>
-    </div>
-    <div class="progress-content">
-        <div class="progress-overview">
-            <div class="progress-stats">
-                <div class="progress-stat">
-                    <div class="stat-value">${userProgress.exercisesCompleted}</div>
-                    <div class="stat-label">Exercícios Concluídos</div>
+        
+        <div class="progress-content">
+            <div class="progress-overview">
+                <div class="progress-stats">
+                    <div class="progress-stat">
+                        <div class="stat-value">${userProgress.exercisesCompleted}</div>
+                        <div class="stat-label">Exercícios Concluídos</div>
+                    </div>
+                    <div class="progress-stat">
+                        <div class="stat-value">${accuracy}%</div>
+                        <div class="stat-label">Taxa de Acerto</div>
+                    </div>
+                    <div class="progress-stat">
+                        <div class="stat-value">${Math.floor(userProgress.practiceTime / 60)}</div>
+                        <div class="stat-label">Minutos de Prática</div>
+                    </div>
+                    <div class="progress-stat">
+                        <div class="stat-value">${userProgress.level}</div>
+                        <div class="stat-label">Seu Nível</div>
+                    </div>
                 </div>
-                <div class="progress-stat">
-                    <div class="stat-value">${accuracy}%</div>
-                    <div class="stat-label">Taxa de Acerto</div>
+            </div>
+            
+            <div class="progress-details">
+                <div class="progress-chart">
+                    <h3><i class="fas fa-chart-bar"></i> Desempenho por Operação</h3>
+                    <div class="chart-container">
+                        <canvas id="operationsChart"></canvas>
+                    </div>
                 </div>
-                <div class="progress-stat">
-                    <div class="stat-value">${Math.floor(userProgress.practiceTime / 60)}</div>
-                    <div class="stat-label">Minutos de Prática</div>
+                
+                <div class="progress-history">
+                    <h3><i class="fas fa-history"></i> Histórico de Atividades</h3>
+                    <div class="activities-timeline" id="activitiesTimeline">
+                        ${generateActivitiesTimeline()}
+                    </div>
                 </div>
-                <div class="progress-stat">
-                    <div class="stat-value">${userProgress.level}</div>
-                    <div class="stat-label">Seu Nível</div>
+            </div>
+            
+            <div class="progress-badges">
+                <h3><i class="fas fa-award"></i> Conquistas</h3>
+                <div class="badges-grid" id="badgesGrid">
+                    ${generateBadges()}
                 </div>
             </div>
         </div>
-        <div class="progress-details">
-            <div class="progress-chart">
-                <h3><i class="fas fa-chart-bar"></i> Desempenho por Operação</h3>
-                <div class="chart-container">
-                    <canvas id="operationsChart"></canvas>
-                </div>
-            </div>
-            <div class="progress-history">
-                <h3><i class="fas fa-history"></i> Histórico de Atividades</h3>
-                <div class="activities-timeline" id="activitiesTimeline">
-                    ${generateActivitiesTimeline()}
-                </div>
-            </div>
-        </div>
-        <div class="progress-badges">
-            <h3><i class="fas fa-award"></i> Conquistas</h3>
-            <div class="badges-grid" id="badgesGrid">
-                ${generateBadges()}
-            </div>
-        </div>
-    </div>
     `;
     
     section.innerHTML = content;
@@ -2059,7 +2446,7 @@ function loadProgressSection() {
     setTimeout(initializeOperationsChart, 100);
 }
 
-// FIX: Gráfico de operações corrigido
+// Gráfico de operações
 function initializeOperationsChart() {
     const ctx = document.getElementById('operationsChart');
     if (!ctx) return;
@@ -2076,12 +2463,14 @@ function initializeOperationsChart() {
         userProgress.multiplication.correct || 0,
         userProgress.division.correct || 0
     ];
+    
     const total = [
         userProgress.addition.total || 0,
         userProgress.subtraction.total || 0,
         userProgress.multiplication.total || 0,
         userProgress.division.total || 0
     ];
+    
     const accuracy = total.map((t, i) => t > 0 ? Math.round((correct[i] / t) * 100) : 0);
     
     // Verificar se Chart.js está disponível
@@ -2175,11 +2564,11 @@ function initializeOperationsChart() {
             }
         });
     } catch (error) {
-        console.error('Erro ao criar gráfico:', error);
+        console.error('❌ Erro ao criar gráfico:', error);
     }
 }
 
-// Carregar seção de administração - FIX: Funcionalidades de administração
+// Carregar seção de administração
 function loadAdminSection() {
     if (!currentUser || currentUser.role !== 'admin') {
         switchSection('dashboard');
@@ -2191,209 +2580,221 @@ function loadAdminSection() {
     if (!section) return;
     
     const content = `
-    <div class="section-header">
-        <div class="header-content">
-            <h2><i class="fas fa-cogs"></i> Painel de Administração</h2>
-            <p>Gerencie usuários e visualize estatísticas do sistema.</p>
+        <div class="section-header">
+            <div class="header-content">
+                <h2><i class="fas fa-cogs"></i> Painel de Administração</h2>
+                <p>Gerencie usuários e visualize estatísticas do sistema.</p>
+            </div>
         </div>
-    </div>
-    <div class="admin-content">
-        <div class="admin-dashboard">
-            <div class="admin-stats">
-                <div class="admin-stat">
-                    <div class="stat-icon">
-                        <i class="fas fa-users"></i>
+        
+        <div class="admin-content">
+            <div class="admin-dashboard">
+                <div class="admin-stats">
+                    <div class="admin-stat">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalUsers">${systemStats.totalUsers}</h3>
+                            <p>Usuários Cadastrados</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3 id="totalUsers">${systemStats.totalUsers}</h3>
-                        <p>Usuários Cadastrados</p>
+                    <div class="admin-stat">
+                        <div class="stat-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="activeStudents">${systemStats.totalStudents}</h3>
+                            <p>Alunos Ativos</p>
+                        </div>
+                    </div>
+                    <div class="admin-stat">
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalExercises">${systemStats.totalExercises}</h3>
+                            <p>Exercícios Resolvidos</p>
+                        </div>
+                    </div>
+                    <div class="admin-stat">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="systemAccuracy">${systemStats.systemAccuracy}%</h3>
+                            <p>Taxa de Acerto Geral</p>
+                        </div>
                     </div>
                 </div>
-                <div class="admin-stat">
-                    <div class="stat-icon">
-                        <i class="fas fa-graduation-cap"></i>
+                
+                <div class="admin-tabs">
+                    <div class="tab-headers">
+                        <button class="tab-header active" data-tab="users">Gerenciar Usuários</button>
+                        <button class="tab-header" data-tab="reports">Relatórios</button>
+                        <button class="tab-header" data-tab="settings">Configurações do Sistema</button>
                     </div>
-                    <div class="stat-info">
-                        <h3 id="activeStudents">${systemStats.totalStudents}</h3>
-                        <p>Alunos Ativos</p>
+                    
+                    <div class="tab-content active" id="usersTab">
+                        <div class="tab-actions">
+                            <button class="btn-admin" id="refreshUsers">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                            <button class="btn-admin primary" id="addUserBtn">
+                                <i class="fas fa-user-plus"></i> Adicionar Usuário
+                            </button>
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchUsers" placeholder="Buscar usuários...">
+                            </div>
+                        </div>
+                        
+                        <div class="users-table-container">
+                            <table class="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Email</th>
+                                        <th>Tipo</th>
+                                        <th>Cadastrado em</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center">Carregando usuários...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-                <div class="admin-stat">
-                    <div class="stat-icon">
-                        <i class="fas fa-check-circle"></i>
+                    
+                    <div class="tab-content" id="reportsTab">
+                        <div class="reports-options">
+                            <div class="report-type">
+                                <label>Tipo de Relatório:</label>
+                                <select id="reportType">
+                                    <option value="progress">Progresso dos Alunos</option>
+                                    <option value="usage">Uso do Sistema</option>
+                                    <option value="performance">Desempenho por Operação</option>
+                                </select>
+                            </div>
+                            <div class="report-period">
+                                <label>Período:</label>
+                                <select id="reportPeriod">
+                                    <option value="week">Última Semana</option>
+                                    <option value="month">Último Mês</option>
+                                    <option value="quarter">Último Trimestre</option>
+                                    <option value="year">Último Ano</option>
+                                </select>
+                            </div>
+                            <button class="btn-admin primary" id="generateReport">
+                                <i class="fas fa-file-export"></i> Gerar Relatório
+                            </button>
+                        </div>
+                        
+                        <div class="report-preview" id="reportPreview">
+                            <p>Selecione as opções e clique em "Gerar Relatório"</p>
+                        </div>
                     </div>
-                    <div class="stat-info">
-                        <h3 id="totalExercises">${systemStats.totalExercises}</h3>
-                        <p>Exercícios Resolvidos</p>
-                    </div>
-                </div>
-                <div class="admin-stat">
-                    <div class="stat-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="systemAccuracy">78%</h3>
-                        <p>Taxa de Acerto Geral</p>
+                    
+                    <div class="tab-content" id="settingsTab">
+                        <div class="system-settings">
+                            <h3>Configurações do Sistema</h3>
+                            
+                            <div class="setting-group">
+                                <h4><i class="fas fa-user-shield"></i> Segurança</h4>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="allowRegistrations" checked>
+                                        Permitir novos cadastros
+                                    </label>
+                                </div>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="emailVerification" checked>
+                                        Exigir verificação de email
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="setting-group">
+                                <h4><i class="fas fa-gamepad"></i> Jogos</h4>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="enableGames" checked>
+                                        Habilitar jogos
+                                    </label>
+                                </div>
+                                <div class="setting">
+                                    <label>Limite de tempo por jogo (minutos):</label>
+                                    <input type="number" id="gameTimeLimit" value="60" min="5" max="180">
+                                </div>
+                            </div>
+                            
+                            <div class="setting-group">
+                                <h4><i class="fas fa-bell"></i> Notificações</h4>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="systemNotifications" checked>
+                                        Notificações do sistema
+                                    </label>
+                                </div>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="progressNotifications" checked>
+                                        Notificações de progresso
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button class="btn-admin primary" id="saveSettings">
+                                <i class="fas fa-save"></i> Salvar Configurações
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="admin-tabs">
-                <div class="tab-headers">
-                    <button class="tab-header active" data-tab="users">Gerenciar Usuários</button>
-                    <button class="tab-header" data-tab="reports">Relatórios</button>
-                    <button class="tab-header" data-tab="settings">Configurações do Sistema</button>
+        </div>
+        
+        <!-- Modal para adicionar/editar usuário -->
+        <div class="modal" id="userModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user"></i> <span id="modalUserTitle">Adicionar Usuário</span></h3>
+                    <button class="close-modal">&times;</button>
                 </div>
-                <div class="tab-content active" id="usersTab">
-                    <div class="tab-actions">
-                        <button class="btn-admin" id="refreshUsers">
-                            <i class="fas fa-sync-alt"></i> Atualizar
-                        </button>
-                        <button class="btn-admin primary" id="addUserBtn">
-                            <i class="fas fa-user-plus"></i> Adicionar Usuário
-                        </button>
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="searchUsers" placeholder="Buscar usuários...">
+                <div class="modal-body">
+                    <form id="userForm">
+                        <div class="form-group">
+                            <label for="modalUserName">Nome Completo</label>
+                            <input type="text" id="modalUserName" required>
                         </div>
-                    </div>
-                    <div class="users-table-container">
-                        <table class="users-table">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>Email</th>
-                                    <th>Tipo</th>
-                                    <th>Cadastrado em</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersTableBody">
-                                <tr>
-                                    <td colspan="6" class="text-center">Carregando usuários...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="tab-content" id="reportsTab">
-                    <div class="reports-options">
-                        <div class="report-type">
-                            <label>Tipo de Relatório:</label>
-                            <select id="reportType">
-                                <option value="progress">Progresso dos Alunos</option>
-                                <option value="usage">Uso do Sistema</option>
-                                <option value="performance">Desempenho por Operação</option>
+                        <div class="form-group">
+                            <label for="modalUserEmail">Email</label>
+                            <input type="email" id="modalUserEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalUserRole">Tipo de Conta</label>
+                            <select id="modalUserRole" required>
+                                <option value="student">Aluno</option>
+                                <option value="admin">Administrador</option>
                             </select>
                         </div>
-                        <div class="report-period">
-                            <label>Período:</label>
-                            <select id="reportPeriod">
-                                <option value="week">Última Semana</option>
-                                <option value="month">Último Mês</option>
-                                <option value="quarter">Último Trimestre</option>
-                                <option value="year">Último Ano</option>
-                            </select>
+                        <div class="form-group">
+                            <label for="modalUserPassword">Senha</label>
+                            <input type="password" id="modalUserPassword" minlength="6">
+                            <small class="form-hint">Deixe em branco para manter a senha atual</small>
                         </div>
-                        <button class="btn-admin primary" id="generateReport">
-                            <i class="fas fa-file-export"></i> Gerar Relatório
+                        <input type="hidden" id="modalUserId">
+                        <button type="submit" class="btn-auth btn-primary" id="saveUserBtn">
+                            <i class="fas fa-save"></i> Salvar
                         </button>
-                    </div>
-                    <div class="report-preview" id="reportPreview">
-                        <p>Selecione as opções e clique em "Gerar Relatório"</p>
-                    </div>
-                </div>
-                <div class="tab-content" id="settingsTab">
-                    <div class="system-settings">
-                        <h3>Configurações do Sistema</h3>
-                        <div class="setting-group">
-                            <h4><i class="fas fa-user-shield"></i> Segurança</h4>
-                            <div class="setting">
-                                <label>
-                                    <input type="checkbox" id="allowRegistrations" checked>
-                                    Permitir novos cadastros
-                                </label>
-                            </div>
-                            <div class="setting">
-                                <label>
-                                    <input type="checkbox" id="emailVerification" checked>
-                                    Exigir verificação de email
-                                </label>
-                            </div>
-                        </div>
-                        <div class="setting-group">
-                            <h4><i class="fas fa-gamepad"></i> Jogos</h4>
-                            <div class="setting">
-                                <label>
-                                    <input type="checkbox" id="enableGames" checked>
-                                    Habilitar jogos
-                                </label>
-                            </div>
-                            <div class="setting">
-                                <label>Limite de tempo por jogo (minutos):</label>
-                                <input type="number" id="gameTimeLimit" value="60" min="5" max="180">
-                            </div>
-                        </div>
-                        <div class="setting-group">
-                            <h4><i class="fas fa-bell"></i> Notificações</h4>
-                            <div class="setting">
-                                <label>
-                                    <input type="checkbox" id="systemNotifications" checked>
-                                    Notificações do sistema
-                                </label>
-                            </div>
-                            <div class="setting">
-                                <label>
-                                    <input type="checkbox" id="progressNotifications" checked>
-                                    Notificações de progresso
-                                </label>
-                            </div>
-                        </div>
-                        <button class="btn-admin primary" id="saveSettings">
-                            <i class="fas fa-save"></i> Salvar Configurações
-                        </button>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Modal para adicionar/editar usuário -->
-    <div class="modal" id="userModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user"></i> <span id="modalUserTitle">Adicionar Usuário</span></h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="userForm">
-                    <div class="form-group">
-                        <label for="modalUserName">Nome Completo</label>
-                        <input type="text" id="modalUserName" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modalUserEmail">Email</label>
-                        <input type="email" id="modalUserEmail" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modalUserRole">Tipo de Conta</label>
-                        <select id="modalUserRole" required>
-                            <option value="student">Aluno</option>
-                            <option value="admin">Administrador</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="modalUserPassword">Senha</label>
-                        <input type="password" id="modalUserPassword" minlength="6">
-                        <small class="form-hint">Deixe em branco para manter a senha atual</small>
-                    </div>
-                    <input type="hidden" id="modalUserId">
-                    <button type="submit" class="btn-auth btn-primary" id="saveUserBtn">
-                        <i class="fas fa-save"></i> Salvar
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
     `;
     
     section.innerHTML = content;
@@ -2402,14 +2803,16 @@ function loadAdminSection() {
     setupAdminEvents();
 }
 
-// Configurar eventos de administração - FIX: Funcionalidades completas
+// Configurar eventos de administração
 function setupAdminEvents() {
     // Tabs
     document.querySelectorAll('.tab-header').forEach(tab => {
         tab.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
+            
             document.querySelectorAll('.tab-header').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
+            
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById(tabId + 'Tab').classList.add('active');
         });
@@ -2517,6 +2920,7 @@ async function saveUser() {
                 showLoading(false);
                 return;
             }
+            
             await createUser({ name, email, role, password });
             showToast('Usuário criado com sucesso!', 'success');
         }
@@ -2528,7 +2932,8 @@ async function saveUser() {
         loadUsersTable();
         
         // Atualizar estatísticas
-        await loadSystemStats();
+        await loadSystemStats(true);
+        
     } catch (error) {
         showToast('Erro ao salvar usuário: ' + error.message, 'error');
     } finally {
@@ -2541,6 +2946,7 @@ async function createUser(userData) {
     if (auth) {
         const userCredential = await auth.createUserWithEmailAndPassword(userData.email, userData.password);
         const userId = userCredential.user.uid;
+        
         const userDoc = {
             name: userData.name,
             email: userData.email,
@@ -2567,6 +2973,7 @@ async function createUser(userData) {
         // Modo demo
         const userId = 'demo_' + Date.now();
         const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
+        
         demoUsers.push({
             id: userId,
             name: userData.name,
@@ -2576,6 +2983,7 @@ async function createUser(userData) {
             lastLogin: new Date().toISOString(),
             verified: true
         });
+        
         localStorage.setItem('mathkids_demo_users', JSON.stringify(demoUsers));
         
         if (userData.role === 'admin') {
@@ -2607,6 +3015,7 @@ async function updateUser(userId, userData) {
         // Modo demo
         const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
         const index = demoUsers.findIndex(u => u.id === userId);
+        
         if (index !== -1) {
             demoUsers[index] = {
                 ...demoUsers[index],
@@ -2614,24 +3023,26 @@ async function updateUser(userId, userData) {
                 email: userData.email,
                 role: userData.role
             };
+            
             localStorage.setItem('mathkids_demo_users', JSON.stringify(demoUsers));
         }
     }
 }
 
-// Carregar tabela de usuários - FIX: Atualização automática
+// Carregar tabela de usuários
 async function loadUsersTable() {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
     
     tbody.innerHTML = `
-    <tr>
-        <td colspan="6" class="text-center">Carregando usuários...</td>
-    </tr>
+        <tr>
+            <td colspan="6" class="text-center">Carregando usuários...</td>
+        </tr>
     `;
     
     try {
         let users = [];
+        
         if (db) {
             const snapshot = await db.collection('users').get();
             users = snapshot.docs.map(doc => ({
@@ -2641,6 +3052,7 @@ async function loadUsersTable() {
         } else {
             const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
             users = demoUsers;
+            
             // Adicionar usuário atual se não estiver na lista
             const currentUserData = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
             if (currentUserData.id && !users.some(u => u.id === currentUserData.id)) {
@@ -2649,12 +3061,13 @@ async function loadUsersTable() {
         }
         
         renderUsersTable(users);
+        
     } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
+        console.error('❌ Erro ao carregar usuários:', error);
         tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center">Erro ao carregar usuários</td>
-        </tr>
+            <tr>
+                <td colspan="6" class="text-center">Erro ao carregar usuários</td>
+            </tr>
         `;
     }
 }
@@ -2666,9 +3079,9 @@ function renderUsersTable(users) {
     
     if (users.length === 0) {
         tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
-        </tr>
+            <tr>
+                <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
+            </tr>
         `;
         return;
     }
@@ -2685,30 +3098,30 @@ function renderUsersTable(users) {
         const statusClass = user.verified ? 'status-verified' : 'status-pending';
         
         html += `
-        <tr>
-            <td>${name}</td>
-            <td>${email}</td>
-            <td><span class="user-role-badge ${role === 'Administrador' ? 'admin' : 'student'}">${role}</span></td>
-            <td>${createdAt}</td>
-            <td><span class="status ${statusClass}">${status}</span></td>
-            <td>
-                <div class="user-actions">
-                    <button class="btn-action edit" data-user-id="${user.id}" data-user-name="${name}" data-user-email="${email}" data-user-role="${user.role}" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-action delete" data-user-id="${user.id}" data-user-name="${name}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
+            <tr>
+                <td>${name}</td>
+                <td>${email}</td>
+                <td><span class="user-role-badge ${role === 'Administrador' ? 'admin' : 'student'}">${role}</span></td>
+                <td>${createdAt}</td>
+                <td><span class="status ${statusClass}">${status}</span></td>
+                <td>
+                    <div class="user-actions">
+                        <button class="btn-action edit" data-user-id="${user.id}" data-user-name="${name}" data-user-email="${email}" data-user-role="${user.role}" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-action delete" data-user-id="${user.id}" data-user-name="${name}" title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
         `;
     });
     
     tbody.innerHTML = html || `
-    <tr>
-        <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
-    </tr>
+        <tr>
+            <td colspan="6" class="text-center">Nenhum usuário encontrado</td>
+        </tr>
     `;
     
     setupUserTableActions();
@@ -2723,6 +3136,7 @@ function setupUserTableActions() {
             const userName = this.getAttribute('data-user-name');
             const userEmail = this.getAttribute('data-user-email');
             const userRole = this.getAttribute('data-user-role');
+            
             openUserModal({
                 id: userId,
                 name: userName,
@@ -2737,6 +3151,7 @@ function setupUserTableActions() {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user-id');
             const userName = this.getAttribute('data-user-name');
+            
             if (confirm(`Tem certeza que deseja excluir o usuário "${userName}"?`)) {
                 deleteUser(userId);
             }
@@ -2751,6 +3166,7 @@ async function deleteUser(userId) {
     try {
         if (db) {
             await db.collection('users').doc(userId).delete();
+            
             // Tentar excluir do Firebase Auth também
             if (auth.currentUser && auth.currentUser.uid === userId) {
                 await auth.currentUser.delete();
@@ -2762,10 +3178,13 @@ async function deleteUser(userId) {
         }
         
         showToast('Usuário excluído com sucesso!', 'success');
+        
         // Recarregar tabela
         loadUsersTable();
+        
         // Atualizar estatísticas
-        await loadSystemStats();
+        await loadSystemStats(true);
+        
     } catch (error) {
         showToast('Erro ao excluir usuário: ' + error.message, 'error');
     } finally {
@@ -2776,13 +3195,14 @@ async function deleteUser(userId) {
 // Filtrar tabela de usuários
 function filterUsersTable(searchTerm) {
     const rows = document.querySelectorAll('#usersTableBody tr');
+    
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
     });
 }
 
-// Gerar relatório - FIX: Funcionalidade completa
+// Gerar relatório
 function generateReport() {
     const reportType = document.getElementById('reportType').value;
     const reportPeriod = document.getElementById('reportPeriod').value;
@@ -2796,89 +3216,91 @@ function generateReport() {
     switch(reportType) {
         case 'progress':
             reportContent = `
-            <h4>📊 Relatório de Progresso dos Alunos</h4>
-            <p><strong>Período:</strong> ${periodName}</p>
-            <div class="report-data">
-                <div class="report-stat">
-                    <span class="stat-label">Total de Alunos:</span>
-                    <span class="stat-value">${systemStats.totalStudents}</span>
+                <h4>📊 Relatório de Progresso dos Alunos</h4>
+                <p><strong>Período:</strong> ${periodName}</p>
+                <div class="report-data">
+                    <div class="report-stat">
+                        <span class="stat-label">Total de Alunos:</span>
+                        <span class="stat-value">${systemStats.totalStudents}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Exercícios Concluídos:</span>
+                        <span class="stat-value">${systemStats.totalExercises}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Taxa Média de Acerto:</span>
+                        <span class="stat-value">${systemStats.systemAccuracy}%</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Tempo Médio de Prática:</span>
+                        <span class="stat-value">45 min/aluno</span>
+                    </div>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Exercícios Concluídos:</span>
-                    <span class="stat-value">${systemStats.totalExercises}</span>
+                <div class="report-chart">
+                    <canvas id="reportChart" height="200"></canvas>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Taxa Média de Acerto:</span>
-                    <span class="stat-value">78%</span>
-                </div>
-                <div class="report-stat">
-                    <span class="stat-label">Tempo Médio de Prática:</span>
-                    <span class="stat-value">45 min/aluno</span>
-                </div>
-            </div>
-            <div class="report-chart">
-                <canvas id="reportChart" height="200"></canvas>
-            </div>
             `;
             break;
+            
         case 'usage':
             reportContent = `
-            <h4>📈 Relatório de Uso do Sistema</h4>
-            <p><strong>Período:</strong> ${periodName}</p>
-            <div class="report-data">
-                <div class="report-stat">
-                    <span class="stat-label">Usuários Totais:</span>
-                    <span class="stat-value">${systemStats.totalUsers}</span>
+                <h4>📈 Relatório de Uso do Sistema</h4>
+                <p><strong>Período:</strong> ${periodName}</p>
+                <div class="report-data">
+                    <div class="report-stat">
+                        <span class="stat-label">Usuários Totais:</span>
+                        <span class="stat-value">${systemStats.totalUsers}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Novos Cadastros:</span>
+                        <span class="stat-value">12</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Acessos Diários:</span>
+                        <span class="stat-value">245</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Tempo Médio de Sessão:</span>
+                        <span class="stat-value">18 min</span>
+                    </div>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Novos Cadastros:</span>
-                    <span class="stat-value">12</span>
+                <div class="usage-breakdown">
+                    <h5>Dispositivos Mais Usados:</h5>
+                    <ul>
+                        <li>Desktop: 65%</li>
+                        <li>Mobile: 30%</li>
+                        <li>Tablet: 5%</li>
+                    </ul>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Acessos Diários:</span>
-                    <span class="stat-value">245</span>
-                </div>
-                <div class="report-stat">
-                    <span class="stat-label">Tempo Médio de Sessão:</span>
-                    <span class="stat-value">18 min</span>
-                </div>
-            </div>
-            <div class="usage-breakdown">
-                <h5>Dispositivos Mais Usados:</h5>
-                <ul>
-                    <li>Desktop: 65%</li>
-                    <li>Mobile: 30%</li>
-                    <li>Tablet: 5%</li>
-                </ul>
-            </div>
             `;
             break;
+            
         case 'performance':
             reportContent = `
-            <h4>🎯 Relatório de Desempenho por Operação</h4>
-            <p><strong>Período:</strong> ${periodName}</p>
-            <div class="report-data">
-                <div class="report-stat">
-                    <span class="stat-label">Adição:</span>
-                    <span class="stat-value">85% de acerto</span>
+                <h4>🎯 Relatório de Desempenho por Operação</h4>
+                <p><strong>Período:</strong> ${periodName}</p>
+                <div class="report-data">
+                    <div class="report-stat">
+                        <span class="stat-label">Adição:</span>
+                        <span class="stat-value">85% de acerto</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Subtração:</span>
+                        <span class="stat-value">82% de acerto</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Multiplicação:</span>
+                        <span class="stat-value">75% de acerto</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Divisão:</span>
+                        <span class="stat-value">70% de acerto</span>
+                    </div>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Subtração:</span>
-                    <span class="stat-value">82% de acerto</span>
+                <div class="performance-trend">
+                    <h5>Tendência de Melhoria:</h5>
+                    <p>Os alunos mostraram uma melhoria média de <strong>15%</strong> no desempenho geral durante o período.</p>
                 </div>
-                <div class="report-stat">
-                    <span class="stat-label">Multiplicação:</span>
-                    <span class="stat-value">75% de acerto</span>
-                </div>
-                <div class="report-stat">
-                    <span class="stat-label">Divisão:</span>
-                    <span class="stat-value">70% de acerto</span>
-                </div>
-            </div>
-            <div class="performance-trend">
-                <h5>Tendência de Melhoria:</h5>
-                <p>Os alunos mostraram uma melhoria média de <strong>15%</strong> no desempenho geral durante o período.</p>
-            </div>
             `;
             break;
     }
@@ -2901,417 +3323,6 @@ function saveSystemSettings() {
     localStorage.setItem('mathkids_system_settings', JSON.stringify(settings));
     showToast('Configurações salvas com sucesso!', 'success');
 }
-
-// ============== FUNÇÕES DO RACHA CUCA ==============
-
-// Inicializar o jogo Racha Cuca
-function initializeRachaCuca() {
-    // Verificar se os elementos existem
-    if (!DOM.rachaCucaBoard) return;
-
-    // Criar o tabuleiro inicial
-    createRachaCucaBoard();
-    renderRachaCucaBoard();
-    createRachaCucaSolutionBoard();
-    updateRachaCucaMoveCounter();
-    resetRachaCucaTimer();
-
-    // Adicionar event listeners
-    setupRachaCucaEventListeners();
-}
-
-// Criar o tabuleiro do Racha Cuca
-function createRachaCucaBoard() {
-    rachaCucaBoard = [];
-    for (let i = 1; i <= 15; i++) {
-        rachaCucaBoard.push(i);
-    }
-    rachaCucaBoard.push(null); // Espaço vazio
-    rachaCucaEmptyTileIndex = 15;
-    rachaCucaMoves = 0;
-    rachaCucaTimer = 0;
-    rachaCucaGameStarted = false;
-    rachaCucaGameCompleted = false;
-}
-
-// Renderizar o tabuleiro do Racha Cuca
-function renderRachaCucaBoard() {
-    if (!DOM.rachaCucaBoard) return;
-
-    DOM.rachaCucaBoard.innerHTML = '';
-    
-    rachaCucaBoard.forEach((value, index) => {
-        const tile = document.createElement('div');
-        tile.className = 'puzzle-tile';
-        
-        if (value === null) {
-            tile.classList.add('empty');
-            tile.textContent = '';
-            rachaCucaEmptyTileIndex = index;
-        } else {
-            tile.textContent = value;
-            tile.dataset.index = index;
-            tile.dataset.value = value;
-            
-            // Verificar se a peça está na posição correta
-            if (value === index + 1) {
-                tile.classList.add('correct-position');
-            }
-            
-            // Verificar se a peça pode ser movida
-            if (isRachaCucaTileMovable(index)) {
-                tile.classList.add('movable');
-                tile.addEventListener('click', () => moveRachaCucaTile(index));
-            } else {
-                tile.style.cursor = 'default';
-            }
-        }
-        
-        DOM.rachaCucaBoard.appendChild(tile);
-    });
-}
-
-// Verificar se uma peça pode ser movida
-function isRachaCucaTileMovable(index) {
-    const row = Math.floor(index / 4);
-    const col = index % 4;
-    const emptyRow = Math.floor(rachaCucaEmptyTileIndex / 4);
-    const emptyCol = rachaCucaEmptyTileIndex % 4;
-    
-    // Verificar se está na mesma linha ou coluna adjacente ao espaço vazio
-    return (row === emptyRow && Math.abs(col - emptyCol) === 1) ||
-           (col === emptyCol && Math.abs(row - emptyRow) === 1);
-}
-
-// Mover uma peça do Racha Cuca
-function moveRachaCucaTile(index) {
-    if (rachaCucaGameCompleted || !isRachaCucaTileMovable(index)) return;
-    
-    // Trocar a peça com o espaço vazio
-    [rachaCucaBoard[index], rachaCucaBoard[rachaCucaEmptyTileIndex]] = [rachaCucaBoard[rachaCucaEmptyTileIndex], rachaCucaBoard[index]];
-    
-    // Atualizar o índice do espaço vazio
-    rachaCucaEmptyTileIndex = index;
-    
-    // Incrementar contador de movimentos
-    rachaCucaMoves++;
-    updateRachaCucaMoveCounter();
-    
-    // Iniciar o timer se for o primeiro movimento
-    if (!rachaCucaGameStarted) {
-        startRachaCucaTimer();
-        rachaCucaGameStarted = true;
-    }
-    
-    // Renderizar o tabuleiro atualizado
-    renderRachaCucaBoard();
-    
-    // Verificar se o jogo foi concluído
-    if (checkRachaCucaWin()) {
-        completeRachaCucaGame();
-    }
-}
-
-// Embaralhar o tabuleiro do Racha Cuca
-function shuffleRachaCucaBoard() {
-    if (rachaCucaGameCompleted) {
-        resetRachaCucaGame();
-        return;
-    }
-    
-    // Parar o timer se estiver rodando
-    if (rachaCucaTimerInterval) {
-        clearInterval(rachaCucaTimerInterval);
-        rachaCucaTimerInterval = null;
-    }
-    
-    // Reiniciar variáveis
-    rachaCucaMoves = 0;
-    rachaCucaGameStarted = false;
-    rachaCucaGameCompleted = false;
-    updateRachaCucaMoveCounter();
-    resetRachaCucaTimer();
-    
-    if (DOM.rachaCucaCompletionMessage) {
-        DOM.rachaCucaCompletionMessage.style.display = 'none';
-    }
-    
-    // Embaralhar o tabuleiro
-    let shuffleCount;
-    switch(rachaCucaCurrentDifficulty) {
-        case 'easy':
-            shuffleCount = 20;
-            break;
-        case 'hard':
-            shuffleCount = 100;
-            break;
-        default: // normal
-            shuffleCount = 50;
-            break;
-    }
-    
-    // Fazer movimentos válidos aleatórios para embaralhar
-    for (let i = 0; i < shuffleCount; i++) {
-        const movableTiles = [];
-        // Encontrar todas as peças que podem ser movidas
-        rachaCucaBoard.forEach((_, index) => {
-            if (isRachaCucaTileMovable(index)) {
-                movableTiles.push(index);
-            }
-        });
-        
-        // Escolher uma peça aleatória para mover
-        if (movableTiles.length > 0) {
-            const randomIndex = Math.floor(Math.random() * movableTiles.length);
-            const tileToMove = movableTiles[randomIndex];
-            
-            // Mover a peça
-            [rachaCucaBoard[tileToMove], rachaCucaBoard[rachaCucaEmptyTileIndex]] = [rachaCucaBoard[rachaCucaEmptyTileIndex], rachaCucaBoard[tileToMove]];
-            rachaCucaEmptyTileIndex = tileToMove;
-        }
-    }
-    
-    // Renderizar o tabuleiro embaralhado
-    renderRachaCucaBoard();
-}
-
-// Mostrar a solução do Racha Cuca
-function showRachaCucaSolution() {
-    // Criar tabuleiro ordenado
-    const solvedBoard = [];
-    for (let i = 1; i <= 15; i++) {
-        solvedBoard.push(i);
-    }
-    solvedBoard.push(null);
-    
-    // Atualizar o tabuleiro atual
-    rachaCucaBoard = [...solvedBoard];
-    rachaCucaEmptyTileIndex = 15;
-    renderRachaCucaBoard();
-    
-    // Parar o timer
-    if (rachaCucaTimerInterval) {
-        clearInterval(rachaCucaTimerInterval);
-        rachaCucaTimerInterval = null;
-    }
-    
-    // Marcar jogo como concluído
-    rachaCucaGameCompleted = true;
-    rachaCucaGameStarted = false;
-}
-
-// Reiniciar o jogo Racha Cuca
-function resetRachaCucaGame() {
-    rachaCucaMoves = 0;
-    rachaCucaGameStarted = false;
-    rachaCucaGameCompleted = false;
-    updateRachaCucaMoveCounter();
-    resetRachaCucaTimer();
-    
-    if (DOM.rachaCucaCompletionMessage) {
-        DOM.rachaCucaCompletionMessage.style.display = 'none';
-    }
-    
-    // Criar tabuleiro ordenado
-    createRachaCucaBoard();
-    renderRachaCucaBoard();
-}
-
-// Mostrar dica do Racha Cuca
-function showRachaCucaHint() {
-    // Encontrar a primeira peça fora do lugar que pode ser movida
-    for (let i = 0; i < rachaCucaBoard.length; i++) {
-        if (rachaCucaBoard[i] !== null && rachaCucaBoard[i] !== i + 1 && isRachaCucaTileMovable(i)) {
-            const tile = document.querySelector(`#puzzle-board .puzzle-tile[data-index="${i}"]`);
-            if (tile) {
-                tile.style.boxShadow = '0 0 15px 5px gold';
-                tile.style.transform = 'scale(1.05)';
-                
-                // Remover o efeito após 2 segundos
-                setTimeout(() => {
-                    tile.style.boxShadow = '';
-                    tile.style.transform = '';
-                }, 2000);
-            }
-            break;
-        }
-    }
-}
-
-// Verificar vitória no Racha Cuca
-function checkRachaCucaWin() {
-    for (let i = 0; i < 15; i++) {
-        if (rachaCucaBoard[i] !== i + 1) {
-            return false;
-        }
-    }
-    return rachaCucaBoard[15] === null;
-}
-
-// Concluir o jogo Racha Cuca
-function completeRachaCucaGame() {
-    rachaCucaGameCompleted = true;
-    
-    // Parar o timer
-    if (rachaCucaTimerInterval) {
-        clearInterval(rachaCucaTimerInterval);
-        rachaCucaTimerInterval = null;
-    }
-    
-    // Mostrar mensagem de conclusão
-    if (DOM.rachaCucaFinalMoves && DOM.rachaCucaFinalTime && DOM.rachaCucaCompletionMessage) {
-        DOM.rachaCucaFinalMoves.textContent = rachaCucaMoves;
-        DOM.rachaCucaFinalTime.textContent = formatRachaCucaTime(rachaCucaTimer);
-        DOM.rachaCucaCompletionMessage.style.display = 'block';
-        
-        // Rolar para a mensagem
-        DOM.rachaCucaCompletionMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-    
-    // Salvar pontuação se for a melhor
-    saveRachaCucaHighScore();
-    
-    // Adicionar atividade
-    addActivity(`Jogo "Racha Cuca" finalizado em ${formatRachaCucaTime(rachaCucaTimer)} com ${rachaCucaMoves} movimentos`, 'game');
-}
-
-// Atualizar contador de movimentos do Racha Cuca
-function updateRachaCucaMoveCounter() {
-    if (DOM.rachaCucaMoveCounter) {
-        DOM.rachaCucaMoveCounter.textContent = rachaCucaMoves;
-    }
-}
-
-// Iniciar timer do Racha Cuca
-function startRachaCucaTimer() {
-    resetRachaCucaTimer();
-    
-    rachaCucaTimerInterval = setInterval(() => {
-        rachaCucaTimer++;
-        if (DOM.rachaCucaTimerElement) {
-            DOM.rachaCucaTimerElement.textContent = formatRachaCucaTime(rachaCucaTimer);
-        }
-    }, 1000);
-}
-
-// Resetar timer do Racha Cuca
-function resetRachaCucaTimer() {
-    rachaCucaTimer = 0;
-    if (DOM.rachaCucaTimerElement) {
-        DOM.rachaCucaTimerElement.textContent = '00:00';
-    }
-    if (rachaCucaTimerInterval) {
-        clearInterval(rachaCucaTimerInterval);
-        rachaCucaTimerInterval = null;
-    }
-}
-
-// Formatar tempo do Racha Cuca (MM:SS)
-function formatRachaCucaTime(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Criar tabuleiro de solução do Racha Cuca
-function createRachaCucaSolutionBoard() {
-    if (!DOM.rachaCucaSolutionBoard) return;
-    
-    DOM.rachaCucaSolutionBoard.innerHTML = '';
-    
-    for (let i = 1; i <= 16; i++) {
-        const tile = document.createElement('div');
-        tile.className = 'solution-tile';
-        
-        if (i <= 15) {
-            tile.textContent = i;
-        } else {
-            tile.classList.add('empty');
-        }
-        
-        DOM.rachaCucaSolutionBoard.appendChild(tile);
-    }
-}
-
-// Configurar eventos do Racha Cuca
-function setupRachaCucaEventListeners() {
-    if (DOM.rachaCucaShuffleBtn) {
-        DOM.rachaCucaShuffleBtn.addEventListener('click', shuffleRachaCucaBoard);
-    }
-    
-    if (DOM.rachaCucaSolveBtn) {
-        DOM.rachaCucaSolveBtn.addEventListener('click', showRachaCucaSolution);
-    }
-    
-    if (DOM.rachaCucaResetBtn) {
-        DOM.rachaCucaResetBtn.addEventListener('click', resetRachaCucaGame);
-    }
-    
-    if (DOM.rachaCucaHintBtn) {
-        DOM.rachaCucaHintBtn.addEventListener('click', showRachaCucaHint);
-    }
-    
-    if (DOM.rachaCucaPlayAgainBtn) {
-        DOM.rachaCucaPlayAgainBtn.addEventListener('click', resetRachaCucaGame);
-    }
-    
-    if (DOM.rachaCucaDifficultyBtns) {
-        DOM.rachaCucaDifficultyBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                DOM.rachaCucaDifficultyBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                rachaCucaCurrentDifficulty = this.dataset.difficulty;
-                
-                if (DOM.rachaCucaDifficulty) {
-                    DOM.rachaCucaDifficulty.textContent =
-                        rachaCucaCurrentDifficulty === 'easy' ? 'Fácil' :
-                        rachaCucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
-                }
-                
-                resetRachaCucaGame();
-            });
-        });
-    }
-}
-
-// Iniciar o jogo Racha Cuca
-function startRachaCuca() {
-    // Resetar o estado do jogo
-    resetRachaCucaGame();
-    
-    // Embaralhar o tabuleiro
-    shuffleRachaCucaBoard();
-    
-    // Atualizar o nome do jogador
-    rachaCucaPlayerName = currentUser?.name || 'Jogador';
-}
-
-// Carregar high score do Racha Cuca
-function loadRachaCucaHighScore() {
-    const highScore = localStorage.getItem('mathkids_rachacuca_highscore') || 0;
-    if (DOM.rachaCucaHighScoreElement) {
-        DOM.rachaCucaHighScoreElement.textContent = highScore;
-    }
-}
-
-// Salvar high score do Racha Cuca
-function saveRachaCucaHighScore() {
-    const currentHighScore = parseInt(localStorage.getItem('mathkids_rachacuca_highscore') || '0');
-    
-    // Para este jogo, vamos considerar que menos movimentos é melhor
-    // Então salvamos o menor número de movimentos como high score
-    if (rachaCucaMoves < currentHighScore || currentHighScore === 0) {
-        localStorage.setItem('mathkids_rachacuca_highscore', rachaCucaMoves.toString());
-        
-        if (DOM.rachaCucaHighScoreElement) {
-            DOM.rachaCucaHighScoreElement.textContent = rachaCucaMoves;
-        }
-        
-        showToast(`🎉 Novo recorde! ${rachaCucaMoves} movimentos`, 'success');
-    }
-}
-
-// ====== FIM DAS FUNÇÕES DO RACHA CUCA ======
 
 // Funções auxiliares
 function getRandomInt(min, max) {
@@ -3352,8 +3363,7 @@ function getGameName(gameId) {
     const names = {
         lightningGame: 'Desafio Relâmpago',
         divisionPuzzle: 'Quebra-cabeça da Divisão',
-        mathChampionship: 'Campeonato MathKids',
-        rachacucaGame: 'Racha Cuca'
+        mathChampionship: 'Campeonato MathKids'
     };
     return names[gameId] || gameId;
 }
@@ -3372,6 +3382,7 @@ function formatTimeAgo(timestamp) {
     const now = new Date();
     const time = new Date(timestamp);
     const diff = now - time;
+    
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -3380,6 +3391,7 @@ function formatTimeAgo(timestamp) {
     if (minutes < 60) return `Há ${minutes} min`;
     if (hours < 24) return `Há ${hours} h`;
     if (days < 7) return `Há ${days} d`;
+    
     return time.toLocaleDateString('pt-BR');
 }
 
@@ -3392,21 +3404,22 @@ function generateActivitiesTimeline() {
     } else {
         activities.forEach(activity => {
             const icon = activity.type === 'correct' ? 'fa-check' :
-                activity.type === 'wrong' ? 'fa-times' :
-                activity.type === 'game' ? 'fa-gamepad' : 'fa-info';
+                        activity.type === 'wrong' ? 'fa-times' :
+                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info';
+            
             const iconClass = activity.type === 'correct' ? 'success' :
-                activity.type === 'wrong' ? 'error' : 'info';
-                
+                             activity.type === 'wrong' ? 'error' : 'info';
+            
             html += `
-            <div class="timeline-item">
-                <div class="timeline-marker ${iconClass}">
-                    <i class="fas ${icon}"></i>
+                <div class="timeline-item">
+                    <div class="timeline-marker ${iconClass}">
+                        <i class="fas ${icon}"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <p>${activity.description}</p>
+                        <small>${formatTimeAgo(activity.timestamp)}</small>
+                    </div>
                 </div>
-                <div class="timeline-content">
-                    <p>${activity.description}</p>
-                    <small>${formatTimeAgo(activity.timestamp)}</small>
-                </div>
-            </div>
             `;
         });
     }
@@ -3427,15 +3440,15 @@ function generateBadges() {
     let html = '';
     badges.forEach(badge => {
         html += `
-        <div class="badge-item ${badge.earned ? 'earned' : 'locked'}">
-            <div class="badge-icon">
-                <i class="fas fa-${badge.earned ? 'award' : 'lock'}"></i>
+            <div class="badge-item ${badge.earned ? 'earned' : 'locked'}">
+                <div class="badge-icon">
+                    <i class="fas fa-${badge.earned ? 'award' : 'lock'}"></i>
+                </div>
+                <div class="badge-info">
+                    <h4>${badge.name}</h4>
+                    <p>${badge.description}</p>
+                </div>
             </div>
-            <div class="badge-info">
-                <h4>${badge.name}</h4>
-                <p>${badge.description}</p>
-            </div>
-        </div>
         `;
     });
     
@@ -3474,45 +3487,47 @@ function loadModalContent(modalId) {
 }
 
 function loadProfileModal(container) {
-    const accuracy = userProgress.totalAnswers > 0
-        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100)
+    const accuracy = userProgress.totalAnswers > 0 
+        ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
     container.innerHTML = `
-    <div class="profile-content">
-        <div class="profile-header">
-            <div class="profile-avatar">
-                <span>${getInitials(currentUser.name)}</span>
+        <div class="profile-content">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <span>${getInitials(currentUser.name)}</span>
+                </div>
+                <div class="profile-info">
+                    <h4>${currentUser.name}</h4>
+                    <p>${currentUser.email}</p>
+                    <span class="profile-badge ${currentUser.role}">${currentUser.role === 'admin' ? 'Administrador' : 'Aluno'}</span>
+                </div>
             </div>
-            <div class="profile-info">
-                <h4>${currentUser.name}</h4>
-                <p>${currentUser.email}</p>
-                <span class="profile-badge ${currentUser.role}">${currentUser.role === 'admin' ? 'Administrador' : 'Aluno'}</span>
+            
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <h5>Exercícios Concluídos</h5>
+                    <p>${userProgress.exercisesCompleted}</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Taxa de Acerto</h5>
+                    <p>${accuracy}%</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Tempo de Prática</h5>
+                    <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <button class="btn-profile" id="changePassword">
+                    <i class="fas fa-key"></i> Alterar Senha
+                </button>
+                <button class="btn-profile" id="editProfile">
+                    <i class="fas fa-edit"></i> Editar Perfil
+                </button>
             </div>
         </div>
-        <div class="profile-stats">
-            <div class="profile-stat">
-                <h5>Exercícios Concluídos</h5>
-                <p>${userProgress.exercisesCompleted}</p>
-            </div>
-            <div class="profile-stat">
-                <h5>Taxa de Acerto</h5>
-                <p>${accuracy}%</p>
-            </div>
-            <div class="profile-stat">
-                <h5>Tempo de Prática</h5>
-                <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
-            </div>
-        </div>
-        <div class="profile-actions">
-            <button class="btn-profile" id="changePassword">
-                <i class="fas fa-key"></i> Alterar Senha
-            </button>
-            <button class="btn-profile" id="editProfile">
-                <i class="fas fa-edit"></i> Editar Perfil
-            </button>
-        </div>
-    </div>
     `;
 }
 
@@ -3526,57 +3541,60 @@ function loadSettingsModal(container) {
     };
     
     container.innerHTML = `
-    <div class="settings-content">
-        <div class="setting-group">
-            <h4><i class="fas fa-palette"></i> Aparência</h4>
-            <div class="setting">
-                <label>Tema:</label>
-                <select id="themeSelect">
-                    <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Claro</option>
-                    <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Escuro</option>
-                    <option value="auto" ${settings.theme === 'auto' ? 'selected' : ''}>Automático</option>
-                </select>
+        <div class="settings-content">
+            <div class="setting-group">
+                <h4><i class="fas fa-palette"></i> Aparência</h4>
+                <div class="setting">
+                    <label>Tema:</label>
+                    <select id="themeSelect">
+                        <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Claro</option>
+                        <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Escuro</option>
+                        <option value="auto" ${settings.theme === 'auto' ? 'selected' : ''}>Automático</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="setting-group">
+                <h4><i class="fas fa-volume-up"></i> Som</h4>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="soundEffects" ${settings.sound ? 'checked' : ''}>
+                        Efeitos sonoros
+                    </label>
+                </div>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="backgroundMusic" ${settings.music ? 'checked' : ''}>
+                        Música de fundo
+                    </label>
+                </div>
+            </div>
+            
+            <div class="setting-group">
+                <h4><i class="fas fa-bell"></i> Notificações</h4>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="notificationsEnabled" ${settings.notifications ? 'checked' : ''}>
+                        Permitir notificações
+                    </label>
+                </div>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="progressNotifications" ${settings.progressNotifications ? 'checked' : ''}>
+                        Notificações de progresso
+                    </label>
+                </div>
+            </div>
+            
+            <div class="settings-actions">
+                <button class="btn-settings primary" id="saveUserSettings">
+                    <i class="fas fa-save"></i> Salvar Configurações
+                </button>
+                <button class="btn-settings" id="resetSettings">
+                    <i class="fas fa-undo"></i> Restaurar Padrões
+                </button>
             </div>
         </div>
-        <div class="setting-group">
-            <h4><i class="fas fa-volume-up"></i> Som</h4>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="soundEffects" ${settings.sound ? 'checked' : ''}>
-                    Efeitos sonoros
-                </label>
-            </div>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="backgroundMusic" ${settings.music ? 'checked' : ''}>
-                    Música de fundo
-                </label>
-            </div>
-        </div>
-        <div class="setting-group">
-            <h4><i class="fas fa-bell"></i> Notificações</h4>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="notificationsEnabled" ${settings.notifications ? 'checked' : ''}>
-                    Permitir notificações
-                </label>
-            </div>
-            <div class="setting">
-                <label>
-                    <input type="checkbox" id="progressNotifications" ${settings.progressNotifications ? 'checked' : ''}>
-                    Notificações de progresso
-                </label>
-            </div>
-        </div>
-        <div class="settings-actions">
-            <button class="btn-settings primary" id="saveUserSettings">
-                <i class="fas fa-save"></i> Salvar Configurações
-            </button>
-            <button class="btn-settings" id="resetSettings">
-                <i class="fas fa-undo"></i> Restaurar Padrões
-            </button>
-        </div>
-    </div>
     `;
     
     document.getElementById('saveUserSettings').addEventListener('click', saveUserSettings);
@@ -3605,7 +3623,7 @@ function saveUserSettings() {
         db.collection('users').doc(currentUser.id).update({
             settings: settings
         }).catch(error => {
-            console.error('Error saving settings:', error);
+            console.error('❌ Error saving settings:', error);
         });
     }
     
@@ -3665,16 +3683,16 @@ function loadNotifications() {
         if (!notification.read) unreadCount++;
         
         html += `
-        <div class="notification-item ${notification.read ? 'read' : 'unread'}">
-            <div class="notification-icon">
-                <i class="fas fa-bell"></i>
+            <div class="notification-item ${notification.read ? 'read' : 'unread'}">
+                <div class="notification-icon">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <div class="notification-content">
+                    <h5>${notification.title}</h5>
+                    <p>${notification.message}</p>
+                    <small>${notification.time}</small>
+                </div>
             </div>
-            <div class="notification-content">
-                <h5>${notification.title}</h5>
-                <p>${notification.message}</p>
-                <small>${notification.time}</small>
-            </div>
-        </div>
         `;
     });
     
@@ -3691,6 +3709,7 @@ function addActivity(description, type = 'info') {
     };
     
     userProgress.lastActivities.unshift(activity);
+    
     if (userProgress.lastActivities.length > 20) {
         userProgress.lastActivities = userProgress.lastActivities.slice(0, 20);
     }
@@ -3725,7 +3744,7 @@ function saveUserProgress() {
         db.collection('users').doc(currentUser.id).update({
             progress: userProgress
         }).catch(error => {
-            console.error('Error saving progress:', error);
+            console.error('❌ Error saving progress:', error);
         });
     }
 }
@@ -3736,14 +3755,14 @@ function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
-    <div class="toast-icon">
-        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
-    </div>
-    <div class="toast-content">
-        <p>${message}</p>
-        <small>Agora</small>
-    </div>
-    <button class="toast-close">&times;</button>
+        <div class="toast-icon">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        </div>
+        <div class="toast-content">
+            <p>${message}</p>
+            <small>Agora</small>
+        </div>
+        <button class="toast-close">&times;</button>
     `;
     
     DOM.toastContainer.appendChild(toast);
@@ -3769,16 +3788,16 @@ function showToast(message, type = 'info') {
         const style = document.createElement('style');
         style.id = 'toastAnimationStyle';
         style.textContent = `
-        @keyframes slideOutRight {
-            from {
-                opacity: 1;
-                transform: translateX(0);
+            @keyframes slideOutRight {
+                from {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateX(100%);
+                }
             }
-            to {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-        }
         `;
         document.head.appendChild(style);
     }
@@ -3795,7 +3814,8 @@ function showLoading(show) {
 }
 
 function handleAuthError(error) {
-    console.error('Auth error:', error);
+    console.error('❌ Auth error:', error);
+    
     let message = 'Erro na autenticação. Tente novamente.';
     
     if (error.code) {
@@ -3843,6 +3863,7 @@ function initializeComponents() {
             const rect = this.getBoundingClientRect();
             tooltip.style.left = rect.left + (rect.width / 2) + 'px';
             tooltip.style.top = rect.top - tooltip.offsetHeight - 10 + 'px';
+            
             this._tooltip = tooltip;
         });
         
@@ -3866,7 +3887,7 @@ function initializeComponents() {
 
 // Modo de demonstração
 function setupDemoMode() {
-    console.log('Modo de demonstração ativado');
+    console.log('🎮 Modo de demonstração ativado');
     
     userProgress = {
         exercisesCompleted: 15,
@@ -3898,7 +3919,9 @@ function setupDemoMode() {
         averageRating: 4.8,
         improvementRate: 98,
         totalExercises: 12450,
-        totalUsers: 1260
+        totalUsers: 1260,
+        systemAccuracy: 78,
+        lastUpdated: Date.now()
     };
     
     updateSystemStatsUI();
@@ -3930,6 +3953,7 @@ async function handleDemoLogin(email, password) {
         };
         
         localStorage.setItem('mathkids_user', JSON.stringify(currentUser));
+        
         return currentUser;
     } else {
         throw new Error('Credenciais inválidas');
@@ -3941,13 +3965,26 @@ window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
-window.startRachaCuca = startRachaCuca;
 
-// Atualizar estatísticas periodicamente
+// Atualizar estatísticas periodicamente (a cada 30 segundos)
 setInterval(() => {
-    if (db && currentUser) {
-        loadSystemStats();
+    if (db) {
+        loadSystemStats(false); // Usar cache se disponível
     }
-}, 30000); // Atualizar a cada 30 segundos
+}, 30000);
 
-console.log('MathKids Pro v3.1 com Racha Cuca integrado carregado com sucesso!');
+// Atualizar estatísticas quando a página ganha foco
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && db) {
+        loadSystemStats(true);
+    }
+});
+
+// Atualizar estatísticas ao voltar para a página
+window.addEventListener('focus', function() {
+    if (db) {
+        loadSystemStats(true);
+    }
+});
+
+console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
