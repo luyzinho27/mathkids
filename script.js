@@ -31,8 +31,8 @@ let gameScore = 0;
 let gameHighScore = 0;
 let systemStats = {
     totalStudents: 0,
-    averageRating: 0,
-    improvementRate: 0,
+    averageRating: 4.8,
+    improvementRate: 98,
     totalExercises: 0,
     totalUsers: 0,
     systemAccuracy: 0,
@@ -204,6 +204,13 @@ let rachacucaGameStarted = false;
 let rachacucaGameCompleted = false;
 let rachacucaCurrentDifficulty = 'normal';
 
+// Variáveis para drag and drop do Racha Cuca
+let rachacucaDraggedTile = null;
+let rachacucaIsDragging = false;
+let rachacucaDragStartX = 0;
+let rachacucaDragStartY = 0;
+let rachacucaDragThreshold = 40;
+
 // Configurar listeners do Firebase em tempo real
 function setupFirebaseListeners() {
     if (!db) return;
@@ -218,11 +225,10 @@ function setupFirebaseListeners() {
     statsListener = db.collection('users').onSnapshot(
         (snapshot) => {
             console.log('📊 Dados do Firebase atualizados em tempo real');
-            loadSystemStats(true); // Forçar atualização
+            loadSystemStats(true);
         },
         (error) => {
             console.error('❌ Erro no listener do Firebase:', error);
-            // Tentar reconectar após 5 segundos
             setTimeout(() => setupFirebaseListeners(), 5000);
         }
     );
@@ -278,40 +284,6 @@ document.addEventListener('DOMContentLoaded', function() {
       auth.onAuthStateChanged(handleAuthStateChange);
     }
 });
-        
-      /* auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log('👤 Usuário autenticado:', user.email);
-                await loadUserDataFromFirebase(user.uid);
-                showApp();
-                // Configurar listeners após login
-                setupFirebaseListeners();
-                setupUserProgressListener();
-            } else {
-                console.log('👤 Nenhum usuário autenticado');
-                // Usuário não autenticado, garantir que mostre a tela de auth
-                DOM.authScreen.style.display = 'flex';
-                DOM.appScreen.style.display = 'none';
-            }
-            // SEMPRE carregar estatísticas, independente do login
-            loadSystemStats(true);
-        });
-    } else {
-        // Sem Firebase, usar modo demo
-        console.log('🎮 Modo demonstração ativado');
-        checkAuthState();
-    }
-    
-    // Inicializar componentes
-    initializeComponents();
-    
-    // Carregar estatísticas IMEDIATAMENTE (não esperar pelo auth)
-    setTimeout(() => {
-        loadSystemStats(true);
-        // Configurar listeners do Firebase
-        setupFirebaseListeners();
-    }, 500);
-}); */
 
 // Função auxiliar para inicializar elementos
 function initializeElements() {
@@ -333,7 +305,6 @@ function initializeElements() {
 
 // Configurar todos os event listeners
 function setupEventListeners() {
-    // Verificar se os elementos existem antes de adicionar listeners
     if (!DOM || !DOM.showRegister) {
         console.error('❌ Elementos DOM não encontrados');
         return;
@@ -377,7 +348,8 @@ function setupEventListeners() {
     
     // Fechar dropdown ao clicar fora
     document.addEventListener('click', function(e) {
-        if (!DOM.userDropdownToggle.contains(e.target) && !DOM.userDropdown.contains(e.target)) {
+        if (DOM.userDropdownToggle && !DOM.userDropdownToggle.contains(e.target) && 
+            DOM.userDropdown && !DOM.userDropdown.contains(e.target)) {
             DOM.userDropdown.classList.remove('active');
         }
     });
@@ -392,52 +364,54 @@ function setupEventListeners() {
     
     // Fechar notificações ao clicar fora
     document.addEventListener('click', function(e) {
-        if (!DOM.notificationsToggle.contains(e.target) && !DOM.notificationsPanel.contains(e.target)) {
+        if (DOM.notificationsToggle && !DOM.notificationsToggle.contains(e.target) && 
+            DOM.notificationsPanel && !DOM.notificationsPanel.contains(e.target)) {
             DOM.notificationsPanel.classList.remove('active');
         }
     });
     
     // Navegação entre seções
-    DOM.navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const sectionId = this.getAttribute('href').substring(1);
-            switchSection(sectionId);
-            
-            // Atualizar navegação ativa - FIX: Agora inclui todas as abas
-            updateActiveNavigation(sectionId);
-            
-            // Fechar sidebar mobile se aberto
-            closeMobileSidebar();
-        });
-    });
-    
-    // Navegação na sidebar mobile
-    DOM.sidebarLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            if (!this.classList.contains('logout')) {
+    if (DOM.navLinks) {
+        DOM.navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
                 e.preventDefault();
                 const sectionId = this.getAttribute('href').substring(1);
                 switchSection(sectionId);
                 updateActiveNavigation(sectionId);
                 closeMobileSidebar();
-            }
+            });
         });
-    });
+    }
+    
+    // Navegação na sidebar mobile
+    if (DOM.sidebarLinks) {
+        DOM.sidebarLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (!this.classList.contains('logout')) {
+                    e.preventDefault();
+                    const sectionId = this.getAttribute('href').substring(1);
+                    switchSection(sectionId);
+                    updateActiveNavigation(sectionId);
+                    closeMobileSidebar();
+                }
+            });
+        });
+    }
     
     // Operações rápidas no dashboard
-    DOM.operationQuicks.forEach(operation => {
-        operation.addEventListener('click', function() {
-            const operationType = this.getAttribute('data-operation');
-            switchSection('practice');
-            loadPracticeSection(operationType);
+    if (DOM.operationQuicks) {
+        DOM.operationQuicks.forEach(operation => {
+            operation.addEventListener('click', function() {
+                const operationType = this.getAttribute('data-operation');
+                switchSection('practice');
+                loadPracticeSection(operationType);
+            });
         });
-    });
+    }
     
     // Botões de ação rápida
     if (DOM.quickPractice) {
         DOM.quickPractice.addEventListener('click', function() {
-            // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
             
@@ -450,7 +424,6 @@ function setupEventListeners() {
     
     if (DOM.quickGame) {
         DOM.quickGame.addEventListener('click', function() {
-            // Adicionar classe ativa temporariamente
             this.classList.add('active');
             setTimeout(() => this.classList.remove('active'), 300);
             
@@ -480,7 +453,6 @@ function setupEventListeners() {
     document.querySelectorAll('.feature').forEach(feature => {
         feature.addEventListener('click', function(e) {
             e.preventDefault();
-            // Recarregar estatísticas
             loadSystemStats(true);
         });
     });
@@ -501,35 +473,46 @@ function setupEventListeners() {
     });
     
     // Links de termos, privacidade e contato
-    DOM.termsLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('terms');
-    });
+    if (DOM.termsLink) {
+        DOM.termsLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('terms');
+        });
+    }
     
-    DOM.privacyLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('privacy');
-    });
+    if (DOM.privacyLink) {
+        DOM.privacyLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('privacy');
+        });
+    }
     
-    DOM.termsLinkFooter.addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('terms');
-    });
+    if (DOM.termsLinkFooter) {
+        DOM.termsLinkFooter.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('terms');
+        });
+    }
     
-    DOM.privacyLinkFooter.addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('privacy');
-    });
+    if (DOM.privacyLinkFooter) {
+        DOM.privacyLinkFooter.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('privacy');
+        });
+    }
     
-    DOM.contactLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        openModal('contact');
-    });
+    if (DOM.contactLink) {
+        DOM.contactLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal('contact');
+        });
+    }
     
     // Fechar modais
     document.querySelectorAll('.close-modal').forEach(button => {
         button.addEventListener('click', function() {
-            closeModal(this.closest('.modal').id);
+            const modal = this.closest('.modal');
+            if (modal) closeModal(modal.id);
         });
     });
     
@@ -542,7 +525,7 @@ function setupEventListeners() {
         });
     });
 
-  // Eventos do Racha Cuca
+    // Eventos do Racha Cuca
     if (DOM.rachacucaShuffleBtn) {
         DOM.rachacucaShuffleBtn.addEventListener('click', rachacucaShuffleBoard);
     }
@@ -589,15 +572,17 @@ function setupEventListeners() {
                 DOM.rachacucaDifficultyBtns.forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 rachacucaCurrentDifficulty = this.dataset.difficulty;
-                DOM.rachacucaDifficulty.textContent = 
-                    rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
-                    rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+                if (DOM.rachacucaDifficulty) {
+                    DOM.rachacucaDifficulty.textContent = 
+                        rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
+                        rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+                }
                 rachacucaResetGame();
             });
         });
     }
 
-     // Eventos das tabs do ranking do Racha Cuca
+    // Eventos das tabs do ranking do Racha Cuca
     if (DOM.rachacucaTabBtns) {
         DOM.rachacucaTabBtns.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -609,12 +594,12 @@ function setupEventListeners() {
         });
     }
 
-  // Fechar modais do Racha Cuca ao clicar fora
+    // Fechar modais do Racha Cuca ao clicar fora
     document.addEventListener('click', function(e) {
-        if (e.target === DOM.rachacucaScoresModal) {
+        if (DOM.rachacucaScoresModal && e.target === DOM.rachacucaScoresModal) {
             DOM.rachacucaScoresModal.classList.remove('active');
         }
-        if (e.target === DOM.rachacucaSaveScoreModal) {
+        if (DOM.rachacucaSaveScoreModal && e.target === DOM.rachacucaSaveScoreModal) {
             DOM.rachacucaSaveScoreModal.classList.remove('active');
         }
     });
@@ -636,23 +621,23 @@ function setupPasswordToggles() {
             toggleBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                 passwordInput.setAttribute('type', type);
-                this.querySelector('i').classList.toggle('fa-eye');
-                this.querySelector('i').classList.toggle('fa-eye-slash');
+                const icon = this.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-eye');
+                    icon.classList.toggle('fa-eye-slash');
+                }
             });
         }
     });
 }
 
-// Carregar estatísticas do sistema - CORRIGIDO: Carregar sempre, mesmo sem login
+// Carregar estatísticas do sistema
 async function loadSystemStats(forceUpdate = false) {
     console.log('📊 Carregando estatísticas do sistema...', { forceUpdate, dbExists: !!db });
     
-    // Mostrar estado de carregamento
     updateSystemStatsUI(true);
     
     if (!db) {
-        // Modo demo
-        console.log('🎮 Usando dados de demonstração');
         systemStats = {
             totalStudents: 1250,
             averageRating: 4.8,
@@ -667,9 +652,8 @@ async function loadSystemStats(forceUpdate = false) {
     }
     
     try {
-        // Verificar cache (5 minutos)
         const cacheKey = 'mathkids_system_stats_cache';
-        const cacheDuration = 5 * 60 * 1000; // 5 minutos
+        const cacheDuration = 5 * 60 * 1000;
         
         if (!forceUpdate) {
             const cached = localStorage.getItem(cacheKey);
@@ -680,8 +664,6 @@ async function loadSystemStats(forceUpdate = false) {
                         console.log('💾 Usando estatísticas em cache');
                         systemStats = { ...stats, lastUpdated: timestamp };
                         updateSystemStatsUI(false);
-                        
-                        // Atualizar em segundo plano (forçar atualização)
                         setTimeout(() => loadSystemStats(true), 1000);
                         return;
                     }
@@ -693,11 +675,9 @@ async function loadSystemStats(forceUpdate = false) {
         
         console.log('🔥 Buscando estatísticas do Firebase...');
         
-        // Buscar todos os usuários
         const usersSnapshot = await db.collection('users').get();
         const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Calcular estatísticas
         const studentUsers = users.filter(user => user.role === 'student');
         const totalStudents = studentUsers.length;
         const totalUsers = users.length;
@@ -714,15 +694,12 @@ async function loadSystemStats(forceUpdate = false) {
             }
         });
         
-        // Calcular métricas
         const systemAccuracy = totalAttempts > 0 ? 
             Math.round((totalCorrect / totalAttempts) * 100) : 78;
         
-        // Verificar se há admin
         const adminExists = users.some(user => user.role === 'admin');
         window.adminExists = adminExists;
         
-        // Atualizar opção de admin se o formulário estiver visível
         if (DOM.adminOption) {
             if (adminExists) {
                 DOM.adminOption.disabled = true;
@@ -733,13 +710,9 @@ async function loadSystemStats(forceUpdate = false) {
             }
         }
         
-        // Calcular avaliação média (simulado - pode ser substituído por dados reais)
         const averageRating = 4.8;
-        
-        // Calcular taxa de melhoria (simulado baseado na acurácia)
         const improvementRate = Math.min(98, systemAccuracy + 20);
         
-        // Atualizar estatísticas do sistema
         systemStats = {
             totalStudents,
             averageRating,
@@ -752,7 +725,6 @@ async function loadSystemStats(forceUpdate = false) {
         
         console.log('✅ Estatísticas carregadas:', systemStats);
         
-        // Salvar no cache
         try {
             const cacheData = {
                 stats: {
@@ -770,10 +742,8 @@ async function loadSystemStats(forceUpdate = false) {
             console.warn('⚠️ Não foi possível salvar cache:', cacheError);
         }
         
-        // Atualizar UI
         updateSystemStatsUI(false);
         
-        // Se estiver na seção Admin, atualizar também
         if (currentSection === 'admin' && currentUser?.role === 'admin') {
             updateAdminStatsUI();
         }
@@ -781,7 +751,6 @@ async function loadSystemStats(forceUpdate = false) {
     } catch (error) {
         console.error('❌ Erro ao carregar estatísticas do sistema:', error);
         
-        // Tentar usar cache em caso de erro
         try {
             const cacheKey = 'mathkids_system_stats_cache';
             const cached = localStorage.getItem(cacheKey);
@@ -791,7 +760,6 @@ async function loadSystemStats(forceUpdate = false) {
                 console.log('🔄 Usando cache devido ao erro');
             }
         } catch (cacheError) {
-            // Fallback para dados demo
             systemStats = {
                 totalStudents: 1250,
                 averageRating: 4.8,
@@ -810,7 +778,6 @@ async function loadSystemStats(forceUpdate = false) {
 
 // Atualizar UI das estatísticas do sistema
 function updateSystemStatsUI(loading = false) {
-    // Aplicar classe de loading aos cards
     const statCards = document.querySelectorAll('.stat-card');
     
     if (loading) {
@@ -819,7 +786,6 @@ function updateSystemStatsUI(loading = false) {
         statCards.forEach(card => card.classList.remove('loading'));
     }
     
-    // Atualizar valores
     if (DOM.statsStudents) {
         DOM.statsStudents.textContent = loading ? '...' : systemStats.totalStudents.toLocaleString();
     }
@@ -830,7 +796,6 @@ function updateSystemStatsUI(loading = false) {
         DOM.statsImprovement.textContent = loading ? '...' : systemStats.improvementRate + '%';
     }
     
-    // Atualizar também na seção Admin se estiver ativa
     if (currentSection === 'admin' && currentUser?.role === 'admin') {
         updateAdminStatsUI();
     }
@@ -851,7 +816,6 @@ function updateAdminStatsUI() {
 
 // Verificar estado de autenticação
 function checkAuthState() {
-    // SEMPRE carregar estatísticas, independente do login
     loadSystemStats(true);
     
     const savedUser = localStorage.getItem('mathkids_user');
@@ -863,11 +827,9 @@ function checkAuthState() {
                 loadUserData(user);
                 showApp();
                 
-                // Configurar listeners após carregar usuário
                 setupFirebaseListeners();
                 setupUserProgressListener();
             } else {
-                // Token expirado, fazer logout
                 console.log('⏰ Sessão expirada');
                 logoutLocal();
             }
@@ -893,7 +855,6 @@ function switchAuthForm(formType) {
         case 'register':
             DOM.registerForm.classList.add('active');
             checkAdminOption();
-            // Atualizar estatísticas ao mostrar formulário de registro
             loadSystemStats(false);
             break;
         case 'recover':
@@ -906,13 +867,11 @@ function switchAuthForm(formType) {
 async function checkAdminOption() {
     if (!DOM.adminOption) return;
     
-    // Se já temos o valor, usar ele
     if (typeof adminExists !== 'undefined') {
         updateAdminOption();
         return;
     }
     
-    // Buscar do Firebase se disponível
     if (db) {
         try {
             const adminSnapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
@@ -966,7 +925,6 @@ async function handleLogin(e) {
         showToast('Login realizado com sucesso!', 'success');
         showApp();
         
-        // Atualizar estatísticas após login
         setTimeout(() => loadSystemStats(true), 1000);
         
     } catch (error) {
@@ -986,7 +944,6 @@ async function handleRegister(e) {
     const userType = DOM.userTypeSelect.value;
     const agreeTerms = document.getElementById('agreeTerms').checked;
     
-    // Validações
     if (!name || !email || !password || !confirmPassword || !userType) {
         showToast('Por favor, preencha todos os campos.', 'error');
         return;
@@ -1044,8 +1001,6 @@ async function handleRegister(e) {
         
         if (db) {
             await db.collection('users').doc(userId).set(userData);
-            
-            // ATUALIZAR ESTATÍSTICAS IMEDIATAMENTE após cadastro
             setTimeout(() => loadSystemStats(true), 1500);
         } else {
             localStorage.setItem('mathkids_user', JSON.stringify({
@@ -1053,7 +1008,6 @@ async function handleRegister(e) {
                 id: userId
             }));
             
-            // Atualizar estatísticas locais
             systemStats.totalStudents++;
             systemStats.totalUsers++;
             updateSystemStatsUI();
@@ -1118,7 +1072,6 @@ function handleLogout() {
 }
 
 function logoutLocal() {
-    // Remover listeners do Firebase
     if (statsListener) {
         statsListener();
         statsListener = null;
@@ -1141,7 +1094,6 @@ function logoutLocal() {
     
     switchAuthForm('login');
     
-    // Atualizar estatísticas após logout
     setTimeout(() => loadSystemStats(true), 500);
     
     showToast('Logout realizado com sucesso.', 'info');
@@ -1152,7 +1104,6 @@ function handleAuthStateChange(user) {
     if (user) {
         loadUserDataFromFirebase(user.uid);
         showApp();
-        // Configurar listeners após login
         setupFirebaseListeners();
         setupUserProgressListener();
     }
@@ -1167,7 +1118,6 @@ async function loadUserDataFromFirebase(userId) {
             const data = doc.data();
             currentUser = { id: userId, ...data };
             
-            // Atualizar último login
             await db.collection('users').doc(userId).update({
                 lastLogin: new Date().toISOString()
             });
@@ -1312,9 +1262,7 @@ function clearAllNotifications() {
 
 // Alternar seção
 function switchSection(sectionId) {
-    // Remover listener do Admin se estiver saindo da seção
     if (currentSection === 'admin' && sectionId !== 'admin') {
-        // Remover listener específico do admin se existir
         if (window.adminTabListener) {
             window.adminTabListener();
             window.adminTabListener = null;
@@ -1330,15 +1278,12 @@ function switchSection(sectionId) {
         targetSection.classList.add('active');
         currentSection = sectionId;
         
-        // Atualizar navegação ativa
         updateActiveNavigation(sectionId);
         
         loadSectionContent(sectionId);
         
-        // Se for a seção Admin, carregar dados em tempo real
         if (sectionId === 'admin' && currentUser?.role === 'admin') {
             loadSystemStats(true);
-            // Configurar listener específico para admin
             setupAdminFirebaseListener();
         }
     }
@@ -1348,12 +1293,10 @@ function switchSection(sectionId) {
 function setupAdminFirebaseListener() {
     if (!db || currentUser?.role !== 'admin') return;
     
-    // Remover listener anterior se existir
     if (window.adminTabListener) {
         window.adminTabListener();
     }
     
-    // Configurar listener em tempo real para a seção Admin
     window.adminTabListener = db.collection('users').onSnapshot(
         () => {
             loadUsersTable();
@@ -1367,7 +1310,6 @@ function setupAdminFirebaseListener() {
 
 // Atualizar navegação ativa
 function updateActiveNavigation(sectionId) {
-    // Atualizar nav principal
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
         link.classList.remove('active');
@@ -1376,7 +1318,6 @@ function updateActiveNavigation(sectionId) {
         }
     });
     
-    // Atualizar sidebar mobile
     const sidebarLinks = document.querySelectorAll('.sidebar-link');
     sidebarLinks.forEach(link => {
         if (!link.classList.contains('logout')) {
@@ -2013,11 +1954,9 @@ function checkPracticeAnswer() {
     updateProgressUI();
     saveUserProgress();
     
-    // Atualizar estatísticas do sistema
     systemStats.totalExercises++;
     updateSystemStatsUI();
     
-    // Salvar cache atualizado
     saveSystemStatsCache();
 }
 
@@ -2174,35 +2113,28 @@ function loadGamesSection() {
 
 // Iniciar jogo Racha Cuca
 function startRachacucaGame() {
-    // Ocultar a seção de jogos
     const gamesSection = document.getElementById('games');
     if (gamesSection) {
         gamesSection.style.display = 'none';
     }
     
-    // Mostrar o container do Racha Cuca
     if (DOM.rachacucaGameContainer) {
         DOM.rachacucaGameContainer.style.display = 'block';
-        
-        // Inicializar o jogo
         rachacucaInitGame();
     }
 }
 
 // Voltar para a seção de jogos
 function rachacucaBackToGames() {
-    // Ocultar o container do Racha Cuca
     if (DOM.rachacucaGameContainer) {
         DOM.rachacucaGameContainer.style.display = 'none';
         
-        // Parar o timer
         if (rachacucaTimerInterval) {
             clearInterval(rachacucaTimerInterval);
             rachacucaTimerInterval = null;
         }
     }
 
-  // Mostrar a seção de jogos
     const gamesSection = document.getElementById('games');
     if (gamesSection) {
         gamesSection.style.display = 'block';
@@ -2212,20 +2144,11 @@ function rachacucaBackToGames() {
 
 // Inicializar o jogo Racha Cuca
 function rachacucaInitGame() {
-    // Criar o tabuleiro
     rachacucaCreateBoard();
-    
-    // Renderizar o tabuleiro
     rachacucaRenderBoard();
-    
-    // Criar tabuleiro de solução
     rachacucaCreateSolutionBoard();
-    
-    // Atualizar contadores
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
-    
-    // Embaralhar o tabuleiro
     rachacucaShuffleBoard();
 }
 
@@ -2235,11 +2158,11 @@ function rachacucaCreateBoard() {
     for (let i = 1; i <= 15; i++) {
         rachacucaBoard.push(i);
     }
-    rachacucaBoard.push(null); // Espaço vazio
+    rachacucaBoard.push(null);
     rachacucaEmptyTileIndex = 15;
 }
 
-// Renderizar o tabuleiro do Racha Cuca
+// Renderizar o tabuleiro do Racha Cuca com suporte a drag and drop
 function rachacucaRenderBoard() {
     if (!DOM.rachacucaPuzzleBoard) return;
     
@@ -2258,22 +2181,134 @@ function rachacucaRenderBoard() {
             tile.dataset.index = index;
             tile.dataset.value = value;
             
-            // Verificar se a peça está na posição correta
             if (value === index + 1) {
                 tile.classList.add('correct-position');
             }
             
-            // Verificar se a peça pode ser movida
-            if (rachacucaIsMovable(index)) {
-                tile.classList.add('movable');
-                tile.addEventListener('click', () => rachacucaMoveTile(index));
-            } else {
-                tile.style.cursor = 'default';
-            }
+            // Adicionar eventos de drag and drop
+            tile.addEventListener('mousedown', rachacucaStartDrag);
+            tile.addEventListener('touchstart', rachacucaStartDragTouch);
+            
+            // Adicionar evento de clique como fallback
+            tile.addEventListener('click', () => {
+                if (!rachacucaIsDragging) {
+                    rachacucaMoveTile(index);
+                }
+            });
         }
         
         DOM.rachacucaPuzzleBoard.appendChild(tile);
     });
+}
+
+// Iniciar arrastar (mouse) - Racha Cuca
+function rachacucaStartDrag(e) {
+    if (rachacucaGameCompleted) return;
+    
+    const tile = e.target;
+    const index = parseInt(tile.dataset.index);
+    
+    if (rachacucaIsMovable(index)) {
+        rachacucaDraggedTile = tile;
+        rachacucaIsDragging = true;
+        rachacucaDragStartX = e.clientX;
+        rachacucaDragStartY = e.clientY;
+        
+        tile.classList.add('dragging');
+        tile.style.zIndex = '100';
+        
+        document.addEventListener('mousemove', rachacucaDrag);
+        document.addEventListener('mouseup', rachacucaEndDrag);
+        
+        e.preventDefault();
+    }
+}
+
+// Iniciar arrastar (touch) - Racha Cuca
+function rachacucaStartDragTouch(e) {
+    if (rachacucaGameCompleted) return;
+    
+    const tile = e.target;
+    const index = parseInt(tile.dataset.index);
+    
+    if (rachacucaIsMovable(index) && e.touches.length === 1) {
+        rachacucaDraggedTile = tile;
+        rachacucaIsDragging = true;
+        rachacucaDragStartX = e.touches[0].clientX;
+        rachacucaDragStartY = e.touches[0].clientY;
+        
+        tile.classList.add('dragging');
+        tile.style.zIndex = '100';
+        
+        document.addEventListener('touchmove', rachacucaDragTouch, { passive: false });
+        document.addEventListener('touchend', rachacucaEndDragTouch);
+        
+        e.preventDefault();
+    }
+}
+
+// Arrastar (mouse) - Racha Cuca
+function rachacucaDrag(e) {
+    if (!rachacucaDraggedTile || !rachacucaIsDragging) return;
+    
+    const dx = e.clientX - rachacucaDragStartX;
+    const dy = e.clientY - rachacucaDragStartY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    rachacucaDraggedTile.style.transform = `translate(${dx}px, ${dy}px)`;
+    
+    if (distance > rachacucaDragThreshold) {
+        const index = parseInt(rachacucaDraggedTile.dataset.index);
+        rachacucaMoveTile(index);
+        rachacucaEndDrag();
+    }
+}
+
+// Arrastar (touch) - Racha Cuca
+function rachacucaDragTouch(e) {
+    if (!rachacucaDraggedTile || !rachacucaIsDragging || e.touches.length !== 1) return;
+    
+    const dx = e.touches[0].clientX - rachacucaDragStartX;
+    const dy = e.touches[0].clientY - rachacucaDragStartY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    rachacucaDraggedTile.style.transform = `translate(${dx}px, ${dy}px)`;
+    
+    if (distance > rachacucaDragThreshold) {
+        const index = parseInt(rachacucaDraggedTile.dataset.index);
+        rachacucaMoveTile(index);
+        rachacucaEndDragTouch();
+    }
+    
+    e.preventDefault();
+}
+
+// Finalizar arrastar (mouse) - Racha Cuca
+function rachacucaEndDrag() {
+    if (rachacucaDraggedTile) {
+        rachacucaDraggedTile.classList.remove('dragging');
+        rachacucaDraggedTile.style.transform = '';
+        rachacucaDraggedTile.style.zIndex = '';
+        rachacucaDraggedTile = null;
+    }
+    rachacucaIsDragging = false;
+    
+    document.removeEventListener('mousemove', rachacucaDrag);
+    document.removeEventListener('mouseup', rachacucaEndDrag);
+}
+
+// Finalizar arrastar (touch) - Racha Cuca
+function rachacucaEndDragTouch() {
+    if (rachacucaDraggedTile) {
+        rachacucaDraggedTile.classList.remove('dragging');
+        rachacucaDraggedTile.style.transform = '';
+        rachacucaDraggedTile.style.zIndex = '';
+        rachacucaDraggedTile = null;
+    }
+    rachacucaIsDragging = false;
+    
+    document.removeEventListener('touchmove', rachacucaDragTouch);
+    document.removeEventListener('touchend', rachacucaEndDragTouch);
 }
 
 // Verificar se uma peça pode ser movida no Racha Cuca
@@ -2283,7 +2318,6 @@ function rachacucaIsMovable(index) {
     const emptyRow = Math.floor(rachacucaEmptyTileIndex / 4);
     const emptyCol = rachacucaEmptyTileIndex % 4;
     
-    // Verificar se está na mesma linha ou coluna adjacente ao espaço vazio
     return (row === emptyRow && Math.abs(col - emptyCol) === 1) || 
            (col === emptyCol && Math.abs(row - emptyRow) === 1);
 }
@@ -2292,26 +2326,20 @@ function rachacucaIsMovable(index) {
 function rachacucaMoveTile(index) {
     if (rachacucaGameCompleted || !rachacucaIsMovable(index)) return;
     
-    // Trocar a peça com o espaço vazio
     [rachacucaBoard[index], rachacucaBoard[rachacucaEmptyTileIndex]] = [rachacucaBoard[rachacucaEmptyTileIndex], rachacucaBoard[index]];
     
-    // Atualizar o índice do espaço vazio
     rachacucaEmptyTileIndex = index;
     
-    // Incrementar contador de movimentos
     rachacucaMoves++;
     rachacucaUpdateMoveCounter();
     
-    // Iniciar o timer se for o primeiro movimento
     if (!rachacucaGameStarted) {
         rachacucaStartTimer();
         rachacucaGameStarted = true;
     }
     
-    // Renderizar o tabuleiro atualizado
     rachacucaRenderBoard();
     
-    // Verificar se o jogo foi concluído
     if (rachacucaCheckWin()) {
         rachacucaCompleteGame();
     }
@@ -2324,25 +2352,21 @@ function rachacucaShuffleBoard() {
         return;
     }
     
-    // Parar o timer se estiver rodando
     if (rachacucaTimerInterval) {
         clearInterval(rachacucaTimerInterval);
         rachacucaTimerInterval = null;
     }
     
-    // Reiniciar variáveis
     rachacucaMoves = 0;
     rachacucaGameStarted = false;
     rachacucaGameCompleted = false;
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
     
-    // Ocultar mensagem de conclusão
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'none';
     }
     
-    // Embaralhar o tabuleiro
     let shuffleCount;
     switch(rachacucaCurrentDifficulty) {
         case 'easy':
@@ -2351,62 +2375,52 @@ function rachacucaShuffleBoard() {
         case 'hard':
             shuffleCount = 100;
             break;
-        default: // normal
+        default:
             shuffleCount = 50;
             break;
     }
     
-    // Fazer movimentos válidos aleatórios para embaralhar
     for (let i = 0; i < shuffleCount; i++) {
         const movableTiles = [];
         
-        // Encontrar todas as peças que podem ser movidas
         rachacucaBoard.forEach((_, index) => {
             if (rachacucaIsMovable(index)) {
                 movableTiles.push(index);
             }
         });
         
-        // Escolher uma peça aleatória para mover
         if (movableTiles.length > 0) {
             const randomIndex = Math.floor(Math.random() * movableTiles.length);
             const tileToMove = movableTiles[randomIndex];
             
-            // Mover a peça
             [rachacucaBoard[tileToMove], rachacucaBoard[rachacucaEmptyTileIndex]] = [rachacucaBoard[rachacucaEmptyTileIndex], rachacucaBoard[tileToMove]];
             rachacucaEmptyTileIndex = tileToMove;
         }
     }
     
-    // Renderizar o tabuleiro embaralhado
     rachacucaRenderBoard();
 }
 
 // Mostrar a solução do Racha Cuca
 function rachacucaShowSolution() {
-    // Criar tabuleiro ordenado
     const solvedBoard = [];
     for (let i = 1; i <= 15; i++) {
         solvedBoard.push(i);
     }
     solvedBoard.push(null);
     
-    // Atualizar o tabuleiro atual
     rachacucaBoard = [...solvedBoard];
     rachacucaEmptyTileIndex = 15;
     rachacucaRenderBoard();
     
-    // Parar o timer
     if (rachacucaTimerInterval) {
         clearInterval(rachacucaTimerInterval);
         rachacucaTimerInterval = null;
     }
     
-    // Marcar jogo como concluído
     rachacucaGameCompleted = true;
     rachacucaGameStarted = false;
     
-    // Mostrar mensagem de conclusão
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'block';
     }
@@ -2420,19 +2434,16 @@ function rachacucaResetGame() {
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
     
-    // Ocultar mensagem de conclusão
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'none';
     }
     
-    // Criar tabuleiro ordenado
     rachacucaCreateBoard();
     rachacucaRenderBoard();
 }
 
 // Mostrar dica no Racha Cuca
 function rachacucaShowHint() {
-    // Encontrar a primeira peça fora do lugar que pode ser movida
     for (let i = 0; i < rachacucaBoard.length; i++) {
         if (rachacucaBoard[i] !== null && rachacucaBoard[i] !== i + 1 && rachacucaIsMovable(i)) {
             const tile = document.querySelector(`.rachacuca-puzzle-tile[data-index="${i}"]`);
@@ -2440,7 +2451,6 @@ function rachacucaShowHint() {
                 tile.style.boxShadow = '0 0 15px 5px gold';
                 tile.style.transform = 'scale(1.05)';
                 
-                // Remover o efeito após 2 segundos
                 setTimeout(() => {
                     tile.style.boxShadow = '';
                     tile.style.transform = '';
@@ -2466,26 +2476,22 @@ function rachacucaCheckWin() {
 function rachacucaCompleteGame() {
     rachacucaGameCompleted = true;
     
-    // Parar o timer
     if (rachacucaTimerInterval) {
         clearInterval(rachacucaTimerInterval);
         rachacucaTimerInterval = null;
     }
     
-    // Mostrar mensagem de conclusão
     if (DOM.rachacucaCompletionMessage && DOM.rachacucaFinalMoves && DOM.rachacucaFinalTime) {
         DOM.rachacucaFinalMoves.textContent = rachacucaMoves;
         DOM.rachacucaFinalTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
         DOM.rachacucaCompletionMessage.style.display = 'block';
         
-        // Salvar melhor tempo
         const bestTime = localStorage.getItem('rachacuca_best_time');
         if (!bestTime || rachacucaTimerSeconds < parseInt(bestTime)) {
             localStorage.setItem('rachacuca_best_time', rachacucaTimerSeconds.toString());
         }
     }
     
-    // Adicionar atividade
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos`, 'game');
 }
 
@@ -2559,7 +2565,6 @@ function rachacucaOpenSaveScoreModal() {
         return;
     }
     
-    // Atualizar informações no modal
     if (DOM.rachacucaSaveMoves && DOM.rachacucaSaveTime && DOM.rachacucaSaveDifficulty) {
         DOM.rachacucaSaveMoves.textContent = rachacucaMoves;
         DOM.rachacucaSaveTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
@@ -2568,13 +2573,11 @@ function rachacucaOpenSaveScoreModal() {
             rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
     }
     
-    // Preencher nome do jogador se já existir
     if (DOM.rachacucaPlayerName) {
         const playerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
         DOM.rachacucaPlayerName.value = playerName;
     }
     
-    // Mostrar modal
     if (DOM.rachacucaSaveScoreModal) {
         DOM.rachacucaSaveScoreModal.classList.add('active');
     }
@@ -2598,10 +2601,8 @@ async function rachacucaSaveScore() {
         return;
     }
     
-    // Salvar nome do jogador no localStorage
     localStorage.setItem('rachacuca_player_name', playerName);
     
-    // Dados da pontuação
     const scoreData = {
         playerName: playerName,
         moves: rachacucaMoves,
@@ -2611,18 +2612,16 @@ async function rachacucaSaveScore() {
         date: new Date().toISOString(),
         userId: currentUser?.id || 'anonymous'
     };
-  try {
-        // Adicionar documento ao Firestore
+  
+    try {
         await db.collection('rachacuca_scores').add(scoreData);
         
         showToast('Pontuação salva com sucesso!', 'success');
         
-        // Fechar modal
         if (DOM.rachacucaSaveScoreModal) {
             DOM.rachacucaSaveScoreModal.classList.remove('active');
         }
         
-        // Recarregar pontuações
         rachacucaLoadScores('global');
     } catch (error) {
         console.error('Erro ao salvar pontuação:', error);
@@ -2637,12 +2636,10 @@ async function rachacucaLoadScores(difficulty = 'global') {
     try {
         let query = db.collection('rachacuca_scores');
         
-        // Filtrar por dificuldade se não for "global"
         if (difficulty !== 'global') {
             query = query.where('difficulty', '==', difficulty);
         }
         
-        // Ordenar por menor número de movimentos e menor tempo
         const snapshot = await query.orderBy('moves').orderBy('time').limit(10).get();
         
         if (snapshot.empty) {
@@ -2650,7 +2647,6 @@ async function rachacucaLoadScores(difficulty = 'global') {
             return;
         }
 
-      // Processar resultados
         const scores = [];
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -2664,7 +2660,6 @@ async function rachacucaLoadScores(difficulty = 'global') {
             });
         });
         
-        // Exibir pontuações
         rachacucaDisplayScores(scores);
     } catch (error) {
         console.error('Erro ao carregar pontuações:', error);
@@ -2682,7 +2677,6 @@ function rachacucaDisplayScores(scores) {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
-        // Destacar pontuação do jogador atual
         const currentPlayerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
         if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
             scoreItem.classList.add('highlight');
@@ -2890,7 +2884,6 @@ function generateGameExercise(gameId) {
         </div>
     `;
     
-    // Adicionar estilos ao input
     const style = document.createElement('style');
     style.textContent = `
         .game-answer-container {
@@ -3121,7 +3114,6 @@ function loadProgressSection() {
     
     section.innerHTML = content;
     
-    // Inicializar gráfico após um pequeno delay para garantir que o DOM esteja pronto
     setTimeout(initializeOperationsChart, 100);
 }
 
@@ -3130,7 +3122,6 @@ function initializeOperationsChart() {
     const ctx = document.getElementById('operationsChart');
     if (!ctx) return;
     
-    // Destruir gráfico anterior se existir
     if (operationsChartInstance) {
         operationsChartInstance.destroy();
     }
@@ -3152,7 +3143,6 @@ function initializeOperationsChart() {
     
     const accuracy = total.map((t, i) => t > 0 ? Math.round((correct[i] / t) * 100) : 0);
     
-    // Verificar se Chart.js está disponível
     if (typeof Chart === 'undefined') {
         console.error('Chart.js não carregado');
         return;
@@ -3478,13 +3468,11 @@ function loadAdminSection() {
     
     section.innerHTML = content;
     
-    // Configurar eventos de administração
     setupAdminEvents();
 }
 
 // Configurar eventos de administração
 function setupAdminEvents() {
-    // Tabs
     document.querySelectorAll('.tab-header').forEach(tab => {
         tab.addEventListener('click', function() {
             const tabId = this.getAttribute('data-tab');
@@ -3497,25 +3485,19 @@ function setupAdminEvents() {
         });
     });
     
-    // Botões de usuários
     document.getElementById('refreshUsers')?.addEventListener('click', loadUsersTable);
     document.getElementById('addUserBtn')?.addEventListener('click', () => openUserModal());
     
-    // Busca de usuários
     document.getElementById('searchUsers')?.addEventListener('input', function(e) {
         filterUsersTable(e.target.value);
     });
     
-    // Relatórios
     document.getElementById('generateReport')?.addEventListener('click', generateReport);
     
-    // Configurações
     document.getElementById('saveSettings')?.addEventListener('click', saveSystemSettings);
     
-    // Carregar tabela de usuários
     loadUsersTable();
     
-    // Configurar modal de usuário
     setupUserModal();
 }
 
@@ -3538,7 +3520,6 @@ function setupUserModal() {
         });
     }
     
-    // Fechar modal ao clicar fora
     modal?.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.style.display = 'none';
@@ -3589,11 +3570,9 @@ async function saveUser() {
     
     try {
         if (id) {
-            // Editar usuário existente
             await updateUser(id, { name, email, role, password });
             showToast('Usuário atualizado com sucesso!', 'success');
         } else {
-            // Criar novo usuário
             if (!password) {
                 showToast('A senha é obrigatória para novos usuários', 'error');
                 showLoading(false);
@@ -3604,13 +3583,10 @@ async function saveUser() {
             showToast('Usuário criado com sucesso!', 'success');
         }
         
-        // Fechar modal
         document.getElementById('userModal').style.display = 'none';
         
-        // Recarregar tabela
         loadUsersTable();
         
-        // Atualizar estatísticas
         await loadSystemStats(true);
         
     } catch (error) {
@@ -3649,7 +3625,6 @@ async function createUser(userData) {
             adminExists = true;
         }
     } else {
-        // Modo demo
         const userId = 'demo_' + Date.now();
         const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
         
@@ -3682,7 +3657,6 @@ async function updateUser(userId, userData) {
         };
         
         if (userData.password) {
-            // Atualizar senha no Firebase Auth
             const user = auth.currentUser;
             if (user && user.uid === userId) {
                 await user.updatePassword(userData.password);
@@ -3691,7 +3665,6 @@ async function updateUser(userId, userData) {
         
         await db.collection('users').doc(userId).update(updateData);
     } else {
-        // Modo demo
         const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
         const index = demoUsers.findIndex(u => u.id === userId);
         
@@ -3732,7 +3705,6 @@ async function loadUsersTable() {
             const demoUsers = JSON.parse(localStorage.getItem('mathkids_demo_users') || '[]');
             users = demoUsers;
             
-            // Adicionar usuário atual se não estiver na lista
             const currentUserData = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
             if (currentUserData.id && !users.some(u => u.id === currentUserData.id)) {
                 users.push(currentUserData);
@@ -3808,7 +3780,6 @@ function renderUsersTable(users) {
 
 // Configurar ações da tabela de usuários
 function setupUserTableActions() {
-    // Botões de editar
     document.querySelectorAll('.btn-action.edit').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user-id');
@@ -3825,7 +3796,6 @@ function setupUserTableActions() {
         });
     });
     
-    // Botões de excluir
     document.querySelectorAll('.btn-action.delete').forEach(btn => {
         btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-user-id');
@@ -3846,7 +3816,6 @@ async function deleteUser(userId) {
         if (db) {
             await db.collection('users').doc(userId).delete();
             
-            // Tentar excluir do Firebase Auth também
             if (auth.currentUser && auth.currentUser.uid === userId) {
                 await auth.currentUser.delete();
             }
@@ -3858,10 +3827,8 @@ async function deleteUser(userId) {
         
         showToast('Usuário excluído com sucesso!', 'success');
         
-        // Recarregar tabela
         loadUsersTable();
         
-        // Atualizar estatísticas
         await loadSystemStats(true);
         
     } catch (error) {
@@ -4337,7 +4304,6 @@ function loadUserSettings() {
         progressNotifications: true
     };
     
-    // Aplicar tema
     if (settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.setAttribute('data-theme', 'dark');
     } else {
@@ -4462,7 +4428,6 @@ function showToast(message, type = 'info') {
         }
     }, 5000);
     
-    // Adicionar animação se não existir
     if (!document.getElementById('toastAnimationStyle')) {
         const style = document.createElement('style');
         style.id = 'toastAnimationStyle';
@@ -4530,7 +4495,6 @@ function handleAuthError(error) {
 }
 
 function initializeComponents() {
-    // Inicializar tooltips
     const tooltips = document.querySelectorAll('[title]');
     tooltips.forEach(element => {
         element.addEventListener('mouseenter', function(e) {
@@ -4554,7 +4518,6 @@ function initializeComponents() {
         });
     });
     
-    // Detectar tema do sistema
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     prefersDark.addEventListener('change', (e) => {
         const settings = currentUser?.settings || { theme: 'auto' };
@@ -4645,10 +4608,10 @@ window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
 
-// Atualizar estatísticas periodicamente (a cada 30 segundos)
+// Atualizar estatísticas periodicamente
 setInterval(() => {
     if (db) {
-        loadSystemStats(false); // Usar cache se disponível
+        loadSystemStats(false);
     }
 }, 30000);
 
@@ -4659,7 +4622,6 @@ document.addEventListener('visibilitychange', function() {
     }
 });
 
-// Atualizar estatísticas ao voltar para a página
 window.addEventListener('focus', function() {
     if (db) {
         loadSystemStats(true);
@@ -4667,4 +4629,3 @@ window.addEventListener('focus', function() {
 });
 
 console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
-
