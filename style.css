@@ -4674,11 +4674,11 @@ select:valid {
     align-items: center;
     font-size: 2rem;
     font-weight: 700;
-    color: white;
+    color: #474242;
     cursor: pointer;
     user-select: none;
     transition: all var(--transition-fast);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(0 0 0 / 20%);
     position: relative;
     overflow: hidden;
 }
@@ -5102,4 +5102,5 @@ select:valid {
 [data-theme="dark"] .rachacuca-solution-tile.empty {
     background-color: var(--gray-700);
 }
+
 
