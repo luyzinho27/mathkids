@@ -1,850 +1,743 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MathKids Pro - Aprendizado Interativo de Matemática</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='15' y='5' width='70' height='90' rx='12' fill='%230ea5e9'/><rect x='25' y='15' width='50' height='15' rx='4' fill='white'/><circle cx='32' cy='45' r='7' fill='white'/><circle cx='50' cy='45' r='7' fill='white'/><circle cx='68' cy='45' r='7' fill='white'/><circle cx='32' cy='65' r='7' fill='white'/><circle cx='50' cy='65' r='7' fill='white'/><circle cx='68' cy='65' r='7' fill='white'/><rect x='25' y='78' width='30' height='10' rx='5' fill='white'/><circle cx='68' cy='83' r='7' fill='white'/></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='15' y='5' width='70' height='90' rx='12' fill='%230ea5e9'/><rect x='25' y='15' width='50' height='15' rx='4' fill='white'/><circle cx='32' cy='45' r='7' fill='white'/><circle cx='50' cy='45' r='7' fill='white'/><circle cx='68' cy='45' r='7' fill='white'/><circle cx='32' cy='65' r='7' fill='white'/><circle cx='50' cy='65' r='7' fill='white'/><circle cx='68' cy='65' r='7' fill='white'/><rect x='25' y='78' width='30' height='10' rx='5' fill='white'/><circle cx='68' cy='83' r='7' fill='white'/></svg>">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathKids Pro - Aprendizado Interativo de Matemática</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='15' y='5' width='70' height='90' rx='12' fill='%230ea5e9'/><rect x='25' y='15' width='50' height='15' rx='4' fill='white'/><circle cx='32' cy='45' r='7' fill='white'/><circle cx='50' cy='45' r='7' fill='white'/><circle cx='68' cy='45' r='7' fill='white'/><circle cx='32' cy='65' r='7' fill='white'/><circle cx='50' cy='65' r='7' fill='white'/><circle cx='68' cy='65' r='7' fill='white'/><rect x='25' y='78' width='30' height='10' rx='5' fill='white'/><circle cx='68' cy='83' r='7' fill='white'/></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='15' y='5' width='70' height='90' rx='12' fill='%230ea5e9'/><rect x='25' y='15' width='50' height='15' rx='4' fill='white'/><circle cx='32' cy='45' r='7' fill='white'/><circle cx='50' cy='45' r='7' fill='white'/><circle cx='68' cy='45' r='7' fill='white'/><circle cx='32' cy='65' r='7' fill='white'/><circle cx='50' cy='65' r='7' fill='white'/><circle cx='68' cy='65' r='7' fill='white'/><rect x='25' y='78' width='30' height='10' rx='5' fill='white'/><circle cx='68' cy='83' r='7' fill='white'/></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 </head>
 <body>
-<div id="authScreen" class="auth-screen">
-<div class="auth-container">
-<div class="auth-header">
-<div class="logo">
-<i class="fas fa-calculator"></i>
-<div class="logo-text">
-<h1>Math<span>Kids</span></h1>
-<span class="pro-badge">PRO</span>
-</div>
-</div>
-<p class="tagline">Aprenda matemática de forma divertida e interativa</p>
-</div>
-<div class="auth-content">
-<div class="welcome-section">
-<h2>Bem-vindo ao MathKids Pro!</h2>
-<p>Uma plataforma educacional completa para alunos do 4º ao 9º ano aprenderem matemática de forma divertida e eficaz.</p>
-<div class="stats-grid">
-<div class="stat-card">
-<div class="stat-icon">
-<i class="fas fa-users"></i>
-</div>
-<div class="stat-info">
-<h3 id="statsStudents">0</h3>
-<p>Alunos Ativos</p>
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon">
-<i class="fas fa-star"></i>
-</div>
-<div class="stat-info">
-<h3 id="statsRating">0.0</h3>
-<p>Avaliação Média</p>
-</div>
-</div>
-<div class="stat-card">
-<div class="stat-icon">
-<i class="fas fa-chart-line"></i>
-</div>
-<div class="stat-info">
-<h3 id="statsImprovement">0%</h3>
-<p>Melhoria no Aprendizado</p>
-</div>
-</div>
-</div>
-<div class="features-grid">
-<div class="feature" data-feature="games">
-<i class="fas fa-gamepad"></i>
-<h4>Jogos Educativos</h4>
-<p>Diversão garantida enquanto aprende</p>
-</div>
-<div class="feature" data-feature="progress">
-<i class="fas fa-chart-line"></i>
-<h4>Acompanhamento</h4>
-<p>Veja sua evolução no aprendizado</p>
-</div>
-<div class="feature" data-feature="challenges">
-<i class="fas fa-trophy"></i>
-<h4>Desafios</h4>
-<p>Conquiste medalhas e reconhecimento</p>
-</div>
-<div class="feature" data-feature="community">
-<i class="fas fa-users"></i>
-<h4>Comunidade</h4>
-<p>Aprenda com outros estudantes</p>
-</div>
-</div>
-</div>
-<div class="auth-forms">
-<div id="loginForm" class="auth-form active">
-<div class="form-header">
-<h3><i class="fas fa-sign-in-alt"></i> Fazer Login</h3>
-<p>Acesse sua conta para continuar aprendendo</p>
-</div>
-<form id="loginFormElement">
-<div class="form-group">
-<label for="loginEmail">
-<i class="fas fa-envelope"></i>
-<span>E-mail</span>
-</label>
-<input type="email" id="loginEmail" placeholder="seu@email.com" required>
-</div>
-<div class="form-group">
-<label for="loginPassword">
-<i class="fas fa-lock"></i>
-<span>Senha</span>
-</label>
-<div class="password-input">
-<input type="password" id="loginPassword" placeholder="Sua senha" required>
-<button type="button" class="toggle-password" id="toggleLoginPassword">
-<i class="fas fa-eye"></i>
-</button>
-</div>
-</div>
-<div class="form-options">
-<label class="checkbox">
-<input type="checkbox" id="rememberMe" hidden>
-<span class="checkmark"></span>
-Lembrar-me
-</label>
-<a href="#" id="forgotPasswordLink" class="forgot-link">Esqueci a senha</a>
-</div>
-<button type="submit" class="btn-auth btn-primary">
-<i class="fas fa-sign-in-alt"></i>
-<span>Entrar na Conta</span>
-</button>
-</form>
-<div class="auth-switch">
-<p>Não tem uma conta? <a href="#" id="showRegister" class="switch-link">Cadastre-se agora</a></p>
-</div>
-</div>
-<div id="registerForm" class="auth-form">
-<div class="form-header">
-<h3><i class="fas fa-user-plus"></i> Criar Conta</h3>
-<p>Junte-se a nossa comunidade de aprendizes</p>
-</div>
-<form id="registerFormElement">
-<div class="form-group">
-<label for="registerName">
-<i class="fas fa-user"></i>
-<span>Nome Completo</span>
-</label>
-<input type="text" id="registerName" placeholder="Seu nome completo" required>
-</div>
-<div class="form-group">
-<label for="registerEmail">
-<i class="fas fa-envelope"></i>
-<span>E-mail</span>
-</label>
-<input type="email" id="registerEmail" placeholder="seu@email.com" required>
-</div>
-<div class="form-group">
-<label for="registerPassword">
-<i class="fas fa-lock"></i>
-<span>Senha</span>
-</label>
-<div class="password-input">
-<input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
-<button type="button" class="toggle-password" id="toggleRegisterPassword">
-<i class="fas fa-eye"></i>
-</button>
-</div>
-<small class="password-hint">A senha deve ter pelo menos 6 caracteres</small>
-</div>
-<div class="form-group">
-<label for="registerConfirmPassword">
-<i class="fas fa-lock"></i>
-<span>Confirmar Senha</span>
-</label>
-<div class="password-input">
-<input type="password" id="registerConfirmPassword" placeholder="Digite a senha novamente" required>
-<button type="button" class="toggle-password" id="toggleRegisterConfirmPassword">
-<i class="fas fa-eye"></i>
-</button>
-</div>
-</div>
-<div class="form-group">
-<label for="userType">
-<i class="fas fa-users"></i>
-<span>Tipo de Conta</span>
-</label>
-<select id="userType" required>
-<option value="" disabled selected>Selecione o tipo de conta</option>
-<option value="student">Aluno</option>
-<option value="admin" id="adminOption" disabled>Administrador</option>
-</select>
-<small class="form-hint">Para se tornar administrador, entre em contato com o administrador atual</small>
-</div>
-<div class="form-group checkbox">
-<label for="agreeTerms" class="terms-label">
-<input type="checkbox" id="agreeTerms" required hidden>
-<span class="checkmark"></span>
-Eu concordo com os <a href="#" id="termsLink">Termos de Uso</a> e <a href="#" id="privacyLink">Política de Privacidade</a>
-</label>
-</div>
-<button type="submit" class="btn-auth btn-primary">
-<i class="fas fa-user-plus"></i>
-<span>Criar Minha Conta</span>
-</button>
-</form>
-<div class="auth-switch">
-<p>Já tem uma conta? <a href="#" id="showLogin" class="switch-link">Faça login aqui</a></p>
-</div>
-</div>
-<div id="recoverForm" class="auth-form">
-<div class="form-header">
-<h3><i class="fas fa-key"></i> Recuperar Senha</h3>
-<p>Vamos te ajudar a recuperar o acesso</p>
-</div>
-<div class="recover-info">
-<i class="fas fa-info-circle"></i>
-<p>Digite seu e-mail cadastrado para receber um link de recuperação de senha.</p>
-</div>
-<form id="recoverFormElement">
-<div class="form-group">
-<label for="recoverEmail">
-<i class="fas fa-envelope"></i>
-<span>E-mail</span>
-</label>
-<input type="email" id="recoverEmail" placeholder="seu@email.com" required>
-</div>
-<button type="submit" class="btn-auth btn-primary">
-<i class="fas fa-paper-plane"></i>
-<span>Enviar Link de Recuperação</span>
-</button>
-</form>
-<div class="auth-switch">
-<p>Lembrou sua senha? <a href="#" id="showLoginFromRecover" class="switch-link">Fazer login</a></p>
-</div>
-</div>
-</div>
-</div>
-<div class="auth-footer">
-<div class="footer-content">
-<p>&copy; 2024 MathKids Pro. Todos os direitos reservados.</p>
-<div class="footer-links">
-<a href="#" id="termsLinkFooter">Termos de Uso</a>
-<a href="#" id="privacyLinkFooter">Privacidade</a>
-<a href="#" id="contactLink">Contato</a>
-</div>
-<p class="version">Versão 2.1.0</p>
-</div>
-</div>
-</div>
-</div>
-<div id="appScreen" class="app-screen">
-<header class="app-header">
-<div class="container">
-<div class="header-left">
-<button class="menu-toggle" id="menuToggle">
-<i class="fas fa-bars"></i>
-</button>
-<div class="logo">
-<i class="fas fa-calculator"></i>
-<div class="logo-text">
-<h1>Math<span>Kids</span></h1>
-<span class="pro-badge">PRO</span>
-</div>
-</div>
-</div>
-<div class="header-center">
-<nav class="main-nav">
-<ul>
-<li><a href="#dashboard" class="nav-link active" data-section="dashboard">
-<i class="fas fa-home"></i>
-<span>Início</span>
-</a></li>
-<li><a href="#learn" class="nav-link" data-section="learn">
-<i class="fas fa-book-open"></i>
-<span>Aprender</span>
-</a></li>
-<li><a href="#practice" class="nav-link" data-section="practice">
-<i class="fas fa-dumbbell"></i>
-<span>Praticar</span>
-</a></li>
-<li><a href="#games" class="nav-link" data-section="games">
-<i class="fas fa-gamepad"></i>
-<span>Jogos</span>
-</a></li>
-<li><a href="#progress" class="nav-link" data-section="progress">
-<i class="fas fa-chart-line"></i>
-<span>Progresso</span>
-</a></li>
-<li id="adminNav" style="display: none;"><a href="#admin" class="nav-link" data-section="admin">
-<i class="fas fa-cogs"></i>
-<span>Admin</span>
-</a></li>
-</ul>
-</nav>
-</div>
-<div class="header-right">
-<div class="quick-actions">
-<button class="btn-quick" id="quickPractice" title="Prática Rápida">
-<i class="fas fa-bolt"></i>
-</button>
-<button class="btn-quick" id="quickGame" title="Jogo Rápido">
-<i class="fas fa-gamepad"></i>
-</button>
-</div>
-<div class="notifications" id="notificationsToggle">
-<i class="fas fa-bell"></i>
-<span class="notification-badge" id="notificationCount">0</span>
-</div>
-<div class="user-menu">
-<div class="user-info" id="userDropdownToggle">
-<div class="user-avatar">
-<span id="userAvatarInitials">U</span>
-</div>
-<div class="user-details">
-<span class="user-name" id="userName">Carregando...</span>
-<span class="user-role" id="userRole">Aluno</span>
-</div>
-<i class="fas fa-chevron-down"></i>
-</div>
-<div class="dropdown-menu" id="userDropdown">
-<div class="dropdown-header">
-<div class="dropdown-avatar">
-<span id="dropdownAvatarInitials">U</span>
-</div>
-<div class="dropdown-user-info">
-<strong id="dropdownUserName">Usuário</strong>
-<span class="badge" id="dropdownUserRole">Aluno</span>
-</div>
-</div>
-<div class="dropdown-divider"></div>
-<a href="#profile" class="dropdown-item">
-<i class="fas fa-user"></i>
-<span>Meu Perfil</span>
-</a>
-<a href="#settings" class="dropdown-item">
-<i class="fas fa-cog"></i>
-<span>Configurações</span>
-</a>
-<div class="dropdown-divider"></div>
-<button id="logoutBtn" class="dropdown-item logout">
-<i class="fas fa-sign-out-alt"></i>
-<span>Sair</span>
-</button>
-</div>
-</div>
-</div>
-</div>
-</header>
-<div class="sidebar-mobile" id="mobileSidebar">
-<div class="sidebar-header">
-<div class="user-info">
-<div class="user-avatar">
-<span id="mobileAvatarInitials">U</span>
-</div>
-<div class="user-details">
-<span class="user-name" id="mobileUserName">Usuário</span>
-<span class="user-role" id="mobileUserRole">Aluno</span>
-</div>
-</div>
-<button class="close-sidebar" id="closeSidebar">
-<i class="fas fa-times"></i>
-</button>
-</div>
-<nav class="sidebar-nav">
-<a href="#dashboard" class="sidebar-link active">
-<i class="fas fa-home"></i>
-<span>Início</span>
-</a>
-<a href="#learn" class="sidebar-link">
-<i class="fas fa-book-open"></i>
-<span>Aprender</span>
-</a>
-<a href="#practice" class="sidebar-link">
-<i class="fas fa-dumbbell"></i>
-<span>Praticar</span>
-</a>
-<a href="#games" class="sidebar-link">
-<i class="fas fa-gamepad"></i>
-<span>Jogos</span>
-</a>
-<a href="#progress" class="sidebar-link">
-<i class="fas fa-chart-line"></i>
-<span>Progresso</span>
-</a>
-<a href="#admin" class="sidebar-link" id="mobileAdminLink" style="display: none;">
-<i class="fas fa-cogs"></i>
-<span>Admin</span>
-</a>
-<div class="sidebar-divider"></div>
-<a href="#profile" class="sidebar-link">
-<i class="fas fa-user"></i>
-<span>Perfil</span>
-</a>
-<a href="#settings" class="sidebar-link">
-<i class="fas fa-cog"></i>
-<span>Configurações</span>
-</a>
-<button id="mobileLogoutBtn" class="sidebar-link logout">
-<i class="fas fa-sign-out-alt"></i>
-<span>Sair</span>
-</button>
-</nav>
-<div class="sidebar-footer">
-<p>&copy; 2024 MathKids Pro</p>
-</div>
-</div>
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
-<main class="app-main">
-<div class="container">
-<section id="dashboard" class="app-section active">
-<div class="section-header">
-<div class="header-content">
-<h2><i class="fas fa-home"></i> Dashboard</h2>
-<p>Bem-vindo de volta, <span id="welcomeUserName" class="highlight">Usuário</span>! Veja suas atividades recentes.</p>
-</div>
-<div class="header-actions">
-<button class="btn-action" id="refreshDashboard">
-<i class="fas fa-sync-alt"></i>
-Atualizar
-</button>
-</div>
-</div>
-<div class="dashboard-content">
-<div class="stats-grid">
-<div class="stat-card primary">
-<div class="stat-icon">
-<i class="fas fa-check-circle"></i>
-</div>
-<div class="stat-info">
-<h3 id="statExercises">0</h3>
-<p>Exercícios Concluídos</p>
-</div>
-<div class="stat-trend">
-<i class="fas fa-arrow-up"></i>
-<span>+12%</span>
-</div>
-</div>
-<div class="stat-card success">
-<div class="stat-icon">
-<i class="fas fa-percentage"></i>
-</div>
-<div class="stat-info">
-<h3 id="statAccuracy">0%</h3>
-<p>Taxa de Acerto</p>
-</div>
-<div class="stat-trend">
-<i class="fas fa-arrow-up"></i>
-<span>+5%</span>
-</div>
-</div>
-<div class="stat-card warning">
-<div class="stat-icon">
-<i class="fas fa-clock"></i>
-</div>
-<div class="stat-info">
-<h3 id="statTime">0 min</h3>
-<p>Tempo de Prática</p>
-</div>
-<div class="stat-trend">
-<i class="fas fa-arrow-up"></i>
-<span>+25%</span>
-</div>
-</div>
-<div class="stat-card danger">
-<div class="stat-icon">
-<i class="fas fa-trophy"></i>
-</div>
-<div class="stat-info">
-<h3 id="statLevel">Iniciante</h3>
-<p>Seu Nível</p>
-</div>
-<div class="stat-trend">
-<i class="fas fa-star"></i>
-<span>Próximo: 50xp</span>
-</div>
-</div>
-</div>
-<div class="content-grid">
-<div class="card recent-activities">
-<div class="card-header">
-<h3><i class="fas fa-history"></i> Atividades Recentes</h3>
-<a href="#" class="view-all">Ver todas</a>
-</div>
-<div class="card-body">
-<div class="activities-list" id="activitiesList">
-</div>
-</div>
-</div>
-<div class="card practice-quick">
-<div class="card-header">
-<h3><i class="fas fa-bolt"></i> Praticar Agora</h3>
-<p>Escolha uma operação para começar</p>
-</div>
-<div class="card-body">
-<div class="operations-quick">
-<div class="operation-quick" data-operation="addition">
-<div class="operation-icon">
-<i class="fas fa-plus"></i>
-</div>
-<span>Adição</span>
-</div>
-<div class="operation-quick" data-operation="subtraction">
-<div class="operation-icon">
-<i class="fas fa-minus"></i>
-</div>
-<span>Subtração</span>
-</div>
-<div class="operation-quick" data-operation="multiplication">
-<div class="operation-icon">
-<i class="fas fa-times"></i>
-</div>
-<span>Multiplicação</span>
-</div>
-<div class="operation-quick" data-operation="division">
-<div class="operation-icon">
-<i class="fas fa-divide"></i>
-</div>
-<span>Divisão</span>
-</div>
-</div>
-</div>
-</div>
-<div class="card next-challenges">
-<div class="card-header">
-<h3><i class="fas fa-flag-checkered"></i> Seus Desafios</h3>
-<a href="#" class="view-all">Ver mais</a>
-</div>
-<div class="card-body">
-<div class="challenges-list" id="challengesList">
-</div>
-</div>
-</div>
-<div class="card daily-progress">
-<div class="card-header">
-<h3><i class="fas fa-chart-bar"></i> Progresso Hoje</h3>
-</div>
-<div class="card-body">
-<div class="progress-stats">
-<div class="progress-item">
-<span>Exercícios</span>
-<div class="progress-bar">
-<div class="progress-fill" style="width: 60%"></div>
-</div>
-<span>6/10</span>
-</div>
-<div class="progress-item">
-<span>Acertos</span>
-<div class="progress-bar">
-<div class="progress-fill" style="width: 80%"></div>
-</div>
-<span>80%</span>
-</div>
-<div class="progress-item">
-<span>Tempo</span>
-<div class="progress-bar">
-<div class="progress-fill" style="width: 45%"></div>
-</div>
-<span>27/60 min</span>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="learn" class="app-section">
-<div class="section-header">
-<div class="header-content">
-<h2><i class="fas fa-book-open"></i> Aprender</h2>
-<p>Explore lições interativas sobre as quatro operações matemáticas básicas.</p>
-</div>
-</div>
-<div class="learn-content">
-<div class="lessons-grid" id="lessonsGrid">
-</div>
-<div class="active-lesson" id="activeLesson">
-<div class="lesson-container">
-<div class="lesson-header">
-<h3 id="lessonTitle">Selecione uma lição para começar</h3>
-<button class="btn-close-lesson" id="closeLesson">
-<i class="fas fa-times"></i>
-</button>
-</div>
-<div class="lesson-content" id="lessonContent">
-<p class="lesson-welcome">Escolha uma das lições acima para ver a explicação detalhada e começar a aprender.</p>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="practice" class="app-section">
-</section>
-<section id="games" class="app-section">
-<div class="section-header">
-<div class="header-content">
-<h2><i class="fas fa-gamepad"></i> Jogos Educativos</h2>
-<p>Aprenda matemática de forma divertida com nossos jogos!</p>
-</div>
-</div>
-<div class="games-content">
-<div class="games-grid">
-<div class="game-card" id="lightningGame">
-<div class="game-header">
-<div class="game-icon">
-<i class="fas fa-bolt"></i>
-</div>
-<div class="game-badge">Popular</div>
-</div>
-<h3>Desafio Relâmpago</h3>
-<p>Resolva o máximo de multiplicações em 60 segundos!</p>
-<div class="game-stats">
-<span><i class="fas fa-trophy"></i> Seu recorde: <span id="lightningHighScore">0</span></span>
-</div>
-<button class="btn-game">Jogar Agora</button>
-</div>
-<div class="game-card" id="divisionPuzzle">
-<div class="game-header">
-<div class="game-icon">
-<i class="fas fa-puzzle-piece"></i>
-</div>
-<div class="game-badge">Novo</div>
-</div>
-<h3>Quebra-cabeça da Divisão</h3>
-<p>Complete o quebra-cabeça resolvendo problemas de divisão.</p>
-<div class="game-stats">
-<span><i class="fas fa-star"></i> Nível: <span id="divisionLevel">1</span></span>
-</div>
-<button class="btn-game">Jogar Agora</button>
-</div>
-<div class="game-card" id="mathChampionship">
-<div class="game-header">
-<div class="game-icon">
-<i class="fas fa-trophy"></i>
-</div>
-<div class="game-badge">Competitivo</div>
-</div>
-<h3>Campeonato MathKids</h3>
-<p>Enfrente operações mistas e suba no ranking.</p>
-<div class="game-stats">
-<span><i class="fas fa-medal"></i> Posição: #<span id="championshipRank">--</span></span>
-</div>
-<button class="btn-game">Jogar Agora</button>
-</div>
-<!-- Novo Jogo Racha Cuca -->
-<div class="game-card" id="rachacucaGame">
-<div class="game-header">
-<div class="game-icon">
-<i class="fas fa-brain"></i>
-</div>
-<div class="game-badge">Lógica</div>
-</div>
-<h3>Racha Cuca</h3>
-<p>Quebra-cabeça clássico para estimular o raciocínio lógico e a concentração.</p>
-<div class="game-stats">
-<span><i class="fas fa-trophy"></i> Seu recorde: <span id="rachacucaHighScore">0</span></span>
-</div>
-<button class="btn-game">Jogar Agora</button>
-</div>
-</div>
-<div class="game-container" id="gameContainer">
-<div class="game-welcome">
-<h3>Selecione um jogo para começar!</h3>
-<p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
-<p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
-</div>
-</div>
-<!-- Container específico para o jogo Racha Cuca -->
-<div class="game-container" id="rachacucaContainer" style="display: none;">
-<div class="rachacuca-game">
-<div class="game-header">
-<h3><i class="fas fa-brain"></i> Racha Cuca</h3>
-<div class="game-stats">
-<div class="stat">
-<span>Movimentos:</span>
-<span id="rachacucaMoves">0</span>
-</div>
-<div class="stat">
-<span>Tempo:</span>
-<span id="rachacucaTimer">00:00</span>
-</div>
-<div class="stat">
-<span>Dificuldade:</span>
-<span id="rachacucaDifficulty">Normal</span>
-</div>
-</div>
-</div>
-<div class="rachacuca-content">
-<div class="puzzle-container">
-<div id="puzzle-board" class="puzzle-board">
-<!-- As peças do quebra-cabeça serão geradas via JavaScript -->
-</div>
-<div class="puzzle-controls">
-<button id="rachacuca-shuffle-btn" class="btn-control">
-<i class="fas fa-shuffle"></i> Embaralhar
-</button>
-<button id="rachacuca-solve-btn" class="btn-control">
-<i class="fas fa-lightbulb"></i> Ver Solução
-</button>
-<button id="rachacuca-reset-btn" class="btn-control">
-<i class="fas fa-redo"></i> Reiniciar
-</button>
-<button id="rachacuca-hint-btn" class="btn-control">
-<i class="fas fa-question-circle"></i> Dica
-</button>
-</div>
-</div>
-<div class="game-sidebar">
-<div class="instructions">
-<h4>Como Jogar</h4>
-<p>Arraste as peças para o espaço vazio para reorganizá-las na ordem correta.</p>
-<p>O objetivo é ordenar os números de 1 a 15 da esquerda para a direita e de cima para baixo, com o espaço vazio no canto inferior direito.</p>
-<div class="difficulty-selector">
-<h5>Dificuldade</h5>
-<div class="difficulty-options">
-<button class="difficulty-btn active" data-difficulty="easy">Fácil</button>
-<button class="difficulty-btn" data-difficulty="normal">Normal</button>
-<button class="difficulty-btn" data-difficulty="hard">Difícil</button>
-</div>
-</div>
-<div class="completion-message" id="completion-message">
-<h4>🎉 Parabéns!</h4>
-<p>Você completou o quebra-cabeça em <span id="final-moves">0</span> movimentos e <span id="final-time">00:00</span>!</p>
-<button id="play-again-btn" class="btn-primary">
-<i class="fas fa-play"></i> Jogar Novamente
-</button>
-</div>
-</div>
-<div class="solution-preview">
-<h4>Solução</h4>
-<div class="solution-board">
-<!-- Grade de solução será gerada via JavaScript -->
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="progress" class="app-section">
-</section>
-<section id="admin" class="app-section">
-</section>
-</div>
-</main>
-<div class="notifications-panel" id="notificationsPanel">
-<div class="notifications-header">
-<h3><i class="fas fa-bell"></i> Notificações</h3>
-<button class="btn-clear" id="clearNotifications">Limpar Todas</button>
-</div>
-<div class="notifications-list" id="notificationsList">
-</div>
-</div>
-<div class="modal" id="profileModal">
-<div class="modal-content">
-<div class="modal-header">
-<h3><i class="fas fa-user"></i> Meu Perfil</h3>
-<button class="close-modal">&times;</button>
-</div>
-<div class="modal-body" id="profileModalBody">
-</div>
-</div>
-</div>
-<div class="modal" id="settingsModal">
-<div class="modal-content">
-<div class="modal-header">
-<h3><i class="fas fa-cog"></i> Configurações</h3>
-<button class="close-modal">&times;</button>
-</div>
-<div class="modal-body" id="settingsModalBody">
-</div>
-</div>
-</div>
-<div class="modal" id="termsModal">
-<div class="modal-content">
-<div class="modal-header">
-<h3><i class="fas fa-file-contract"></i> Termos de Uso</h3>
-<button class="close-modal">&times;</button>
-</div>
-<div class="modal-body">
-<div class="terms-content">
-<h4>1. Aceitação dos Termos</h4>
-<p>Ao acessar e usar o MathKids Pro, você concorda com estes termos de uso.</p>
-<h4>2. Uso da Plataforma</h4>
-<p>A plataforma é destinada ao aprendizado de matemática para estudantes do ensino fundamental.</p>
-<h4>3. Conta do Usuário</h4>
-<p>Você é responsável por manter a confidencialidade de sua conta e senha.</p>
-<h4>4. Privacidade</h4>
-<p>Respeitamos sua privacidade conforme nossa política de privacidade.</p>
-<h4>5. Limitações</h4>
-<p>O uso indevido da plataforma pode resultar na suspensão da conta.</p>
-</div>
-</div>
-</div>
-</div>
-<div class="modal" id="privacyModal">
-<div class="modal-content">
-<div class="modal-header">
-<h3><i class="fas fa-shield-alt"></i> Política de Privacidade</h3>
-<button class="close-modal">&times;</button>
-</div>
-<div class="modal-body">
-<div class="privacy-content">
-<h4>1. Informações Coletadas</h4>
-<p>Coletamos informações necessárias para o funcionamento da plataforma e melhoria da experiência do usuário.</p>
-<h4>2. Uso das Informações</h4>
-<p>As informações são usadas para personalizar o aprendizado e gerar estatísticas de progresso.</p>
-<h4>3. Segurança</h4>
-<p>Implementamos medidas de segurança para proteger suas informações.</p>
-<h4>4. Compartilhamento</h4>
-<p>Não compartilhamos suas informações pessoais com terceiros sem seu consentimento.</p>
-<h4>5. Seus Direitos</h4>
-<p>Você tem direito a acessar, corrigir e excluir suas informações pessoais.</p>
-</div>
-</div>
-</div>
-</div>
-<div class="modal" id="contactModal">
-<div class="modal-content">
-<div class="modal-header">
-<h3><i class="fas fa-envelope"></i> Contato</h3>
-<button class="close-modal">&times;</button>
-</div>
-<div class="modal-body">
-<div class="contact-content">
-<h4>Entre em Contato</h4>
-<p>Tem dúvidas ou sugestões? Entre em contato conosco!</p>
-<div class="contact-info">
-<div class="contact-item">
-<i class="fas fa-envelope"></i>
-<span>contato@mathkidspro.com</span>
-</div>
-<div class="contact-item">
-<i class="fas fa-phone"></i>
-<span>(11) 99999-9999</span>
-</div>
-<div class="contact-item">
-<i class="fas fa-clock"></i>
-<span>Segunda a Sexta, 9h às 18h</span>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="loading-overlay" id="loadingOverlay">
-<div class="loading-content">
-<div class="loading-spinner">
-<i class="fas fa-calculator"></i>
-</div>
-<p>Carregando...</p>
-</div>
-</div>
-<div class="toast-container" id="toastContainer"></div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="script.js"></script>
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="logo">
+                    <i class="fas fa-calculator"></i>
+                    <div class="logo-text">
+                        <h1>Math<span>Kids</span></h1>
+                        <span class="pro-badge">PRO</span>
+                    </div>
+                </div>
+                <p class="tagline">Aprenda matemática de forma divertida e interativa</p>
+            </div>
+            
+            <div class="auth-content">
+                <div class="welcome-section">
+                    <h2>Bem-vindo ao MathKids Pro!</h2>
+                    <p>Uma plataforma educacional completa para alunos do 4º ao 9º ano aprenderem matemática de forma divertida e eficaz.</p>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsStudents">0</h3>
+                                <p>Alunos Ativos</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsRating">0.0</h3>
+                                <p>Avaliação Média</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsImprovement">0%</h3>
+                                <p>Melhoria no Aprendizado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="features-grid">
+                        <div class="feature" data-feature="games">
+                            <i class="fas fa-gamepad"></i>
+                            <h4>Jogos Educativos</h4>
+                            <p>Diversão garantida enquanto aprende</p>
+                        </div>
+                        <div class="feature" data-feature="progress">
+                            <i class="fas fa-chart-line"></i>
+                            <h4>Acompanhamento</h4>
+                            <p>Veja sua evolução no aprendizado</p>
+                        </div>
+                        <div class="feature" data-feature="challenges">
+                            <i class="fas fa-trophy"></i>
+                            <h4>Desafios</h4>
+                            <p>Conquiste medalhas e reconhecimento</p>
+                        </div>
+                        <div class="feature" data-feature="community">
+                            <i class="fas fa-users"></i>
+                            <h4>Comunidade</h4>
+                            <p>Aprenda com outros estudantes</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="auth-forms">
+                    <div id="loginForm" class="auth-form active">
+                        <div class="form-header">
+                            <h3><i class="fas fa-sign-in-alt"></i> Fazer Login</h3>
+                            <p>Acesse sua conta para continuar aprendendo</p>
+                        </div>
+                        <form id="loginFormElement">
+                            <div class="form-group">
+                                <label for="loginEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
+                                <input type="email" id="loginEmail" placeholder="seu@email.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="loginPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Senha</span>
+                                </label>
+                                <div class="password-input">
+                                    <input type="password" id="loginPassword" placeholder="Sua senha" required>
+                                    <button type="button" class="toggle-password" id="toggleLoginPassword">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox">
+                                    <input type="checkbox" id="rememberMe" hidden>
+                                    <span class="checkmark"></span>
+                                    Lembrar-me
+                                </label>
+                                <a href="#" id="forgotPasswordLink" class="forgot-link">Esqueci a senha</a>
+                            </div>
+                            <button type="submit" class="btn-auth btn-primary">
+                                <i class="fas fa-sign-in-alt"></i>
+                                <span>Entrar na Conta</span>
+                            </button>
+                        </form>
+                        <div class="auth-switch">
+                            <p>Não tem uma conta? <a href="#" id="showRegister" class="switch-link">Cadastre-se agora</a></p>
+                        </div>
+                    </div>
+                    
+                    <div id="registerForm" class="auth-form">
+                        <div class="form-header">
+                            <h3><i class="fas fa-user-plus"></i> Criar Conta</h3>
+                            <p>Junte-se a nossa comunidade de aprendizes</p>
+                        </div>
+                        <form id="registerFormElement">
+                            <div class="form-group">
+                                <label for="registerName">
+                                    <i class="fas fa-user"></i>
+                                    <span>Nome Completo</span>
+                                </label>
+                                <input type="text" id="registerName" placeholder="Seu nome completo" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="registerEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
+                                <input type="email" id="registerEmail" placeholder="seu@email.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="registerPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Senha</span>
+                                </label>
+                                <div class="password-input">
+                                    <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
+                                    <button type="button" class="toggle-password" id="toggleRegisterPassword">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <small class="password-hint">A senha deve ter pelo menos 6 caracteres</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="registerConfirmPassword">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Confirmar Senha</span>
+                                </label>
+                                <div class="password-input">
+                                    <input type="password" id="registerConfirmPassword" placeholder="Digite a senha novamente" required>
+                                    <button type="button" class="toggle-password" id="toggleRegisterConfirmPassword">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="userType">
+                                    <i class="fas fa-users"></i>
+                                    <span>Tipo de Conta</span>
+                                </label>
+                                <select id="userType" required>
+                                    <option value="" disabled selected>Selecione o tipo de conta</option>
+                                    <option value="student">Aluno</option>
+                                    <option value="admin" id="adminOption" disabled>Administrador</option>
+                                </select>
+                                <small class="form-hint">Para se tornar administrador, entre em contato com o administrador atual</small>
+                            </div>
+                            <div class="form-group checkbox">
+                                <label for="agreeTerms" class="terms-label">
+                                    <input type="checkbox" id="agreeTerms" required hidden>
+                                    <span class="checkmark"></span>
+                                    Eu concordo com os <a href="#" id="termsLink">Termos de Uso</a> e <a href="#" id="privacyLink">Política de Privacidade</a>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn-auth btn-primary">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Criar Minha Conta</span>
+                            </button>
+                        </form>
+                        <div class="auth-switch">
+                            <p>Já tem uma conta? <a href="#" id="showLogin" class="switch-link">Faça login aqui</a></p>
+                        </div>
+                    </div>
+                    
+                    <div id="recoverForm" class="auth-form">
+                        <div class="form-header">
+                            <h3><i class="fas fa-key"></i> Recuperar Senha</h3>
+                            <p>Vamos te ajudar a recuperar o acesso</p>
+                        </div>
+                        <div class="recover-info">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Digite seu e-mail cadastrado para receber um link de recuperação de senha.</p>
+                        </div>
+                        <form id="recoverFormElement">
+                            <div class="form-group">
+                                <label for="recoverEmail">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>E-mail</span>
+                                </label>
+                                <input type="email" id="recoverEmail" placeholder="seu@email.com" required>
+                            </div>
+                            <button type="submit" class="btn-auth btn-primary">
+                                <i class="fas fa-paper-plane"></i>
+                                <span>Enviar Link de Recuperação</span>
+                            </button>
+                        </form>
+                        <div class="auth-switch">
+                            <p>Lembrou sua senha? <a href="#" id="showLoginFromRecover" class="switch-link">Fazer login</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="auth-footer">
+                <div class="footer-content">
+                    <p>&copy; 2024 MathKids Pro. Todos os direitos reservados.</p>
+                    <div class="footer-links">
+                        <a href="#" id="termsLinkFooter">Termos de Uso</a>
+                        <a href="#" id="privacyLinkFooter">Privacidade</a>
+                        <a href="#" id="contactLink">Contato</a>
+                    </div>
+                    <p class="version">Versão 2.1.0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="appScreen" class="app-screen">
+        <header class="app-header">
+            <div class="container">
+                <div class="header-left">
+                    <button class="menu-toggle" id="menuToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="logo">
+                        <i class="fas fa-calculator"></i>
+                        <div class="logo-text">
+                            <h1>Math<span>Kids</span></h1>
+                            <span class="pro-badge">PRO</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-center">
+                    <nav class="main-nav">
+                        <ul>
+                            <li><a href="#dashboard" class="nav-link active" data-section="dashboard">
+                                <i class="fas fa-home"></i>
+                                <span>Início</span>
+                            </a></li>
+                            <li><a href="#learn" class="nav-link" data-section="learn">
+                                <i class="fas fa-book-open"></i>
+                                <span>Aprender</span>
+                            </a></li>
+                            <li><a href="#practice" class="nav-link" data-section="practice">
+                                <i class="fas fa-dumbbell"></i>
+                                <span>Praticar</span>
+                            </a></li>
+                            <li><a href="#games" class="nav-link" data-section="games">
+                                <i class="fas fa-gamepad"></i>
+                                <span>Jogos</span>
+                            </a></li>
+                            <li><a href="#progress" class="nav-link" data-section="progress">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Progresso</span>
+                            </a></li>
+                            <li id="adminNav" style="display: none;"><a href="#admin" class="nav-link" data-section="admin">
+                                <i class="fas fa-cogs"></i>
+                                <span>Admin</span>
+                            </a></li>
+                        </ul>
+                    </nav>
+                </div>
+                
+                <div class="header-right">
+                    <div class="quick-actions">
+                        <button class="btn-quick" id="quickPractice" title="Prática Rápida">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                        <button class="btn-quick" id="quickGame" title="Jogo Rápido">
+                            <i class="fas fa-gamepad"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="notifications" id="notificationsToggle">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationCount">0</span>
+                    </div>
+                    
+                    <div class="user-menu">
+                        <div class="user-info" id="userDropdownToggle">
+                            <div class="user-avatar">
+                                <span id="userAvatarInitials">U</span>
+                            </div>
+                            <div class="user-details">
+                                <span class="user-name" id="userName">Carregando...</span>
+                                <span class="user-role" id="userRole">Aluno</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="dropdown-menu" id="userDropdown">
+                            <div class="dropdown-header">
+                                <div class="dropdown-avatar">
+                                    <span id="dropdownAvatarInitials">U</span>
+                                </div>
+                                <div class="dropdown-user-info">
+                                    <strong id="dropdownUserName">Usuário</strong>
+                                    <span class="badge" id="dropdownUserRole">Aluno</span>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="#profile" class="dropdown-item">
+                                <i class="fas fa-user"></i>
+                                <span>Meu Perfil</span>
+                            </a>
+                            <a href="#settings" class="dropdown-item">
+                                <i class="fas fa-cog"></i>
+                                <span>Configurações</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <button id="logoutBtn" class="dropdown-item logout">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Sair</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="sidebar-mobile" id="mobileSidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <span id="mobileAvatarInitials">U</span>
+                    </div>
+                    <div class="user-details">
+                        <span class="user-name" id="mobileUserName">Usuário</span>
+                        <span class="user-role" id="mobileUserRole">Aluno</span>
+                    </div>
+                </div>
+                <button class="close-sidebar" id="closeSidebar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="sidebar-link active">
+                    <i class="fas fa-home"></i>
+                    <span>Início</span>
+                </a>
+                <a href="#learn" class="sidebar-link">
+                    <i class="fas fa-book-open"></i>
+                    <span>Aprender</span>
+                </a>
+                <a href="#practice" class="sidebar-link">
+                    <i class="fas fa-dumbbell"></i>
+                    <span>Praticar</span>
+                </a>
+                <a href="#games" class="sidebar-link">
+                    <i class="fas fa-gamepad"></i>
+                    <span>Jogos</span>
+                </a>
+                <a href="#progress" class="sidebar-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Progresso</span>
+                </a>
+                <a href="#admin" class="sidebar-link" id="mobileAdminLink" style="display: none;">
+                    <i class="fas fa-cogs"></i>
+                    <span>Admin</span>
+                </a>
+                <div class="sidebar-divider"></div>
+                <a href="#profile" class="sidebar-link">
+                    <i class="fas fa-user"></i>
+                    <span>Perfil</span>
+                </a>
+                <a href="#settings" class="sidebar-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Configurações</span>
+                </a>
+                <button id="mobileLogoutBtn" class="sidebar-link logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Sair</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>&copy; 2024 MathKids Pro</p>
+            </div>
+        </div>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <main class="app-main">
+            <div class="container">
+                <section id="dashboard" class="app-section active">
+                    <div class="section-header">
+                        <div class="header-content">
+                            <h2><i class="fas fa-home"></i> Dashboard</h2>
+                            <p>Bem-vindo de volta, <span id="welcomeUserName" class="highlight">Usuário</span>! Veja suas atividades recentes.</p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn-action" id="refreshDashboard">
+                                <i class="fas fa-sync-alt"></i>
+                                Atualizar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-content">
+                        <div class="stats-grid">
+                            <div class="stat-card primary">
+                                <div class="stat-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3 id="statExercises">0</h3>
+                                    <p>Exercícios Concluídos</p>
+                                </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+12%</span>
+                                </div>
+                            </div>
+                            <div class="stat-card success">
+                                <div class="stat-icon">
+                                    <i class="fas fa-percentage"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3 id="statAccuracy">0%</h3>
+                                    <p>Taxa de Acerto</p>
+                                </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+5%</span>
+                                </div>
+                            </div>
+                            <div class="stat-card warning">
+                                <div class="stat-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3 id="statTime">0 min</h3>
+                                    <p>Tempo de Prática</p>
+                                </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+25%</span>
+                                </div>
+                            </div>
+                            <div class="stat-card danger">
+                                <div class="stat-icon">
+                                    <i class="fas fa-trophy"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3 id="statLevel">Iniciante</h3>
+                                    <p>Seu Nível</p>
+                                </div>
+                                <div class="stat-trend">
+                                    <i class="fas fa-star"></i>
+                                    <span>Próximo: 50xp</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="content-grid">
+                            <div class="card recent-activities">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-history"></i> Atividades Recentes</h3>
+                                    <a href="#" class="view-all">Ver todas</a>
+                                </div>
+                                <div class="card-body">
+                                    <div class="activities-list" id="activitiesList">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card practice-quick">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-bolt"></i> Praticar Agora</h3>
+                                    <p>Escolha uma operação para começar</p>
+                                </div>
+                                <div class="card-body">
+                                    <div class="operations-quick">
+                                        <div class="operation-quick" data-operation="addition">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-plus"></i>
+                                            </div>
+                                            <span>Adição</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="subtraction">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-minus"></i>
+                                            </div>
+                                            <span>Subtração</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="multiplication">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-times"></i>
+                                            </div>
+                                            <span>Multiplicação</span>
+                                        </div>
+                                        <div class="operation-quick" data-operation="division">
+                                            <div class="operation-icon">
+                                                <i class="fas fa-divide"></i>
+                                            </div>
+                                            <span>Divisão</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card next-challenges">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-flag-checkered"></i> Seus Desafios</h3>
+                                    <a href="#" class="view-all">Ver mais</a>
+                                </div>
+                                <div class="card-body">
+                                    <div class="challenges-list" id="challengesList">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card daily-progress">
+                                <div class="card-header">
+                                    <h3><i class="fas fa-chart-bar"></i> Progresso Hoje</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="progress-stats">
+                                        <div class="progress-item">
+                                            <span>Exercícios</span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 60%"></div>
+                                            </div>
+                                            <span>6/10</span>
+                                        </div>
+                                        <div class="progress-item">
+                                            <span>Acertos</span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 80%"></div>
+                                            </div>
+                                            <span>80%</span>
+                                        </div>
+                                        <div class="progress-item">
+                                            <span>Tempo</span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 45%"></div>
+                                            </div>
+                                            <span>27/60 min</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="learn" class="app-section">
+                    <div class="section-header">
+                        <div class="header-content">
+                            <h2><i class="fas fa-book-open"></i> Aprender</h2>
+                            <p>Explore lições interativas sobre as quatro operações matemáticas básicas.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="learn-content">
+                        <div class="lessons-grid" id="lessonsGrid">
+                        </div>
+                        
+                        <div class="active-lesson" id="activeLesson">
+                            <div class="lesson-container">
+                                <div class="lesson-header">
+                                    <h3 id="lessonTitle">Selecione uma lição para começar</h3>
+                                    <button class="btn-close-lesson" id="closeLesson">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="lesson-content" id="lessonContent">
+                                    <p class="lesson-welcome">Escolha uma das lições acima para ver a explicação detalhada e começar a aprender.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="practice" class="app-section">
+                </section>
+                
+                <section id="games" class="app-section">
+                </section>
+                
+                <section id="progress" class="app-section">
+                </section>
+                
+                <section id="admin" class="app-section">
+                </section>
+            </div>
+        </main>
+
+        <div class="notifications-panel" id="notificationsPanel">
+            <div class="notifications-header">
+                <h3><i class="fas fa-bell"></i> Notificações</h3>
+                <button class="btn-clear" id="clearNotifications">Limpar Todas</button>
+            </div>
+            <div class="notifications-list" id="notificationsList">
+            </div>
+        </div>
+
+        <div class="modal" id="profileModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user"></i> Meu Perfil</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" id="profileModalBody">
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="settingsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-cog"></i> Configurações</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body" id="settingsModalBody">
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="termsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-file-contract"></i> Termos de Uso</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="terms-content">
+                        <h4>1. Aceitação dos Termos</h4>
+                        <p>Ao acessar e usar o MathKids Pro, você concorda com estes termos de uso.</p>
+                        <h4>2. Uso da Plataforma</h4>
+                        <p>A plataforma é destinada ao aprendizado de matemática para estudantes do ensino fundamental.</p>
+                        <h4>3. Conta do Usuário</h4>
+                        <p>Você é responsável por manter a confidencialidade de sua conta e senha.</p>
+                        <h4>4. Privacidade</h4>
+                        <p>Respeitamos sua privacidade conforme nossa política de privacidade.</p>
+                        <h4>5. Limitações</h4>
+                        <p>O uso indevido da plataforma pode resultar na suspensão da conta.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="privacyModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-shield-alt"></i> Política de Privacidade</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="privacy-content">
+                        <h4>1. Informações Coletadas</h4>
+                        <p>Coletamos informações necessárias para o funcionamento da plataforma e melhoria da experiência do usuário.</p>
+                        <h4>2. Uso das Informações</h4>
+                        <p>As informações são usadas para personalizar o aprendizado e gerar estatísticas de progresso.</p>
+                        <h4>3. Segurança</h4>
+                        <p>Implementamos medidas de segurança para proteger suas informações.</p>
+                        <h4>4. Compartilhamento</h4>
+                        <p>Não compartilhamos suas informações pessoais com terceiros sem seu consentimento.</p>
+                        <h4>5. Seus Direitos</h4>
+                        <p>Você tem direito a acessar, corrigir e excluir suas informações pessoais.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="contactModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-envelope"></i> Contato</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="contact-content">
+                        <h4>Entre em Contato</h4>
+                        <p>Tem dúvidas ou sugestões? Entre em contato conosco!</p>
+                        <div class="contact-info">
+                            <div class="contact-item">
+                                <i class="fas fa-envelope"></i>
+                                <span>contato@mathkidspro.com</span>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone"></i>
+                                <span>(11) 99999-9999</span>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-clock"></i>
+                                <span>Segunda a Sexta, 9h às 18h</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <i class="fas fa-calculator"></i>
+                </div>
+                <p>Carregando...</p>
+            </div>
+        </div>
+
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
