@@ -609,6 +609,26 @@
                 </section>
                 
                 <section id="games" class="app-section">
+                    <div class="section-header">
+                        <div class="header-content">
+                            <h2><i class="fas fa-gamepad"></i> Jogos Educativos</h2>
+                            <p>Aprenda matemática de forma divertida com nossos jogos!</p>
+                        </div>
+                    </div>
+                    
+                    <div class="games-content">
+                        <div class="games-grid" id="gamesGrid">
+                            <!-- Jogos serão carregados via JavaScript -->
+                        </div>
+                        
+                        <div class="game-container" id="gameContainer">
+                            <div class="game-welcome">
+                                <h3>Selecione um jogo para começar!</h3>
+                                <p>Escolha um dos jogos acima para testar suas habilidades matemáticas de forma divertida.</p>
+                                <p>Os jogos ajudam a fixar o conhecimento e melhoram a velocidade de cálculo.</p>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 
                 <section id="progress" class="app-section">
@@ -725,6 +745,141 @@
             </div>
         </div>
 
+        <!-- Modal para ranking do Racha Cuca -->
+        <div id="rachacucaScoresModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-trophy"></i> Melhores Pontuações - Racha Cuca</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="ranking-tabs">
+                        <button class="tab-btn active" data-tab="global">Global</button>
+                        <button class="tab-btn" data-tab="easy">Fácil</button>
+                        <button class="tab-btn" data-tab="normal">Normal</button>
+                        <button class="tab-btn" data-tab="hard">Difícil</button>
+                    </div>
+                    <div id="rachacucaScoresList">
+                        <p class="no-scores">Nenhuma pontuação salva ainda.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para salvar pontuação do Racha Cuca -->
+        <div id="rachacucaSaveScoreModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-save"></i> Salvar Pontuação - Racha Cuca</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="score-summary">
+                        <p>Você completou o quebra-cabeça em <strong id="rachacucaSaveMoves">0</strong> movimentos e <strong id="rachacucaSaveTime">00:00</strong>!</p>
+                        <p>Dificuldade: <strong id="rachacucaSaveDifficulty">Normal</strong></p>
+                    </div>
+                    <div class="player-input">
+                        <label for="rachacucaPlayerName">Seu nome:</label>
+                        <input type="text" id="rachacucaPlayerName" placeholder="Digite seu nome" maxlength="20">
+                        <small>Máximo 20 caracteres</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="rachacucaConfirmSaveBtn" class="btn-auth btn-primary">
+                            <i class="fas fa-check"></i> Salvar Pontuação
+                        </button>
+                        <button id="rachacucaCancelSaveBtn" class="btn-auth btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container do jogo Racha Cuca -->
+        <div id="rachacucaGameContainer" class="rachacuca-container" style="display: none;">
+            <div class="rachacuca-header">
+                <div class="rachacuca-logo">
+                    <h1><i class="fas fa-puzzle-piece"></i> RACHA-CUCA</h1>
+                    <p class="subtitle">Quebra-cabeça numérico clássico</p>
+                </div>
+                <div class="rachacuca-game-info">
+                    <div class="info-box">
+                        <span class="info-label">Movimentos</span>
+                        <span id="rachacucaMoveCounter" class="info-value">0</span>
+                    </div>
+                    <div class="info-box">
+                        <span class="info-label">Tempo</span>
+                        <span id="rachacucaTimer" class="info-value">00:00</span>
+                    </div>
+                    <div class="info-box">
+                        <span class="info-label">Dificuldade</span>
+                        <span id="rachacucaDifficulty" class="info-value">Normal</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rachacuca-main-content">
+                <div class="puzzle-container">
+                    <div id="rachacucaPuzzleBoard" class="puzzle-board">
+                        <!-- As peças do quebra-cabeça serão geradas via JavaScript -->
+                    </div>
+                    
+                    <div class="puzzle-controls">
+                        <button id="rachacucaShuffleBtn" class="btn btn-primary">
+                            <i class="fas fa-random"></i> Embaralhar
+                        </button>
+                        <button id="rachacucaSolveBtn" class="btn btn-secondary">
+                            <i class="fas fa-lightbulb"></i> Ver Solução
+                        </button>
+                        <button id="rachacucaResetBtn" class="btn btn-secondary">
+                            <i class="fas fa-redo"></i> Reiniciar
+                        </button>
+                        <button id="rachacucaHintBtn" class="btn btn-secondary">
+                            <i class="fas fa-question-circle"></i> Dica
+                        </button>
+                        <button id="rachacucaBackBtn" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar aos Jogos
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="rachacuca-game-sidebar">
+                    <div class="instructions">
+                        <h2><i class="fas fa-info-circle"></i> Como Jogar</h2>
+                        <p>Clique nas peças para movê-las para o espaço vazio e reorganizá-las na ordem correta.</p>
+                        <p>O objetivo é ordenar os números de 1 a 15 da esquerda para a direita e de cima para baixo, com o espaço vazio no canto inferior direito.</p>
+                        
+                        <div class="difficulty-selector">
+                            <h3><i class="fas fa-sliders-h"></i> Dificuldade</h3>
+                            <div class="difficulty-options">
+                                <button class="difficulty-btn active" data-difficulty="easy">Fácil</button>
+                                <button class="difficulty-btn" data-difficulty="normal">Normal</button>
+                                <button class="difficulty-btn" data-difficulty="hard">Difícil</button>
+                            </div>
+                        </div>
+                        
+                        <div class="completion-message" id="rachacucaCompletionMessage" style="display: none;">
+                            <h3><i class="fas fa-trophy"></i> Parabéns!</h3>
+                            <p>Você completou o quebra-cabeça em <span id="rachacucaFinalMoves">0</span> movimentos e <span id="rachacucaFinalTime">00:00</span>!</p>
+                            <button id="rachacucaPlayAgainBtn" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Jogar Novamente
+                            </button>
+                            <button id="rachacucaSaveScoreBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                                <i class="fas fa-save"></i> Salvar Pontuação
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="solution-preview">
+                        <h3><i class="fas fa-check-circle"></i> Solução</h3>
+                        <div class="solution-board">
+                            <!-- Grade de solução será gerada via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-content">
                 <div class="loading-spinner">
@@ -741,3 +896,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
