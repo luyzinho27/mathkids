@@ -2154,33 +2154,48 @@ function loadGamesSection() {
     });
 }
 
-// Voltar para a tela inicial (Home/Dashboard)
+// Voltar para a tela inicial (Dashboard/Home)
 function rachacucaBackToGames() {
-    // Ocultar o container do Racha Cuca
+    console.log('📱 Voltando para a tela inicial...');
+    
+    // 1. Ocultar o container do Racha Cuca
     if (DOM.rachacucaGameContainer) {
         DOM.rachacucaGameContainer.style.display = 'none';
-        
-        // Parar o timer se estiver ativo
-        if (rachacucaTimerInterval) {
-            clearInterval(rachacucaTimerInterval);
-            rachacucaTimerInterval = null;
-        }
     }
-
-    // Usar a função switchSection para navegar para o dashboard (tela inicial)
-    switchSection('dashboard');
     
-    // Atualizar a navegação ativa para dashboard
-    updateActiveNavigation('dashboard');
+    // 2. Garantir que a seção de jogos esteja visível primeiro
+    const gamesSection = document.getElementById('games');
+    if (gamesSection) {
+        gamesSection.style.display = 'block';
+    }
     
-    // Fechar a sidebar mobile se estiver aberta
-    closeMobileSidebar();
+    // 3. Parar o timer do jogo
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
     
-    // Recarregar o conteúdo do dashboard
-    loadDashboardContent();
+    // 4. Resetar variáveis do jogo
+    rachacucaMoves = 0;
+    rachacucaTimerSeconds = 0;
+    rachacucaGameStarted = false;
+    rachacucaGameCompleted = false;
+    rachacucaIsDragging = false;
+    rachacucaDraggedTile = null;
     
-    // Mostrar mensagem de confirmação
-    showToast('Retornado para a tela inicial!', 'success');
+    // 5. Navegar para a tela inicial (dashboard)
+    setTimeout(() => {
+        // Usar o switchSection padrão da aplicação
+        switchSection('dashboard');
+        
+        // Fechar sidebar mobile se aberta
+        closeMobileSidebar();
+        
+        console.log('✅ Retornado para a tela inicial');
+        
+        // Feedback para o usuário
+        showToast('Retornado para a tela inicial!', 'success');
+    }, 100);
 }
 
 // Inicializar o jogo Racha Cuca
@@ -4894,5 +4909,6 @@ window.addEventListener('focus', function() {
 });
 
 console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
+
 
 
