@@ -4626,7 +4626,7 @@ select:valid {
     font-size: 0.9rem;
     opacity: 0.9;
     margin-top: 5px;
-    color: var(--text-secondary);
+    color: #2d2a2b;
 }
 
 .rachacuca-game-info {
@@ -5102,5 +5102,6 @@ select:valid {
 [data-theme="dark"] .rachacuca-solution-tile.empty {
     background-color: var(--gray-700);
 }
+
 
 
