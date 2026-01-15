@@ -17,6 +17,7 @@ let adminExists = false;
 // Configurar listeners do Firebase em tempo real
 let statsListener = null;
 let userProgressListener = null;
+let rachacucaScoresListener = null;
 
 // Estados da aplicação
 let currentSection = 'dashboard';
@@ -261,6 +262,32 @@ function setupUserProgressListener() {
         },
         (error) => {
             console.error('❌ Erro no listener de progresso:', error);
+        }
+    );
+}
+
+// Configurar listener para pontuações do Racha Cuca
+function setupRachacucaScoresListener() {
+    if (!db) return;
+    
+    // Remover listener anterior se existir
+    if (rachacucaScoresListener) {
+        rachacucaScoresListener();
+        rachacucaScoresListener = null;
+    }
+    
+    // Configurar listener em tempo real para pontuações do Racha Cuca
+    rachacucaScoresListener = db.collection('rachacuca_scores').onSnapshot(
+        (snapshot) => {
+            console.log('🏆 Pontuações do Racha Cuca atualizadas em tempo real');
+            // Atualizar a lista de pontuações se o modal estiver aberto
+            if (DOM.rachacucaScoresModal && DOM.rachacucaScoresModal.classList.contains('active')) {
+                const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'global';
+                rachacucaLoadScores(activeTab);
+            }
+        },
+        (error) => {
+            console.error('❌ Erro no listener do Racha Cuca:', error);
         }
     );
 }
@@ -603,6 +630,16 @@ function setupEventListeners() {
             DOM.rachacucaSaveScoreModal.classList.remove('active');
         }
     });
+
+    // Abrir modal de pontuações do Racha Cuca
+    const rachacucaViewScoresBtn = document.getElementById('rachacucaViewScoresBtn');
+    if (rachacucaViewScoresBtn) {
+        rachacucaViewScoresBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            DOM.rachacucaScoresModal.classList.add('active');
+            rachacucaLoadScores('global');
+        });
+    }
 }
 
 // Configurar toggles de senha
@@ -829,6 +866,7 @@ function checkAuthState() {
                 
                 setupFirebaseListeners();
                 setupUserProgressListener();
+                setupRachacucaScoresListener();
             } else {
                 console.log('⏰ Sessão expirada');
                 logoutLocal();
@@ -1080,6 +1118,10 @@ function logoutLocal() {
         userProgressListener();
         userProgressListener = null;
     }
+    if (rachacucaScoresListener) {
+        rachacucaScoresListener();
+        rachacucaScoresListener = null;
+    }
     
     localStorage.removeItem('mathkids_user');
     currentUser = null;
@@ -1106,6 +1148,7 @@ function handleAuthStateChange(user) {
         showApp();
         setupFirebaseListeners();
         setupUserProgressListener();
+        setupRachacucaScoresListener();
     }
 }
 
@@ -2610,7 +2653,8 @@ async function rachacucaSaveScore() {
         difficulty: rachacucaCurrentDifficulty,
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         date: new Date().toISOString(),
-        userId: currentUser?.id || 'anonymous'
+        userId: currentUser?.id || 'anonymous',
+        userName: currentUser?.name || playerName
     };
   
     try {
@@ -2622,7 +2666,9 @@ async function rachacucaSaveScore() {
             DOM.rachacucaSaveScoreModal.classList.remove('active');
         }
         
+        // Atualizar a lista de pontuações
         rachacucaLoadScores('global');
+        
     } catch (error) {
         console.error('Erro ao salvar pontuação:', error);
         showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
@@ -2631,7 +2677,9 @@ async function rachacucaSaveScore() {
 
 // Carregar pontuações do Racha Cuca
 async function rachacucaLoadScores(difficulty = 'global') {
-    if (!DOM.rachacucaScoresList || !db) return;
+    if (!DOM.rachacucaScoresList) return;
+    
+    DOM.rachacucaScoresList.innerHTML = '<p class="text-center">Carregando pontuações...</p>';
     
     try {
         let query = db.collection('rachacuca_scores');
@@ -2640,7 +2688,7 @@ async function rachacucaLoadScores(difficulty = 'global') {
             query = query.where('difficulty', '==', difficulty);
         }
         
-        const snapshot = await query.orderBy('moves').orderBy('time').limit(10).get();
+        const snapshot = await query.orderBy('moves').orderBy('time').limit(20).get();
         
         if (snapshot.empty) {
             DOM.rachacucaScoresList.innerHTML = '<p class="no-scores">Nenhuma pontuação salva ainda.</p>';
@@ -2656,7 +2704,9 @@ async function rachacucaLoadScores(difficulty = 'global') {
                 moves: data.moves,
                 time: data.time,
                 difficulty: data.difficulty,
-                date: data.date || data.timestamp?.toDate?.() || new Date()
+                date: data.date || data.timestamp?.toDate?.() || new Date(),
+                userId: data.userId,
+                userName: data.userName
             });
         });
         
@@ -2673,27 +2723,51 @@ function rachacucaDisplayScores(scores) {
     
     DOM.rachacucaScoresList.innerHTML = '';
     
+    if (scores.length === 0) {
+        DOM.rachacucaScoresList.innerHTML = '<p class="no-scores">Nenhuma pontuação salva ainda.</p>';
+        return;
+    }
+    
     scores.forEach((score, index) => {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
         const currentPlayerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
-        if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
+        const isCurrentUser = score.userId === currentUser?.id || score.playerName === currentPlayerName;
+        
+        if (isCurrentUser) {
             scoreItem.classList.add('highlight');
         }
         
+        let medal = '';
+        if (index === 0) medal = '🥇';
+        else if (index === 1) medal = '🥈';
+        else if (index === 2) medal = '🥉';
+        
         scoreItem.innerHTML = `
-            <div class="score-rank">${index + 1}</div>
-            <div class="score-name">${score.playerName}</div>
+            <div class="score-rank">${medal} ${index + 1}</div>
+            <div class="score-player">
+                <div class="score-name">${score.playerName}</div>
+                ${score.userName && score.userName !== score.playerName ? `<small class="score-username">${score.userName}</small>` : ''}
+            </div>
             <div class="score-details">
-                <span>${score.moves} movimentos</span>
-                <span>${rachacucaFormatTime(score.time)}</span>
-                <span>${score.difficulty === 'easy' ? 'Fácil' : score.difficulty === 'normal' ? 'Normal' : 'Difícil'}</span>
+                <span class="score-moves">${score.moves} movimentos</span>
+                <span class="score-time">${rachacucaFormatTime(score.time)}</span>
+                <span class="score-difficulty">${score.difficulty === 'easy' ? 'Fácil' : score.difficulty === 'normal' ? 'Normal' : 'Difícil'}</span>
+                <small class="score-date">${new Date(score.date).toLocaleDateString('pt-BR')}</small>
             </div>
         `;
         
         DOM.rachacucaScoresList.appendChild(scoreItem);
     });
+}
+
+// Abrir modal de pontuações
+function rachacucaOpenScoresModal() {
+    if (DOM.rachacucaScoresModal) {
+        DOM.rachacucaScoresModal.classList.add('active');
+        rachacucaLoadScores('global');
+    }
 }
 
 // Iniciar jogo
@@ -3302,6 +3376,7 @@ function loadAdminSection() {
                         <button class="tab-header active" data-tab="users">Gerenciar Usuários</button>
                         <button class="tab-header" data-tab="reports">Relatórios</button>
                         <button class="tab-header" data-tab="settings">Configurações do Sistema</button>
+                        <button class="tab-header" data-tab="rachacuca">Racha Cuca</button>
                     </div>
                     
                     <div class="tab-content active" id="usersTab">
@@ -3423,6 +3498,57 @@ function loadAdminSection() {
                             </button>
                         </div>
                     </div>
+                    
+                    <div class="tab-content" id="rachacucaTab">
+                        <div class="rachacuca-admin">
+                            <h3><i class="fas fa-puzzle-piece"></i> Gerenciar Racha Cuca</h3>
+                            
+                            <div class="rachacuca-stats">
+                                <div class="rachacuca-stat">
+                                    <h4>Total de Pontuações</h4>
+                                    <p id="totalRachacucaScores">Carregando...</p>
+                                </div>
+                                <div class="rachacuca-stat">
+                                    <h4>Melhor Pontuação</h4>
+                                    <p id="bestRachacucaScore">Carregando...</p>
+                                </div>
+                                <div class="rachacuca-stat">
+                                    <h4>Jogadores Únicos</h4>
+                                    <p id="uniqueRachacucaPlayers">Carregando...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="rachacuca-actions">
+                                <button class="btn-admin primary" id="viewAllRachacucaScores">
+                                    <i class="fas fa-list"></i> Ver Todas as Pontuações
+                                </button>
+                                <button class="btn-admin warning" id="clearRachacucaScores">
+                                    <i class="fas fa-trash"></i> Limpar Pontuações Antigas
+                                </button>
+                            </div>
+                            
+                            <div class="rachacuca-scores-table-container">
+                                <h4>Últimas Pontuações</h4>
+                                <table class="rachacuca-scores-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Jogador</th>
+                                            <th>Movimentos</th>
+                                            <th>Tempo</th>
+                                            <th>Dificuldade</th>
+                                            <th>Data</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rachacucaScoresTableBody">
+                                        <tr>
+                                            <td colspan="6" class="text-center">Carregando pontuações...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3482,6 +3608,10 @@ function setupAdminEvents() {
             
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById(tabId + 'Tab').classList.add('active');
+            
+            if (tabId === 'rachacuca') {
+                loadRachacucaAdminData();
+            }
         });
     });
     
@@ -3496,9 +3626,145 @@ function setupAdminEvents() {
     
     document.getElementById('saveSettings')?.addEventListener('click', saveSystemSettings);
     
+    document.getElementById('viewAllRachacucaScores')?.addEventListener('click', viewAllRachacucaScores);
+    document.getElementById('clearRachacucaScores')?.addEventListener('click', clearOldRachacucaScores);
+    
     loadUsersTable();
     
     setupUserModal();
+}
+
+// Carregar dados administrativos do Racha Cuca
+async function loadRachacucaAdminData() {
+    if (!db) return;
+    
+    try {
+        const scoresSnapshot = await db.collection('rachacuca_scores').get();
+        const scores = scoresSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Total de pontuações
+        document.getElementById('totalRachacucaScores').textContent = scores.length;
+        
+        // Melhor pontuação
+        if (scores.length > 0) {
+            const bestScore = scores.reduce((best, current) => {
+                return (current.moves < best.moves) || 
+                       (current.moves === best.moves && current.time < best.time) ? current : best;
+            });
+            document.getElementById('bestRachacucaScore').textContent = 
+                `${bestScore.playerName} - ${bestScore.moves} movimentos em ${rachacucaFormatTime(bestScore.time)}`;
+        } else {
+            document.getElementById('bestRachacucaScore').textContent = 'Nenhuma pontuação';
+        }
+        
+        // Jogadores únicos
+        const uniquePlayers = new Set(scores.map(score => score.userId || score.playerName));
+        document.getElementById('uniqueRachacucaPlayers').textContent = uniquePlayers.size;
+        
+        // Carregar tabela de pontuações
+        loadRachacucaScoresTable(scores.slice(0, 10));
+        
+    } catch (error) {
+        console.error('Erro ao carregar dados do Racha Cuca:', error);
+        showToast('Erro ao carregar dados do Racha Cuca', 'error');
+    }
+}
+
+// Carregar tabela de pontuações do Racha Cuca
+function loadRachacucaScoresTable(scores) {
+    const tbody = document.getElementById('rachacucaScoresTableBody');
+    if (!tbody) return;
+    
+    if (scores.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">Nenhuma pontuação encontrada</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    scores.forEach(score => {
+        const date = score.date ? new Date(score.date).toLocaleDateString('pt-BR') : '--';
+        html += `
+            <tr>
+                <td>${score.playerName}</td>
+                <td>${score.moves}</td>
+                <td>${rachacucaFormatTime(score.time)}</td>
+                <td>${score.difficulty === 'easy' ? 'Fácil' : score.difficulty === 'normal' ? 'Normal' : 'Difícil'}</td>
+                <td>${date}</td>
+                <td>
+                    <button class="btn-action delete" data-score-id="${score.id}" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    
+    // Configurar eventos dos botões de exclusão
+    document.querySelectorAll('#rachacucaScoresTableBody .btn-action.delete').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const scoreId = this.getAttribute('data-score-id');
+            if (confirm('Tem certeza que deseja excluir esta pontuação?')) {
+                deleteRachacucaScore(scoreId);
+            }
+        });
+    });
+}
+
+// Excluir pontuação do Racha Cuca
+async function deleteRachacucaScore(scoreId) {
+    if (!db) return;
+    
+    try {
+        await db.collection('rachacuca_scores').doc(scoreId).delete();
+        showToast('Pontuação excluída com sucesso!', 'success');
+        loadRachacucaAdminData();
+    } catch (error) {
+        console.error('Erro ao excluir pontuação:', error);
+        showToast('Erro ao excluir pontuação', 'error');
+    }
+}
+
+// Ver todas as pontuações do Racha Cuca
+function viewAllRachacucaScores() {
+    rachacucaOpenScoresModal();
+}
+
+// Limpar pontuações antigas do Racha Cuca
+async function clearOldRachacucaScores() {
+    if (!db) return;
+    
+    if (!confirm('Tem certeza que deseja limpar todas as pontuações com mais de 30 dias?')) {
+        return;
+    }
+    
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const scoresSnapshot = await db.collection('rachacuca_scores')
+            .where('date', '<', thirtyDaysAgo.toISOString())
+            .get();
+        
+        const batch = db.batch();
+        scoresSnapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        
+        showToast(`${scoresSnapshot.size} pontuações antigas foram removidas.`, 'success');
+        loadRachacucaAdminData();
+        
+    } catch (error) {
+        console.error('Erro ao limpar pontuações antigas:', error);
+        showToast('Erro ao limpar pontuações antigas', 'error');
+    }
 }
 
 // Configurar modal de usuário
@@ -4607,6 +4873,7 @@ window.switchSection = switchSection;
 window.loadPracticeSection = loadPracticeSection;
 window.loadLesson = loadLesson;
 window.startGame = startGame;
+window.rachacucaOpenScoresModal = rachacucaOpenScoresModal;
 
 // Atualizar estatísticas periodicamente
 setInterval(() => {
@@ -4628,4 +4895,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
+console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
