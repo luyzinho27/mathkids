@@ -303,9 +303,6 @@
                         <button class="btn-quick" id="quickGame" title="Jogo Rápido">
                             <i class="fas fa-gamepad"></i>
                         </button>
-                        <button class="btn-quick" id="rachacucaViewScoresBtn" title="Ver Pontuações Racha Cuca">
-                            <i class="fas fa-trophy"></i>
-                        </button>
                     </div>
                     
                     <div class="notifications" id="notificationsToggle">
@@ -763,36 +760,7 @@
                         <button class="tab-btn" data-tab="hard">Difícil</button>
                     </div>
                     <div id="rachacucaScoresList">
-                        <p class="no-scores">Carregando pontuações...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal para salvar pontuação do Racha Cuca -->
-        <div id="rachacucaSaveScoreModal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2><i class="fas fa-save"></i> Salvar Pontuação - Racha Cuca</h2>
-                    <span class="close-modal">&times;</span>
-                </div>
-                <div class="modal-body">
-                    <div class="score-summary">
-                        <p>Você completou o quebra-cabeça em <strong id="rachacucaSaveMoves">0</strong> movimentos e <strong id="rachacucaSaveTime">00:00</strong>!</p>
-                        <p>Dificuldade: <strong id="rachacucaSaveDifficulty">Normal</strong></p>
-                    </div>
-                    <div class="player-input">
-                        <label for="rachacucaPlayerName">Seu nome:</label>
-                        <input type="text" id="rachacucaPlayerName" placeholder="Digite seu nome" maxlength="20">
-                        <small>Máximo 20 caracteres</small>
-                    </div>
-                    <div class="modal-actions">
-                        <button id="rachacucaConfirmSaveBtn" class="btn-auth btn-primary">
-                            <i class="fas fa-check"></i> Salvar Pontuação
-                        </button>
-                        <button id="rachacucaCancelSaveBtn" class="btn-auth btn-secondary">
-                            <i class="fas fa-times"></i> Cancelar
-                        </button>
+                        <p class="no-scores">Nenhuma pontuação salva ainda.</p>
                     </div>
                 </div>
             </div>
@@ -867,7 +835,7 @@
                             <button id="rachacucaPlayAgainBtn" class="btn btn-primary">
                                 <i class="fas fa-play"></i> Jogar Novamente
                             </button>
-                            <button id="rachacucaSaveScoreBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                            <button id="rachacucaSaveScoreBtn" class="btn btn-secondary" style="display: none; margin-top: 10px;">
                                 <i class="fas fa-save"></i> Salvar Pontuação
                             </button>
                         </div>
