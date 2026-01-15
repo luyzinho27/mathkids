@@ -2154,7 +2154,7 @@ function loadGamesSection() {
     });
 }
 
-// Voltar para a seção de jogos
+// Voltar para a tela inicial (Home/Dashboard)
 function rachacucaBackToGames() {
     // Ocultar o container do Racha Cuca
     if (DOM.rachacucaGameContainer) {
@@ -2167,23 +2167,20 @@ function rachacucaBackToGames() {
         }
     }
 
-    // Garantir que a seção de jogos esteja visível
-    const gamesSection = document.getElementById('games');
-    if (gamesSection) {
-        gamesSection.style.display = 'block';
-        
-        // Usar a função switchSection para garantir a navegação correta
-        switchSection('games');
-        
-        // Atualizar a navegação ativa
-        updateActiveNavigation('games');
-        
-        // Recarregar o conteúdo da seção de jogos
-        loadGamesSection();
-        
-        // Fechar a sidebar mobile se estiver aberta
-        closeMobileSidebar();
-    }
+    // Usar a função switchSection para navegar para o dashboard (tela inicial)
+    switchSection('dashboard');
+    
+    // Atualizar a navegação ativa para dashboard
+    updateActiveNavigation('dashboard');
+    
+    // Fechar a sidebar mobile se estiver aberta
+    closeMobileSidebar();
+    
+    // Recarregar o conteúdo do dashboard
+    loadDashboardContent();
+    
+    // Mostrar mensagem de confirmação
+    showToast('Retornado para a tela inicial!', 'success');
 }
 
 // Inicializar o jogo Racha Cuca
@@ -4897,4 +4894,5 @@ window.addEventListener('focus', function() {
 });
 
 console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
+
 
