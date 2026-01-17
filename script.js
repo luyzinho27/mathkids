@@ -36,6 +36,9 @@ let systemStats = {
     totalExercises: 0,
     totalUsers: 0,
     systemAccuracy: 0,
+    totalRachacucaGames: 0,
+    rachacucaAvgMoves: 0,
+    rachacucaAvgTime: 0,
     lastUpdated: 0
 };
 
@@ -49,13 +52,27 @@ let userProgress = {
     subtraction: { correct: 0, total: 0 },
     multiplication: { correct: 0, total: 0 },
     division: { correct: 0, total: 0 },
+    games: {
+        lightningGame: { played: 0, highScore: 0 },
+        divisionPuzzle: { played: 0, highScore: 0 },
+        mathChampionship: { played: 0, highScore: 0 },
+        rachacuca: { 
+            played: 0, 
+            completed: 0,
+            bestMoves: { easy: null, normal: null, hard: null },
+            bestTime: { easy: null, normal: null, hard: null },
+            totalMoves: 0,
+            totalTime: 0
+        }
+    },
     lastActivities: [],
     level: 'Iniciante',
     badges: [],
     dailyProgress: {
         exercises: 0,
         correct: 0,
-        time: 0
+        time: 0,
+        games: 0
     }
 };
 
@@ -103,6 +120,7 @@ const DOM = {
     statsStudents: document.getElementById('statsStudents'),
     statsRating: document.getElementById('statsRating'),
     statsImprovement: document.getElementById('statsImprovement'),
+    statsRachacucaGames: document.getElementById('statsRachacucaGames'),
     
     // Navegação
     menuToggle: document.getElementById('menuToggle'),
@@ -137,6 +155,7 @@ const DOM = {
     statExercises: document.getElementById('statExercises'),
     statAccuracy: document.getElementById('statAccuracy'),
     statTime: document.getElementById('statTime'),
+    statRachacucaGames: document.getElementById('statRachacucaGames'),
     statLevel: document.getElementById('statLevel'),
     
     // Elementos de seções
@@ -164,9 +183,16 @@ const DOM = {
     rachacucaFinalMoves: document.getElementById('rachacucaFinalMoves'),
     rachacucaFinalTime: document.getElementById('rachacucaFinalTime'),
     rachacucaPlayAgainBtn: document.getElementById('rachacucaPlayAgainBtn'),
-    rachacucaViewScoresBtn: document.getElementById('rachacucaViewScoresBtn'),
+    rachacucaSaveScoreBtn: document.getElementById('rachacucaSaveScoreBtn'),
     rachacucaScoresModal: document.getElementById('rachacucaScoresModal'),
     rachacucaScoresList: document.getElementById('rachacucaScoresList'),
+    rachacucaSaveScoreModal: document.getElementById('rachacucaSaveScoreModal'),
+    rachacucaSaveMoves: document.getElementById('rachacucaSaveMoves'),
+    rachacucaSaveTime: document.getElementById('rachacucaSaveTime'),
+    rachacucaSaveDifficulty: document.getElementById('rachacucaSaveDifficulty'),
+    rachacucaPlayerName: document.getElementById('rachacucaPlayerName'),
+    rachacucaConfirmSaveBtn: document.getElementById('rachacucaConfirmSaveBtn'),
+    rachacucaCancelSaveBtn: document.getElementById('rachacucaCancelSaveBtn'),
     
     // Modais
     termsModal: document.getElementById('termsModal'),
@@ -250,6 +276,11 @@ function setupUserProgressListener() {
                 if (data.progress) {
                     userProgress = data.progress;
                     updateProgressUI();
+                    
+                    // Atualizar estatísticas do Racha Cuca no dashboard
+                    if (DOM.statRachacucaGames) {
+                        DOM.statRachacucaGames.textContent = userProgress.games.rachacuca.completed || 0;
+                    }
                 }
             }
         },
@@ -544,10 +575,18 @@ function setupEventListeners() {
         DOM.rachacucaPlayAgainBtn.addEventListener('click', rachacucaResetGame);
     }
     
-    if (DOM.rachacucaViewScoresBtn) {
-        DOM.rachacucaViewScoresBtn.addEventListener('click', function() {
-            DOM.rachacucaScoresModal.classList.add('active');
-            rachacucaLoadScores('global');
+    if (DOM.rachacucaSaveScoreBtn) {
+        DOM.rachacucaSaveScoreBtn.addEventListener('click', rachacucaOpenSaveScoreModal);
+    }
+    
+    // Eventos dos modais do Racha Cuca
+    if (DOM.rachacucaConfirmSaveBtn) {
+        DOM.rachacucaConfirmSaveBtn.addEventListener('click', rachacucaSaveScore);
+    }
+    
+    if (DOM.rachacucaCancelSaveBtn) {
+        DOM.rachacucaCancelSaveBtn.addEventListener('click', function() {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
         });
     }
     
@@ -584,6 +623,9 @@ function setupEventListeners() {
     document.addEventListener('click', function(e) {
         if (DOM.rachacucaScoresModal && e.target === DOM.rachacucaScoresModal) {
             DOM.rachacucaScoresModal.classList.remove('active');
+        }
+        if (DOM.rachacucaSaveScoreModal && e.target === DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
         }
     });
 }
@@ -628,6 +670,9 @@ async function loadSystemStats(forceUpdate = false) {
             totalExercises: 12450,
             totalUsers: 1260,
             systemAccuracy: 78,
+            totalRachacucaGames: 347,
+            rachacucaAvgMoves: 42,
+            rachacucaAvgTime: 185,
             lastUpdated: Date.now()
         };
         updateSystemStatsUI(false);
@@ -668,17 +713,32 @@ async function loadSystemStats(forceUpdate = false) {
         let totalExercises = 0;
         let totalCorrect = 0;
         let totalAttempts = 0;
+        let totalRachacucaGames = 0;
+        let totalRachacucaMoves = 0;
+        let totalRachacucaTime = 0;
         
         studentUsers.forEach(user => {
             if (user.progress) {
                 totalExercises += user.progress.exercisesCompleted || 0;
                 totalCorrect += user.progress.correctAnswers || 0;
                 totalAttempts += user.progress.totalAnswers || 0;
+                
+                if (user.progress.games && user.progress.games.rachacuca) {
+                    totalRachacucaGames += user.progress.games.rachacuca.completed || 0;
+                    totalRachacucaMoves += user.progress.games.rachacuca.totalMoves || 0;
+                    totalRachacucaTime += user.progress.games.rachacuca.totalTime || 0;
+                }
             }
         });
         
         const systemAccuracy = totalAttempts > 0 ? 
             Math.round((totalCorrect / totalAttempts) * 100) : 78;
+        
+        const rachacucaAvgMoves = totalRachacucaGames > 0 ? 
+            Math.round(totalRachacucaMoves / totalRachacucaGames) : 0;
+        
+        const rachacucaAvgTime = totalRachacucaGames > 0 ? 
+            Math.round(totalRachacucaTime / totalRachacucaGames) : 0;
         
         const adminExists = users.some(user => user.role === 'admin');
         window.adminExists = adminExists;
@@ -703,6 +763,9 @@ async function loadSystemStats(forceUpdate = false) {
             totalExercises,
             totalUsers,
             systemAccuracy,
+            totalRachacucaGames,
+            rachacucaAvgMoves,
+            rachacucaAvgTime,
             lastUpdated: Date.now()
         };
         
@@ -716,7 +779,10 @@ async function loadSystemStats(forceUpdate = false) {
                     improvementRate,
                     totalExercises,
                     totalUsers,
-                    systemAccuracy
+                    systemAccuracy,
+                    totalRachacucaGames,
+                    rachacucaAvgMoves,
+                    rachacucaAvgTime
                 },
                 timestamp: Date.now()
             };
@@ -750,6 +816,9 @@ async function loadSystemStats(forceUpdate = false) {
                 totalExercises: 12450,
                 totalUsers: 1260,
                 systemAccuracy: 78,
+                totalRachacucaGames: 347,
+                rachacucaAvgMoves: 42,
+                rachacucaAvgTime: 185,
                 lastUpdated: Date.now()
             };
             console.log('🎮 Usando dados de demonstração devido ao erro');
@@ -778,6 +847,9 @@ function updateSystemStatsUI(loading = false) {
     if (DOM.statsImprovement) {
         DOM.statsImprovement.textContent = loading ? '...' : systemStats.improvementRate + '%';
     }
+    if (DOM.statsRachacucaGames) {
+        DOM.statsRachacucaGames.textContent = loading ? '...' : systemStats.totalRachacucaGames.toLocaleString();
+    }
     
     if (currentSection === 'admin' && currentUser?.role === 'admin') {
         updateAdminStatsUI();
@@ -790,11 +862,17 @@ function updateAdminStatsUI() {
     const activeStudentsEl = document.getElementById('activeStudents');
     const totalExercisesEl = document.getElementById('totalExercises');
     const systemAccuracyEl = document.getElementById('systemAccuracy');
+    const totalRachacucaGamesEl = document.getElementById('totalRachacucaGames');
+    const rachacucaAvgMovesEl = document.getElementById('rachacucaAvgMoves');
+    const rachacucaAvgTimeEl = document.getElementById('rachacucaAvgTime');
     
     if (totalUsersEl) totalUsersEl.textContent = systemStats.totalUsers;
     if (activeStudentsEl) activeStudentsEl.textContent = systemStats.totalStudents;
     if (totalExercisesEl) totalExercisesEl.textContent = systemStats.totalExercises;
     if (systemAccuracyEl) systemAccuracyEl.textContent = systemStats.systemAccuracy + '%';
+    if (totalRachacucaGamesEl) totalRachacucaGamesEl.textContent = systemStats.totalRachacucaGames;
+    if (rachacucaAvgMovesEl) rachacucaAvgMovesEl.textContent = systemStats.rachacucaAvgMoves;
+    if (rachacucaAvgTimeEl) rachacucaAvgTimeEl.textContent = rachacucaFormatTime(systemStats.rachacucaAvgTime);
 }
 
 // Verificar estado de autenticação
@@ -1200,6 +1278,10 @@ function updateProgressUI() {
         DOM.statTime.textContent = Math.floor(userProgress.practiceTime / 60) + ' min';
     }
     
+    if (DOM.statRachacucaGames) {
+        DOM.statRachacucaGames.textContent = userProgress.games.rachacuca.completed || 0;
+    }
+    
     if (DOM.statLevel) {
         DOM.statLevel.textContent = userProgress.level || 'Iniciante';
     }
@@ -1356,7 +1438,8 @@ function loadRecentActivities() {
         activities.forEach(activity => {
             const icon = activity.type === 'correct' ? 'fa-check-circle' :
                         activity.type === 'wrong' ? 'fa-times-circle' :
-                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info-circle';
+                        activity.type === 'game' ? 'fa-gamepad' :
+                        activity.type === 'rachacuca' ? 'fa-puzzle-piece' : 'fa-info-circle';
             
             const scoreClass = activity.type === 'correct' ? 'correct' :
                               activity.type === 'wrong' ? 'wrong' : '';
@@ -1407,6 +1490,13 @@ function loadChallenges() {
             description: 'Resolva 30 divisões sem erros',
             progress: 12,
             total: 30
+        },
+        {
+            icon: 'fa-puzzle-piece',
+            title: 'Mestre do Racha Cuca',
+            description: 'Complete 5 jogos de Racha Cuca',
+            progress: userProgress.games.rachacuca.completed || 0,
+            total: 5
         }
     ];
     
@@ -1983,7 +2073,10 @@ function saveSystemStatsCache() {
                 improvementRate: systemStats.improvementRate,
                 totalExercises: systemStats.totalExercises,
                 totalUsers: systemStats.totalUsers,
-                systemAccuracy: systemStats.systemAccuracy
+                systemAccuracy: systemStats.systemAccuracy,
+                totalRachacucaGames: systemStats.totalRachacucaGames,
+                rachacucaAvgMoves: systemStats.rachacucaAvgMoves,
+                rachacucaAvgTime: systemStats.rachacucaAvgTime
             },
             timestamp: Date.now()
         };
@@ -2018,7 +2111,7 @@ function loadGamesSection() {
                     <h3>Desafio Relâmpago</h3>
                     <p>Resolva o máximo de multiplicações em 60 segundos!</p>
                     <div class="game-stats">
-                        <span><i class="fas fa-trophy"></i> Seu recorde: ${localStorage.getItem('mathkids_highscore_lightning') || 0}</span>
+                        <span><i class="fas fa-trophy"></i> Seu recorde: ${userProgress.games.lightningGame.highScore || 0}</span>
                     </div>
                     <button class="btn-game">Jogar Agora</button>
                 </div>
@@ -2048,7 +2141,7 @@ function loadGamesSection() {
                     <h3>Racha Cuca</h3>
                     <p>Quebra-cabeça numérico clássico. Organize os números de 1 a 15.</p>
                     <div class="game-stats">
-                        <span><i class="fas fa-trophy"></i> Melhor tempo: ${localStorage.getItem('rachacuca_best_time') || '--'}</span>
+                        <span><i class="fas fa-trophy"></i> Jogos concluídos: ${userProgress.games.rachacuca.completed || 0}</span>
                     </div>
                     <button class="btn-game">Jogar Agora</button>
                 </div>
@@ -2329,6 +2422,52 @@ function rachacucaMoveTile(index) {
     }
 }
 
+// Atualizar estatísticas do Racha Cuca no progresso do usuário
+function updateRachacucaStats() {
+    if (!userProgress.games.rachacuca) {
+        userProgress.games.rachacuca = {
+            played: 0,
+            completed: 0,
+            bestMoves: { easy: null, normal: null, hard: null },
+            bestTime: { easy: null, normal: null, hard: null },
+            totalMoves: 0,
+            totalTime: 0
+        };
+    }
+    
+    // Incrementar contadores
+    userProgress.games.rachacuca.played++;
+    userProgress.games.rachacuca.completed++;
+    userProgress.games.rachacuca.totalMoves += rachacucaMoves;
+    userProgress.games.rachacuca.totalTime += rachacucaTimerSeconds;
+    
+    // Atualizar melhores marcas por dificuldade
+    const difficultyKey = rachacucaCurrentDifficulty;
+    
+    if (!userProgress.games.rachacuca.bestMoves[difficultyKey] || 
+        rachacucaMoves < userProgress.games.rachacuca.bestMoves[difficultyKey]) {
+        userProgress.games.rachacuca.bestMoves[difficultyKey] = rachacucaMoves;
+    }
+    
+    if (!userProgress.games.rachacuca.bestTime[difficultyKey] || 
+        rachacucaTimerSeconds < userProgress.games.rachacuca.bestTime[difficultyKey]) {
+        userProgress.games.rachacuca.bestTime[difficultyKey] = rachacucaTimerSeconds;
+    }
+    
+    // Atualizar estatísticas diárias
+    userProgress.dailyProgress.games++;
+    
+    // Salvar progresso
+    saveUserProgress();
+    
+    // Atualizar UI
+    updateProgressUI();
+    
+    // Atualizar estatísticas do sistema
+    systemStats.totalRachacucaGames++;
+    updateSystemStatsUI();
+}
+
 // Embaralhar o tabuleiro do Racha Cuca
 function rachacucaShuffleBoard() {
     if (rachacucaGameCompleted) {
@@ -2470,14 +2609,13 @@ async function rachacucaCompleteGame() {
         DOM.rachacucaFinalMoves.textContent = rachacucaMoves;
         DOM.rachacucaFinalTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
         DOM.rachacucaCompletionMessage.style.display = 'block';
-        
-        const bestTime = localStorage.getItem('rachacuca_best_time');
-        if (!bestTime || rachacucaTimerSeconds < parseInt(bestTime)) {
-            localStorage.setItem('rachacuca_best_time', rachacucaTimerSeconds.toString());
-        }
     }
     
-    addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos`, 'game');
+    // Atualizar estatísticas do usuário
+    updateRachacucaStats();
+    
+    // Adicionar atividade ao histórico
+    addActivity(`Racha Cuca ${rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil'} concluído em ${rachacucaMoves} movimentos`, 'rachacuca');
     
     // Salvar pontuação automaticamente
     await rachacucaAutoSaveScore();
@@ -2564,15 +2702,6 @@ async function rachacucaAutoSaveScore() {
         localScores.push(scoreData);
         localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
         
-        // Mostrar notificação de salvamento automático
-        const autoSaveNotice = document.getElementById('autoSaveNotice');
-        if (autoSaveNotice) {
-            autoSaveNotice.style.display = 'block';
-            setTimeout(() => {
-                autoSaveNotice.style.display = 'none';
-            }, 5000);
-        }
-        
         showToast('Pontuação salva localmente!', 'success');
         return;
     }
@@ -2594,15 +2723,6 @@ async function rachacucaAutoSaveScore() {
         };
         
         await db.collection('rachacuca_scores').add(scoreData);
-        
-        // Mostrar notificação de salvamento automático
-        const autoSaveNotice = document.getElementById('autoSaveNotice');
-        if (autoSaveNotice) {
-            autoSaveNotice.style.display = 'block';
-            setTimeout(() => {
-                autoSaveNotice.style.display = 'none';
-            }, 5000);
-        }
         
         showToast('Pontuação salva automaticamente!', 'success');
         
@@ -2628,15 +2748,6 @@ async function rachacucaAutoSaveScore() {
             localScores.push(scoreData);
             localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
             
-            // Mostrar notificação de salvamento automático
-            const autoSaveNotice = document.getElementById('autoSaveNotice');
-            if (autoSaveNotice) {
-                autoSaveNotice.style.display = 'block';
-                setTimeout(() => {
-                    autoSaveNotice.style.display = 'none';
-                }, 5000);
-            }
-            
             showToast('Pontuação salva localmente (erro no servidor)', 'warning');
         } catch (localError) {
             console.error('❌ Erro ao salvar localmente:', localError);
@@ -2661,14 +2772,21 @@ async function ensureRachacucaCollectionExists() {
         // Aqui apenas mostramos uma mensagem informativa
         if (error.code === 'permission-denied') {
             console.warn('⚠️ Permissões do Firebase precisam ser ajustadas no Console do Firebase');
-            console.warn('⚠️ Adicione estas regras de segurança para a coleção rachacuca_scores:');
+            console.warn('⚠️ Adicione estas regras de segurança:');
             console.warn(`
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Permissões para rachacuca_scores
     match /rachacuca_scores/{document} {
       allow read: if true;
       allow write: if request.auth != null;
+    }
+    
+    // Permissões para users (existentes)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.token.role == 'admin';
     }
   }
 }
@@ -2678,6 +2796,132 @@ service cloud.firestore {
         // Não podemos criar a coleção programaticamente devido a restrições de segurança
         // O administrador precisa fazer isso manualmente no Console do Firebase
         return false;
+    }
+}
+
+// Abrir modal para salvar pontuação do Racha Cuca
+function rachacucaOpenSaveScoreModal() {
+    if (!rachacucaGameCompleted) {
+        showToast('Complete o jogo primeiro para salvar sua pontuação!', 'error');
+        return;
+    }
+    
+    if (DOM.rachacucaSaveMoves && DOM.rachacucaSaveTime && DOM.rachacucaSaveDifficulty) {
+        DOM.rachacucaSaveMoves.textContent = rachacucaMoves;
+        DOM.rachacucaSaveTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
+        DOM.rachacucaSaveDifficulty.textContent = 
+            rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
+            rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+    }
+    
+    if (DOM.rachacucaPlayerName) {
+        const playerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
+        DOM.rachacucaPlayerName.value = playerName;
+    }
+    
+    if (DOM.rachacucaSaveScoreModal) {
+        DOM.rachacucaSaveScoreModal.classList.add('active');
+    }
+}
+
+// Salvar pontuação do Racha Cuca (manual)
+async function rachacucaSaveScore() {
+    if (!DOM.rachacucaPlayerName) return;
+    
+    const playerName = DOM.rachacucaPlayerName.value.trim();
+    
+    if (!playerName) {
+        showToast('Por favor, digite seu nome!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    if (playerName.length > 20) {
+        showToast('O nome deve ter no máximo 20 caracteres!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    localStorage.setItem('rachacuca_player_name', playerName);
+    
+    if (!db) {
+        // Modo demo - salvar localmente
+        const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+        const scoreData = {
+            playerName: playerName,
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            date: new Date().toISOString(),
+            userId: currentUser?.id || 'anonymous',
+            manuallySaved: true
+        };
+        
+        localScores.push(scoreData);
+        localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+        
+        showToast('Pontuação salva localmente (modo demo)!', 'success');
+        
+        if (DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
+        
+        return;
+    }
+    
+    try {
+        await ensureRachacucaCollectionExists();
+        
+        const scoreData = {
+            playerName: playerName,
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            date: new Date().toISOString(),
+            userId: currentUser?.id || 'anonymous',
+            manuallySaved: true
+        };
+        
+        await db.collection('rachacuca_scores').add(scoreData);
+        
+        showToast('Pontuação salva com sucesso!', 'success');
+        
+        if (DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
+        
+        rachacucaLoadScores('global');
+        
+    } catch (error) {
+        console.error('Erro ao salvar pontuação:', error);
+        
+        // Fallback para salvar localmente
+        try {
+            const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+            const scoreData = {
+                playerName: playerName,
+                moves: rachacucaMoves,
+                time: rachacucaTimerSeconds,
+                difficulty: rachacucaCurrentDifficulty,
+                date: new Date().toISOString(),
+                userId: currentUser?.id || 'anonymous',
+                manuallySaved: true,
+                error: error.message
+            };
+            
+            localScores.push(scoreData);
+            localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+            
+            showToast('Pontuação salva localmente (erro no servidor)', 'warning');
+            
+            if (DOM.rachacucaSaveScoreModal) {
+                DOM.rachacucaSaveScoreModal.classList.remove('active');
+            }
+        } catch (localError) {
+            console.error('❌ Erro ao salvar localmente:', localError);
+            showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
+        }
     }
 }
 
@@ -2758,7 +3002,7 @@ function rachacucaDisplayScores(scores) {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
-        const currentPlayerName = currentUser?.name || '';
+        const currentPlayerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
         if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
             scoreItem.classList.add('highlight');
         }
@@ -2813,7 +3057,7 @@ function startGame(gameId) {
     gameScore = 0;
     gameTimeLeft = game.timeLimit;
     gameActive = true;
-    gameHighScore = localStorage.getItem(`mathkids_highscore_${gameId}`) || 0;
+    gameHighScore = userProgress.games[gameId]?.highScore || 0;
     
     gameContainer.innerHTML = `
         <div class="game-header">
@@ -3124,7 +3368,13 @@ function endGame() {
     
     if (gameScore > gameHighScore) {
         gameHighScore = gameScore;
-        localStorage.setItem(`mathkids_highscore_${currentGame}`, gameHighScore);
+        if (!userProgress.games[currentGame]) {
+            userProgress.games[currentGame] = { played: 0, highScore: 0 };
+        }
+        userProgress.games[currentGame].highScore = gameHighScore;
+        userProgress.games[currentGame].played++;
+        saveUserProgress();
+        
         const highScoreElement = document.getElementById('gameHighScore');
         if (highScoreElement) highScoreElement.textContent = gameHighScore;
         showToast(`🎉 Novo recorde! ${gameHighScore} pontos`, 'success');
@@ -3165,8 +3415,8 @@ function loadProgressSection() {
                         <div class="stat-label">Minutos de Prática</div>
                     </div>
                     <div class="progress-stat">
-                        <div class="stat-value">${userProgress.level}</div>
-                        <div class="stat-label">Seu Nível</div>
+                        <div class="stat-value">${userProgress.games.rachacuca?.completed || 0}</div>
+                        <div class="stat-label">Jogos Racha Cuca</div>
                     </div>
                 </div>
             </div>
@@ -3183,6 +3433,42 @@ function loadProgressSection() {
                     <h3><i class="fas fa-history"></i> Histórico de Atividades</h3>
                     <div class="activities-timeline" id="activitiesTimeline">
                         ${generateActivitiesTimeline()}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="progress-games">
+                <h3><i class="fas fa-gamepad"></i> Estatísticas de Jogos</h3>
+                <div class="games-stats-grid">
+                    <div class="game-stat-card">
+                        <div class="game-stat-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="game-stat-info">
+                            <h4>Desafio Relâmpago</h4>
+                            <p>Recorde: ${userProgress.games.lightningGame?.highScore || 0} pontos</p>
+                            <p>Jogados: ${userProgress.games.lightningGame?.played || 0}</p>
+                        </div>
+                    </div>
+                    <div class="game-stat-card">
+                        <div class="game-stat-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div class="game-stat-info">
+                            <h4>Racha Cuca</h4>
+                            <p>Concluídos: ${userProgress.games.rachacuca?.completed || 0}</p>
+                            <p>Média: ${userProgress.games.rachacuca?.completed ? Math.round(userProgress.games.rachacuca.totalMoves / userProgress.games.rachacuca.completed) : 0} movimentos</p>
+                        </div>
+                    </div>
+                    <div class="game-stat-card">
+                        <div class="game-stat-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <div class="game-stat-info">
+                            <h4>Campeonato</h4>
+                            <p>Recorde: ${userProgress.games.mathChampionship?.highScore || 0} pontos</p>
+                            <p>Jogados: ${userProgress.games.mathChampionship?.played || 0}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3372,11 +3658,11 @@ function loadAdminSection() {
                     </div>
                     <div class="admin-stat">
                         <div class="stat-icon">
-                            <i class="fas fa-chart-line"></i>
+                            <i class="fas fa-puzzle-piece"></i>
                         </div>
                         <div class="stat-info">
-                            <h3 id="systemAccuracy">${systemStats.systemAccuracy}%</h3>
-                            <p>Taxa de Acerto Geral</p>
+                            <h3 id="totalRachacucaGames">${systemStats.totalRachacucaGames}</h3>
+                            <p>Jogos Racha Cuca</p>
                         </div>
                     </div>
                 </div>
@@ -3385,6 +3671,7 @@ function loadAdminSection() {
                     <div class="tab-headers">
                         <button class="tab-header active" data-tab="users">Gerenciar Usuários</button>
                         <button class="tab-header" data-tab="reports">Relatórios</button>
+                        <button class="tab-header" data-tab="stats">Estatísticas Detalhadas</button>
                         <button class="tab-header" data-tab="settings">Configurações do Sistema</button>
                     </div>
                     
@@ -3431,6 +3718,7 @@ function loadAdminSection() {
                                     <option value="progress">Progresso dos Alunos</option>
                                     <option value="usage">Uso do Sistema</option>
                                     <option value="performance">Desempenho por Operação</option>
+                                    <option value="games">Estatísticas de Jogos</option>
                                 </select>
                             </div>
                             <div class="report-period">
@@ -3449,6 +3737,45 @@ function loadAdminSection() {
                         
                         <div class="report-preview" id="reportPreview">
                             <p>Selecione as opções e clique em "Gerar Relatório"</p>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="statsTab">
+                        <div class="detailed-stats">
+                            <h3>Estatísticas Detalhadas do Sistema</h3>
+                            
+                            <div class="stats-grid-detailed">
+                                <div class="stat-card-detailed">
+                                    <h4><i class="fas fa-calculator"></i> Exercícios</h4>
+                                    <div class="stat-value-detailed">${systemStats.totalExercises.toLocaleString()}</div>
+                                    <div class="stat-label">Total resolvidos</div>
+                                </div>
+                                
+                                <div class="stat-card-detailed">
+                                    <h4><i class="fas fa-percentage"></i> Acurácia</h4>
+                                    <div class="stat-value-detailed">${systemStats.systemAccuracy}%</div>
+                                    <div class="stat-label">Taxa média de acerto</div>
+                                </div>
+                                
+                                <div class="stat-card-detailed">
+                                    <h4><i class="fas fa-puzzle-piece"></i> Racha Cuca</h4>
+                                    <div class="stat-value-detailed">${systemStats.totalRachacucaGames.toLocaleString()}</div>
+                                    <div class="stat-label">Jogos completados</div>
+                                    <div class="stat-subvalue">Média: ${systemStats.rachacucaAvgMoves} movimentos</div>
+                                    <div class="stat-subvalue">Tempo: ${rachacucaFormatTime(systemStats.rachacucaAvgTime)}</div>
+                                </div>
+                                
+                                <div class="stat-card-detailed">
+                                    <h4><i class="fas fa-chart-line"></i> Melhoria</h4>
+                                    <div class="stat-value-detailed">${systemStats.improvementRate}%</div>
+                                    <div class="stat-label">Taxa de melhoria</div>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-chart">
+                                <h4>Distribuição de Atividades</h4>
+                                <canvas id="adminStatsChart" height="200"></canvas>
+                            </div>
                         </div>
                     </div>
                     
@@ -3478,6 +3805,12 @@ function loadAdminSection() {
                                     <label>
                                         <input type="checkbox" id="enableGames" checked>
                                         Habilitar jogos
+                                    </label>
+                                </div>
+                                <div class="setting">
+                                    <label>
+                                        <input type="checkbox" id="enableRachacuca" checked>
+                                        Habilitar Racha Cuca
                                     </label>
                                 </div>
                                 <div class="setting">
@@ -3553,6 +3886,66 @@ function loadAdminSection() {
     section.innerHTML = content;
     
     setupAdminEvents();
+    
+    // Inicializar gráfico de estatísticas do admin
+    setTimeout(initializeAdminStatsChart, 100);
+}
+
+// Inicializar gráfico de estatísticas do admin
+function initializeAdminStatsChart() {
+    const ctx = document.getElementById('adminStatsChart');
+    if (!ctx) return;
+    
+    try {
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js não carregado');
+            return;
+        }
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Exercícios', 'Jogos Racha Cuca', 'Outros Jogos', 'Lições'],
+                datasets: [{
+                    data: [
+                        systemStats.totalExercises,
+                        systemStats.totalRachacucaGames,
+                        2450, // Outros jogos (valor exemplo)
+                        1245  // Lições (valor exemplo)
+                    ],
+                    backgroundColor: [
+                        'rgba(14, 165, 233, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(34, 197, 94, 0.8)',
+                        'rgba(245, 158, 11, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgb(14, 165, 233)',
+                        'rgb(139, 92, 246)',
+                        'rgb(34, 197, 94)',
+                        'rgb(245, 158, 11)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: {
+                                family: 'Inter'
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao criar gráfico do admin:', error);
+    }
 }
 
 // Configurar eventos de administração
@@ -4033,6 +4426,39 @@ function generateReport() {
                 </div>
             `;
             break;
+            
+        case 'games':
+            reportContent = `
+                <h4>🎮 Relatório de Estatísticas de Jogos</h4>
+                <p><strong>Período:</strong> ${periodName}</p>
+                <div class="report-data">
+                    <div class="report-stat">
+                        <span class="stat-label">Total de Jogos:</span>
+                        <span class="stat-value">${systemStats.totalRachacucaGames + 2450}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Jogos Racha Cuca:</span>
+                        <span class="stat-value">${systemStats.totalRachacucaGames}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Média de Movimentos:</span>
+                        <span class="stat-value">${systemStats.rachacucaAvgMoves}</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-label">Tempo Médio:</span>
+                        <span class="stat-value">${rachacucaFormatTime(systemStats.rachacucaAvgTime)}</span>
+                    </div>
+                </div>
+                <div class="games-breakdown">
+                    <h5>Distribuição por Dificuldade:</h5>
+                    <ul>
+                        <li>Fácil: 45%</li>
+                        <li>Normal: 40%</li>
+                        <li>Difícil: 15%</li>
+                    </ul>
+                </div>
+            `;
+            break;
     }
     
     preview.innerHTML = reportContent;
@@ -4045,6 +4471,7 @@ function saveSystemSettings() {
         allowRegistrations: document.getElementById('allowRegistrations').checked,
         emailVerification: document.getElementById('emailVerification').checked,
         enableGames: document.getElementById('enableGames').checked,
+        enableRachacuca: document.getElementById('enableRachacuca').checked,
         gameTimeLimit: document.getElementById('gameTimeLimit').value,
         systemNotifications: document.getElementById('systemNotifications').checked,
         progressNotifications: document.getElementById('progressNotifications').checked
@@ -4135,10 +4562,12 @@ function generateActivitiesTimeline() {
         activities.forEach(activity => {
             const icon = activity.type === 'correct' ? 'fa-check' :
                         activity.type === 'wrong' ? 'fa-times' :
-                        activity.type === 'game' ? 'fa-gamepad' : 'fa-info';
+                        activity.type === 'game' ? 'fa-gamepad' :
+                        activity.type === 'rachacuca' ? 'fa-puzzle-piece' : 'fa-info';
             
             const iconClass = activity.type === 'correct' ? 'success' :
-                             activity.type === 'wrong' ? 'error' : 'info';
+                             activity.type === 'wrong' ? 'error' :
+                             activity.type === 'rachacuca' ? 'info' : 'info';
             
             html += `
                 <div class="timeline-item">
@@ -4164,7 +4593,9 @@ function generateBadges() {
         { id: 'exercises50', name: 'Estudante', description: '50 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 50 },
         { id: 'accuracy80', name: 'Preciso', description: '80% de acertos', earned: ((userProgress.correctAnswers / userProgress.totalAnswers) || 0) >= 0.8 },
         { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true },
-        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 }
+        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 },
+        { id: 'rachacuca5', name: 'Quebra-cabeças', description: '5 jogos Racha Cuca', earned: (userProgress.games.rachacuca?.completed || 0) >= 5 },
+        { id: 'games10', name: 'Jogador', description: '10 jogos completados', earned: ((userProgress.games.lightningGame?.played || 0) + (userProgress.games.rachacuca?.completed || 0) + (userProgress.games.mathChampionship?.played || 0)) >= 10 }
     ];
     
     let html = '';
@@ -4242,6 +4673,10 @@ function loadProfileModal(container) {
                 <div class="profile-stat">
                     <h5>Taxa de Acerto</h5>
                     <p>${accuracy}%</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Jogos Racha Cuca</h5>
+                    <p>${userProgress.games.rachacuca?.completed || 0}</p>
                 </div>
                 <div class="profile-stat">
                     <h5>Tempo de Prática</h5>
@@ -4624,9 +5059,22 @@ function setupDemoMode() {
         subtraction: { correct: 3, total: 4 },
         multiplication: { correct: 3, total: 4 },
         division: { correct: 2, total: 3 },
+        games: {
+            lightningGame: { played: 3, highScore: 120 },
+            divisionPuzzle: { played: 2, highScore: 80 },
+            mathChampionship: { played: 1, highScore: 60 },
+            rachacuca: { 
+                played: 5, 
+                completed: 5,
+                bestMoves: { easy: 25, normal: 42, hard: 68 },
+                bestTime: { easy: 120, normal: 185, hard: 320 },
+                totalMoves: 210,
+                totalTime: 925
+            }
+        },
         lastActivities: [
             { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
-            { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
+            { id: 2, description: 'Racha Cuca Normal concluído em 42 movimentos', type: 'rachacuca', timestamp: new Date(Date.now() - 3600000).toISOString() },
             { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() }
         ],
         level: 'Iniciante',
@@ -4634,7 +5082,8 @@ function setupDemoMode() {
         dailyProgress: {
             exercises: 6,
             correct: 5,
-            time: 27
+            time: 27,
+            games: 2
         }
     };
     
@@ -4647,6 +5096,9 @@ function setupDemoMode() {
         totalExercises: 12450,
         totalUsers: 1260,
         systemAccuracy: 78,
+        totalRachacucaGames: 347,
+        rachacucaAvgMoves: 42,
+        rachacucaAvgTime: 185,
         lastUpdated: Date.now()
     };
     
