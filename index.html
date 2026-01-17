@@ -61,6 +61,15 @@
                                 <p>Melhoria no Aprendizado</p>
                             </div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-puzzle-piece"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsRachacucaGames">0</h3>
+                                <p>Jogos Racha Cuca</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="features-grid">
@@ -472,15 +481,15 @@
                             </div>
                             <div class="stat-card danger">
                                 <div class="stat-icon">
-                                    <i class="fas fa-trophy"></i>
+                                    <i class="fas fa-puzzle-piece"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <h3 id="statLevel">Iniciante</h3>
-                                    <p>Seu Nível</p>
+                                    <h3 id="statRachacucaGames">0</h3>
+                                    <p>Jogos Racha Cuca</p>
                                 </div>
                                 <div class="stat-trend">
-                                    <i class="fas fa-star"></i>
-                                    <span>Próximo: 50xp</span>
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>+8%</span>
                                 </div>
                             </div>
                         </div>
@@ -564,11 +573,11 @@
                                             <span>80%</span>
                                         </div>
                                         <div class="progress-item">
-                                            <span>Tempo</span>
+                                            <span>Jogos</span>
                                             <div class="progress-bar">
-                                                <div class="progress-fill" style="width: 45%"></div>
+                                                <div class="progress-fill" style="width: 40%"></div>
                                             </div>
-                                            <span>27/60 min</span>
+                                            <span>2/5</span>
                                         </div>
                                     </div>
                                 </div>
@@ -766,6 +775,35 @@
             </div>
         </div>
 
+        <!-- Modal para salvar pontuação do Racha Cuca -->
+        <div id="rachacucaSaveScoreModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-save"></i> Salvar Pontuação - Racha Cuca</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="score-summary">
+                        <p>Você completou o quebra-cabeça em <strong id="rachacucaSaveMoves">0</strong> movimentos e <strong id="rachacucaSaveTime">00:00</strong>!</p>
+                        <p>Dificuldade: <strong id="rachacucaSaveDifficulty">Normal</strong></p>
+                    </div>
+                    <div class="player-input">
+                        <label for="rachacucaPlayerName">Seu nome:</label>
+                        <input type="text" id="rachacucaPlayerName" placeholder="Digite seu nome" maxlength="20">
+                        <small>Máximo 20 caracteres</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="rachacucaConfirmSaveBtn" class="btn-auth btn-primary">
+                            <i class="fas fa-check"></i> Salvar Pontuação
+                        </button>
+                        <button id="rachacucaCancelSaveBtn" class="btn-auth btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Container do jogo Racha Cuca -->
         <div id="rachacucaGameContainer" class="rachacuca-container" style="display: none;">
             <div class="rachacuca-header">
@@ -838,6 +876,9 @@
                             </div>
                             <button id="rachacucaPlayAgainBtn" class="btn btn-primary">
                                 <i class="fas fa-play"></i> Jogar Novamente
+                            </button>
+                            <button id="rachacucaSaveScoreBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                                <i class="fas fa-save"></i> Salvar Pontuação (Opcional)
                             </button>
                             <button id="rachacucaViewScoresBtn" class="btn btn-outline" style="margin-top: 10px;">
                                 <i class="fas fa-trophy"></i> Ver Ranking
