@@ -5138,7 +5138,7 @@ margin-top: 5px;
 .rachacuca-game-info {
 display: flex;
 gap: 20px;
-background: rgba(255,255,255,0.1);
+background: rgba(155, 155, 155, 0.5);
 padding: 15px;
 border-radius: 15px;
 backdrop-filter: blur(10px);
@@ -5151,9 +5151,10 @@ min-width: 100px;
 
 .info-label {
 display: block;
-font-size: 0.9rem;
-opacity: 0.8;
+font-size: 1.2rem;
+opacity: 1.0;
 margin-bottom: 5px;
+text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .info-value {
@@ -5614,3 +5615,4 @@ transform: translateX(0);
 opacity: 1;
 }
 }
+
