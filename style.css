@@ -4813,7 +4813,7 @@ select:valid {
 .rachacuca-solution-tile.empty {
     background-color: var(--gray-200);
     color: transparent;
-    visibility: hidden;
+	visibility: hidden;
 }
 
 .completion-message {
@@ -5103,7 +5103,3 @@ select:valid {
 [data-theme="dark"] .rachacuca-solution-tile.empty {
     background-color: var(--gray-700);
 }
-
-
-
-
