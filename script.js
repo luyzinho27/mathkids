@@ -29,14 +29,6 @@ let gameTimer = null;
 let gameTimeLeft = 60;
 let gameScore = 0;
 let gameHighScore = 0;
-
-// Contador de tempo de prática global
-let practiceTimer = null;
-let practiceStartTime = null;
-let totalPracticeTime = 0;
-let sessionPracticeTime = 0;
-
-// Dados do sistema
 let systemStats = {
     totalStudents: 0,
     averageRating: 4.8,
@@ -52,7 +44,7 @@ let userProgress = {
     exercisesCompleted: 0,
     correctAnswers: 0,
     totalAnswers: 0,
-    practiceTime: 0, // Em segundos
+    practiceTime: 0,
     addition: { correct: 0, total: 0 },
     subtraction: { correct: 0, total: 0 },
     multiplication: { correct: 0, total: 0 },
@@ -64,9 +56,6 @@ let userProgress = {
         exercises: 0,
         correct: 0,
         time: 0
-    },
-    gameScores: {
-        rachacuca: []
     }
 };
 
@@ -176,8 +165,17 @@ const DOM = {
     rachacucaFinalTime: document.getElementById('rachacucaFinalTime'),
     rachacucaPlayAgainBtn: document.getElementById('rachacucaPlayAgainBtn'),
     rachacucaSaveScoreBtn: document.getElementById('rachacucaSaveScoreBtn'),
+    rachacucaViewRankingBtn: document.getElementById('rachacucaViewRankingBtn'),
     rachacucaScoresModal: document.getElementById('rachacucaScoresModal'),
     rachacucaScoresList: document.getElementById('rachacucaScoresList'),
+    rachacucaSaveScoreModal: document.getElementById('rachacucaSaveScoreModal'),
+    rachacucaSaveMoves: document.getElementById('rachacucaSaveMoves'),
+    rachacucaSaveTime: document.getElementById('rachacucaSaveTime'),
+    rachacucaSaveDifficulty: document.getElementById('rachacucaSaveDifficulty'),
+    rachacucaPlayerName: document.getElementById('rachacucaPlayerName'),
+    rachacucaConfirmSaveBtn: document.getElementById('rachacucaConfirmSaveBtn'),
+    rachacucaCancelSaveBtn: document.getElementById('rachacucaCancelSaveBtn'),
+    autoSaveNote: document.getElementById('autoSaveNote'),
     
     // Modais
     termsModal: document.getElementById('termsModal'),
@@ -207,6 +205,7 @@ let rachacucaTimerInterval = null;
 let rachacucaGameStarted = false;
 let rachacucaGameCompleted = false;
 let rachacucaCurrentDifficulty = 'normal';
+let rachacucaAutoSaveAttempted = false;
 
 // Configurar listeners do Firebase em tempo real
 function setupFirebaseListeners() {
@@ -253,11 +252,6 @@ function setupUserProgressListener() {
                 if (data.progress) {
                     userProgress = data.progress;
                     updateProgressUI();
-                    
-                    // Atualizar o tempo de prática na UI
-                    if (DOM.statTime) {
-                        DOM.statTime.textContent = Math.floor(userProgress.practiceTime / 60) + ' min';
-                    }
                 }
             }
         },
@@ -274,9 +268,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Configurar eventos
     setupEventListeners();
-    
-    // Carregar credenciais salvas
-    loadSavedCredentials();
     
     // Verificar autenticação
     checkAuthState();
@@ -410,7 +401,6 @@ function setupEventListeners() {
                 const operationType = this.getAttribute('data-operation');
                 switchSection('practice');
                 loadPracticeSection(operationType);
-                startPracticeTimer();
             });
         });
     }
@@ -425,7 +415,6 @@ function setupEventListeners() {
             const randomOperation = operations[Math.floor(Math.random() * operations.length)];
             switchSection('practice');
             loadPracticeSection(randomOperation);
-            startPracticeTimer();
         });
     }
     
@@ -557,6 +546,26 @@ function setupEventListeners() {
         DOM.rachacucaPlayAgainBtn.addEventListener('click', rachacucaResetGame);
     }
     
+    if (DOM.rachacucaViewRankingBtn) {
+        DOM.rachacucaViewRankingBtn.addEventListener('click', function() {
+            if (DOM.rachacucaScoresModal) {
+                DOM.rachacucaScoresModal.classList.add('active');
+                rachacucaLoadScores('global');
+            }
+        });
+    }
+    
+    // Eventos dos modais do Racha Cuca
+    if (DOM.rachacucaConfirmSaveBtn) {
+        DOM.rachacucaConfirmSaveBtn.addEventListener('click', rachacucaSaveScore);
+    }
+    
+    if (DOM.rachacucaCancelSaveBtn) {
+        DOM.rachacucaCancelSaveBtn.addEventListener('click', function() {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        });
+    }
+    
     // Eventos dos botões de dificuldade do Racha Cuca
     if (DOM.rachacucaDifficultyBtns) {
         DOM.rachacucaDifficultyBtns.forEach(btn => {
@@ -591,6 +600,9 @@ function setupEventListeners() {
         if (DOM.rachacucaScoresModal && e.target === DOM.rachacucaScoresModal) {
             DOM.rachacucaScoresModal.classList.remove('active');
         }
+        if (DOM.rachacucaSaveScoreModal && e.target === DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
     });
 }
 
@@ -618,32 +630,6 @@ function setupPasswordToggles() {
             });
         }
     });
-}
-
-// Carregar credenciais salvas
-function loadSavedCredentials() {
-    const savedEmail = localStorage.getItem('mathkids_saved_email');
-    const savedPassword = localStorage.getItem('mathkids_saved_password');
-    const rememberMe = localStorage.getItem('mathkids_remember_me') === 'true';
-    
-    if (rememberMe && savedEmail && savedPassword) {
-        document.getElementById('loginEmail').value = savedEmail;
-        document.getElementById('loginPassword').value = savedPassword;
-        document.getElementById('rememberMe').checked = true;
-    }
-}
-
-// Salvar credenciais
-function saveCredentials(email, password, remember) {
-    if (remember) {
-        localStorage.setItem('mathkids_saved_email', email);
-        localStorage.setItem('mathkids_saved_password', password);
-        localStorage.setItem('mathkids_remember_me', 'true');
-    } else {
-        localStorage.removeItem('mathkids_saved_email');
-        localStorage.removeItem('mathkids_saved_password');
-        localStorage.removeItem('mathkids_remember_me');
-    }
 }
 
 // Carregar estatísticas do sistema
@@ -700,14 +686,12 @@ async function loadSystemStats(forceUpdate = false) {
         let totalExercises = 0;
         let totalCorrect = 0;
         let totalAttempts = 0;
-        let totalPracticeTime = 0;
         
         studentUsers.forEach(user => {
             if (user.progress) {
                 totalExercises += user.progress.exercisesCompleted || 0;
                 totalCorrect += user.progress.correctAnswers || 0;
                 totalAttempts += user.progress.totalAnswers || 0;
-                totalPracticeTime += user.progress.practiceTime || 0;
             }
         });
         
@@ -934,12 +918,8 @@ async function handleLogin(e) {
         if (auth) {
             const userCredential = await auth.signInWithEmailAndPassword(email, password);
             await loadUserDataFromFirebase(userCredential.user.uid);
-            
-            // Salvar credenciais se "Lembrar-me" estiver marcado
-            saveCredentials(email, password, rememberMe);
         } else {
             await handleDemoLogin(email, password);
-            saveCredentials(email, password, rememberMe);
         }
         
         showLoading(false);
@@ -1080,8 +1060,6 @@ async function handlePasswordRecovery(e) {
 
 // Manipular logout
 function handleLogout() {
-    stopPracticeTimer();
-    
     if (auth) {
         auth.signOut().then(() => {
             logoutLocal();
@@ -1095,8 +1073,6 @@ function handleLogout() {
 }
 
 function logoutLocal() {
-    stopPracticeTimer();
-    
     if (statsListener) {
         statsListener();
         statsListener = null;
@@ -1170,12 +1146,6 @@ function loadUserData(user) {
     
     if (user.progress) {
         userProgress = user.progress;
-        
-        // Inicializar o tempo de prática se não existir
-        if (!userProgress.practiceTime) {
-            userProgress.practiceTime = 0;
-        }
-        
         updateProgressUI();
     }
     
@@ -1245,64 +1215,11 @@ function updateProgressUI() {
     }
     
     if (DOM.statTime) {
-        // Mostrar tempo em minutos
-        const minutes = Math.floor((userProgress.practiceTime || 0) / 60);
-        DOM.statTime.textContent = minutes + ' min';
+        DOM.statTime.textContent = Math.floor(userProgress.practiceTime / 60) + ' min';
     }
     
     if (DOM.statLevel) {
         DOM.statLevel.textContent = userProgress.level || 'Iniciante';
-    }
-}
-
-// Iniciar timer de prática
-function startPracticeTimer() {
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-    }
-    
-    practiceStartTime = Date.now();
-    sessionPracticeTime = 0;
-    
-    practiceTimer = setInterval(() => {
-        sessionPracticeTime = Math.floor((Date.now() - practiceStartTime) / 1000);
-        
-        // Atualizar o tempo na UI a cada 30 segundos
-        if (sessionPracticeTime % 30 === 0) {
-            updatePracticeTime();
-        }
-    }, 1000);
-}
-
-// Parar timer de prática
-function stopPracticeTimer() {
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-        practiceTimer = null;
-        updatePracticeTime();
-    }
-}
-
-// Atualizar tempo de prática no perfil do usuário
-function updatePracticeTime() {
-    if (!currentUser) return;
-    
-    // Adicionar o tempo da sessão atual ao tempo total
-    if (sessionPracticeTime > 0) {
-        userProgress.practiceTime = (userProgress.practiceTime || 0) + sessionPracticeTime;
-        userProgress.dailyProgress.time = (userProgress.dailyProgress.time || 0) + Math.floor(sessionPracticeTime / 60);
-        
-        // Salvar no Firebase
-        saveUserProgress();
-        
-        // Atualizar UI
-        updateProgressUI();
-        
-        // Resetar sessão
-        sessionPracticeTime = 0;
-        if (practiceStartTime) {
-            practiceStartTime = Date.now();
-        }
     }
 }
 
@@ -1424,7 +1341,6 @@ function loadSectionContent(sectionId) {
             break;
         case 'practice':
             loadPracticeSection();
-            startPracticeTimer();
             break;
         case 'games':
             loadGamesSection();
@@ -2235,6 +2151,12 @@ function rachacucaInitGame() {
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
     rachacucaShuffleBoard();
+    rachacucaAutoSaveAttempted = false;
+    
+    // Ocultar botão de salvar manualmente (agora é automático)
+    if (DOM.rachacucaSaveScoreBtn) {
+        DOM.rachacucaSaveScoreBtn.style.display = 'none';
+    }
 }
 
 // Criar o tabuleiro do Racha Cuca
@@ -2330,6 +2252,7 @@ function rachacucaShuffleBoard() {
     rachacucaGameCompleted = false;
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
+    rachacucaAutoSaveAttempted = false;
     
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'none';
@@ -2401,6 +2324,7 @@ function rachacucaResetGame() {
     rachacucaGameCompleted = false;
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
+    rachacucaAutoSaveAttempted = false;
     
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'none';
@@ -2440,8 +2364,8 @@ function rachacucaCheckWin() {
     return rachacucaBoard[15] === null;
 }
 
-// Concluir o jogo Racha Cuca e salvar automaticamente
-async function rachacucaCompleteGame() {
+// Concluir o jogo Racha Cuca
+function rachacucaCompleteGame() {
     rachacucaGameCompleted = true;
     
     if (rachacucaTimerInterval) {
@@ -2454,25 +2378,26 @@ async function rachacucaCompleteGame() {
         DOM.rachacucaFinalTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
         DOM.rachacucaCompletionMessage.style.display = 'block';
         
-        // Salvar o melhor tempo localmente
+        // Atualizar melhor tempo local
         const bestTime = localStorage.getItem('rachacuca_best_time');
         if (!bestTime || rachacucaTimerSeconds < parseInt(bestTime)) {
             localStorage.setItem('rachacuca_best_time', rachacucaTimerSeconds.toString());
         }
+        
+        // Salvar pontuação automaticamente
+        rachacucaAutoSaveScore();
     }
     
-    // Adicionar atividade
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos`, 'game');
-    
-    // Salvar pontuação automaticamente no Firebase
-    await rachacucaSaveScoreAutomatically();
 }
 
-// Salvar pontuação do Racha Cuca automaticamente
-async function rachacucaSaveScoreAutomatically() {
-    if (!db || !currentUser) return;
+// Salvar pontuação automaticamente
+async function rachacucaAutoSaveScore() {
+    if (!db || !currentUser || rachacucaAutoSaveAttempted) return;
     
-    const playerName = currentUser.name || 'Anônimo';
+    rachacucaAutoSaveAttempted = true;
+    
+    const playerName = currentUser.name || 'Jogador';
     
     const scoreData = {
         playerName: playerName,
@@ -2481,38 +2406,35 @@ async function rachacucaSaveScoreAutomatically() {
         difficulty: rachacucaCurrentDifficulty,
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         date: new Date().toISOString(),
-        userId: currentUser.id
+        userId: currentUser.id,
+        autoSaved: true
     };
     
     try {
-        // Salvar na coleção geral de pontuações
         await db.collection('rachacuca_scores').add(scoreData);
         
-        // Também salvar no perfil do usuário
-        if (!userProgress.gameScores.rachacuca) {
-            userProgress.gameScores.rachacuca = [];
+        // Mostrar mensagem de sucesso
+        if (DOM.autoSaveNote) {
+            DOM.autoSaveNote.style.display = 'block';
+            DOM.autoSaveNote.innerHTML = '<i class="fas fa-check-circle"></i> Sua pontuação foi salva automaticamente!';
         }
-        
-        userProgress.gameScores.rachacuca.push({
-            moves: rachacucaMoves,
-            time: rachacucaTimerSeconds,
-            difficulty: rachacucaCurrentDifficulty,
-            date: new Date().toISOString()
-        });
-        
-        // Manter apenas as últimas 10 pontuações
-        if (userProgress.gameScores.rachacuca.length > 10) {
-            userProgress.gameScores.rachacuca = userProgress.gameScores.rachacuca.slice(-10);
-        }
-        
-        // Atualizar o progresso do usuário
-        await saveUserProgress();
         
         console.log('✅ Pontuação do Racha Cuca salva automaticamente');
-        
+        showToast('Pontuação salva automaticamente!', 'success');
     } catch (error) {
         console.error('❌ Erro ao salvar pontuação automaticamente:', error);
-        showToast('Não foi possível salvar a pontuação automaticamente.', 'warning');
+        
+        // Mostrar mensagem de erro
+        if (DOM.autoSaveNote) {
+            DOM.autoSaveNote.style.display = 'block';
+            DOM.autoSaveNote.innerHTML = '<i class="fas fa-exclamation-circle"></i> Erro ao salvar pontuação automaticamente';
+            DOM.autoSaveNote.style.color = 'var(--danger-500)';
+        }
+        
+        // Mostrar botão para salvar manualmente em caso de erro
+        if (DOM.rachacucaSaveScoreBtn) {
+            DOM.rachacucaSaveScoreBtn.style.display = 'inline-block';
+        }
     }
 }
 
@@ -2574,6 +2496,77 @@ function rachacucaCreateSolutionBoard() {
     }
 }
 
+// Abrir modal para salvar pontuação do Racha Cuca (fallback manual)
+function rachacucaOpenSaveScoreModal() {
+    if (!rachacucaGameCompleted) {
+        showToast('Complete o jogo primeiro para salvar sua pontuação!', 'error');
+        return;
+    }
+    
+    if (DOM.rachacucaSaveMoves && DOM.rachacucaSaveTime && DOM.rachacucaSaveDifficulty) {
+        DOM.rachacucaSaveMoves.textContent = rachacucaMoves;
+        DOM.rachacucaSaveTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
+        DOM.rachacucaSaveDifficulty.textContent = 
+            rachacucaCurrentDifficulty === 'easy' ? 'Fácil' : 
+            rachacucaCurrentDifficulty === 'normal' ? 'Normal' : 'Difícil';
+    }
+    
+    if (DOM.rachacucaPlayerName) {
+        const playerName = currentUser?.name || localStorage.getItem('rachacuca_player_name') || '';
+        DOM.rachacucaPlayerName.value = playerName;
+    }
+    
+    if (DOM.rachacucaSaveScoreModal) {
+        DOM.rachacucaSaveScoreModal.classList.add('active');
+    }
+}
+
+// Salvar pontuação do Racha Cuca (fallback manual)
+async function rachacucaSaveScore() {
+    if (!DOM.rachacucaPlayerName || !db) return;
+    
+    const playerName = DOM.rachacucaPlayerName.value.trim();
+    
+    if (!playerName) {
+        showToast('Por favor, digite seu nome!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    if (playerName.length > 20) {
+        showToast('O nome deve ter no máximo 20 caracteres!', 'error');
+        DOM.rachacucaPlayerName.focus();
+        return;
+    }
+    
+    localStorage.setItem('rachacuca_player_name', playerName);
+    
+    const scoreData = {
+        playerName: playerName,
+        moves: rachacucaMoves,
+        time: rachacucaTimerSeconds,
+        difficulty: rachacucaCurrentDifficulty,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        date: new Date().toISOString(),
+        userId: currentUser?.id || 'anonymous'
+    };
+  
+    try {
+        await db.collection('rachacuca_scores').add(scoreData);
+        
+        showToast('Pontuação salva com sucesso!', 'success');
+        
+        if (DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
+        
+        rachacucaLoadScores('global');
+    } catch (error) {
+        console.error('Erro ao salvar pontuação:', error);
+        showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
+    }
+}
+
 // Carregar pontuações do Racha Cuca
 async function rachacucaLoadScores(difficulty = 'global') {
     if (!DOM.rachacucaScoresList || !db) return;
@@ -2622,7 +2615,8 @@ function rachacucaDisplayScores(scores) {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
-        if (currentUser && score.userId === currentUser.id) {
+        const currentPlayerName = currentUser?.name || localStorage.getItem('rachacuca_player_name') || '';
+        if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
             scoreItem.classList.add('highlight');
         }
         
@@ -3001,9 +2995,6 @@ function loadProgressSection() {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
-    // Calcular tempo de prática em minutos
-    const practiceMinutes = Math.floor((userProgress.practiceTime || 0) / 60);
-    
     const content = `
         <div class="section-header">
             <div class="header-content">
@@ -3024,7 +3015,7 @@ function loadProgressSection() {
                         <div class="stat-label">Taxa de Acerto</div>
                     </div>
                     <div class="progress-stat">
-                        <div class="stat-value">${practiceMinutes}</div>
+                        <div class="stat-value">${Math.floor(userProgress.practiceTime / 60)}</div>
                         <div class="stat-label">Minutos de Prática</div>
                     </div>
                     <div class="progress-stat">
@@ -4027,7 +4018,7 @@ function generateBadges() {
         { id: 'exercises50', name: 'Estudante', description: '50 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 50 },
         { id: 'accuracy80', name: 'Preciso', description: '80% de acertos', earned: ((userProgress.correctAnswers / userProgress.totalAnswers) || 0) >= 0.8 },
         { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true },
-        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: Math.floor((userProgress.practiceTime || 0) / 60) >= 60 }
+        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 }
     ];
     
     let html = '';
@@ -4108,7 +4099,7 @@ function loadProfileModal(container) {
                 </div>
                 <div class="profile-stat">
                     <h5>Tempo de Prática</h5>
-                    <p>${Math.floor((userProgress.practiceTime || 0) / 60)} min</p>
+                    <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
                 </div>
             </div>
             
@@ -4412,31 +4403,29 @@ function handleAuthError(error) {
     if (error.code) {
         switch(error.code) {
             case 'auth/invalid-email':
-                message = 'Email inválido. Verifique o formato do email.';
+                message = 'Email inválido.';
                 break;
             case 'auth/user-disabled':
-                message = 'Esta conta foi desativada. Entre em contato com o suporte.';
+                message = 'Esta conta foi desativada.';
                 break;
             case 'auth/user-not-found':
-                message = 'Usuário não encontrado. Verifique seu email ou cadastre-se.';
+                message = 'Usuário não encontrado.';
                 break;
             case 'auth/wrong-password':
-                message = 'Senha incorreta. Tente novamente ou clique em "Esqueci a senha".';
+                message = 'Senha incorreta.';
                 break;
             case 'auth/email-already-in-use':
-                message = 'Este email já está em uso. Tente fazer login ou use outro email.';
+                message = 'Este email já está em uso.';
                 break;
             case 'auth/weak-password':
                 message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
                 break;
             case 'auth/operation-not-allowed':
-                message = 'Operação não permitida. Entre em contato com o suporte.';
+                message = 'Operação não permitida.';
                 break;
             case 'auth/too-many-requests':
                 message = 'Muitas tentativas. Tente novamente mais tarde.';
                 break;
-            default:
-                message = `Erro: ${error.message}`;
         }
     }
     
@@ -4484,7 +4473,7 @@ function setupDemoMode() {
         exercisesCompleted: 15,
         correctAnswers: 12,
         totalAnswers: 15,
-        practiceTime: 2700, // 45 minutos em segundos
+        practiceTime: 45,
         addition: { correct: 4, total: 4 },
         subtraction: { correct: 3, total: 4 },
         multiplication: { correct: 3, total: 4 },
@@ -4500,9 +4489,6 @@ function setupDemoMode() {
             exercises: 6,
             correct: 5,
             time: 27
-        },
-        gameScores: {
-            rachacuca: []
         }
     };
     
@@ -4580,9 +4566,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-// Atualizar tempo de prática quando o usuário sai da página
-window.addEventListener('beforeunload', function() {
-    stopPracticeTimer();
-});
-
-console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
+console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
