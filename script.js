@@ -165,7 +165,6 @@ const DOM = {
     rachacucaFinalTime: document.getElementById('rachacucaFinalTime'),
     rachacucaPlayAgainBtn: document.getElementById('rachacucaPlayAgainBtn'),
     rachacucaSaveScoreBtn: document.getElementById('rachacucaSaveScoreBtn'),
-    rachacucaViewRankingBtn: document.getElementById('rachacucaViewRankingBtn'),
     rachacucaScoresModal: document.getElementById('rachacucaScoresModal'),
     rachacucaScoresList: document.getElementById('rachacucaScoresList'),
     rachacucaSaveScoreModal: document.getElementById('rachacucaSaveScoreModal'),
@@ -175,7 +174,6 @@ const DOM = {
     rachacucaPlayerName: document.getElementById('rachacucaPlayerName'),
     rachacucaConfirmSaveBtn: document.getElementById('rachacucaConfirmSaveBtn'),
     rachacucaCancelSaveBtn: document.getElementById('rachacucaCancelSaveBtn'),
-    autoSaveNote: document.getElementById('autoSaveNote'),
     
     // Modais
     termsModal: document.getElementById('termsModal'),
@@ -206,6 +204,13 @@ let rachacucaGameStarted = false;
 let rachacucaGameCompleted = false;
 let rachacucaCurrentDifficulty = 'normal';
 let rachacucaAutoSaveAttempted = false;
+
+// Variáveis para drag and drop do Racha Cuca
+let rachacucaDraggedTile = null;
+let rachacucaIsDragging = false;
+let rachacucaDragStartX = 0;
+let rachacucaDragStartY = 0;
+let rachacucaDragThreshold = 40;
 
 // Configurar listeners do Firebase em tempo real
 function setupFirebaseListeners() {
@@ -546,13 +551,8 @@ function setupEventListeners() {
         DOM.rachacucaPlayAgainBtn.addEventListener('click', rachacucaResetGame);
     }
     
-    if (DOM.rachacucaViewRankingBtn) {
-        DOM.rachacucaViewRankingBtn.addEventListener('click', function() {
-            if (DOM.rachacucaScoresModal) {
-                DOM.rachacucaScoresModal.classList.add('active');
-                rachacucaLoadScores('global');
-            }
-        });
+    if (DOM.rachacucaSaveScoreBtn) {
+        DOM.rachacucaSaveScoreBtn.addEventListener('click', rachacucaOpenSaveScoreModal);
     }
     
     // Eventos dos modais do Racha Cuca
@@ -2152,11 +2152,6 @@ function rachacucaInitGame() {
     rachacucaResetTimer();
     rachacucaShuffleBoard();
     rachacucaAutoSaveAttempted = false;
-    
-    // Ocultar botão de salvar manualmente (agora é automático)
-    if (DOM.rachacucaSaveScoreBtn) {
-        DOM.rachacucaSaveScoreBtn.style.display = 'none';
-    }
 }
 
 // Criar o tabuleiro do Racha Cuca
@@ -2169,7 +2164,7 @@ function rachacucaCreateBoard() {
     rachacucaEmptyTileIndex = 15;
 }
 
-// Renderizar o tabuleiro do Racha Cuca
+// Renderizar o tabuleiro do Racha Cuca com suporte a drag and drop
 function rachacucaRenderBoard() {
     if (!DOM.rachacucaPuzzleBoard) return;
     
@@ -2192,13 +2187,130 @@ function rachacucaRenderBoard() {
                 tile.classList.add('correct-position');
             }
             
+            // Adicionar eventos de drag and drop
+            tile.addEventListener('mousedown', rachacucaStartDrag);
+            tile.addEventListener('touchstart', rachacucaStartDragTouch);
+            
+            // Adicionar evento de clique como fallback
             tile.addEventListener('click', () => {
-                rachacucaMoveTile(index);
+                if (!rachacucaIsDragging) {
+                    rachacucaMoveTile(index);
+                }
             });
         }
         
         DOM.rachacucaPuzzleBoard.appendChild(tile);
     });
+}
+
+// Iniciar arrastar (mouse) - Racha Cuca
+function rachacucaStartDrag(e) {
+    if (rachacucaGameCompleted) return;
+    
+    const tile = e.target;
+    const index = parseInt(tile.dataset.index);
+    
+    if (rachacucaIsMovable(index)) {
+        rachacucaDraggedTile = tile;
+        rachacucaIsDragging = true;
+        rachacucaDragStartX = e.clientX;
+        rachacucaDragStartY = e.clientY;
+        
+        tile.classList.add('dragging');
+        tile.style.zIndex = '100';
+        
+        document.addEventListener('mousemove', rachacucaDrag);
+        document.addEventListener('mouseup', rachacucaEndDrag);
+        
+        e.preventDefault();
+    }
+}
+
+// Iniciar arrastar (touch) - Racha Cuca
+function rachacucaStartDragTouch(e) {
+    if (rachacucaGameCompleted) return;
+    
+    const tile = e.target;
+    const index = parseInt(tile.dataset.index);
+    
+    if (rachacucaIsMovable(index) && e.touches.length === 1) {
+        rachacucaDraggedTile = tile;
+        rachacucaIsDragging = true;
+        rachacucaDragStartX = e.touches[0].clientX;
+        rachacucaDragStartY = e.touches[0].clientY;
+        
+        tile.classList.add('dragging');
+        tile.style.zIndex = '100';
+        
+        document.addEventListener('touchmove', rachacucaDragTouch, { passive: false });
+        document.addEventListener('touchend', rachacucaEndDragTouch);
+        
+        e.preventDefault();
+    }
+}
+
+// Arrastar (mouse) - Racha Cuca
+function rachacucaDrag(e) {
+    if (!rachacucaDraggedTile || !rachacucaIsDragging) return;
+    
+    const dx = e.clientX - rachacucaDragStartX;
+    const dy = e.clientY - rachacucaDragStartY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    rachacucaDraggedTile.style.transform = `translate(${dx}px, ${dy}px)`;
+    
+    if (distance > rachacucaDragThreshold) {
+        const index = parseInt(rachacucaDraggedTile.dataset.index);
+        rachacucaMoveTile(index);
+        rachacucaEndDrag();
+    }
+}
+
+// Arrastar (touch) - Racha Cuca
+function rachacucaDragTouch(e) {
+    if (!rachacucaDraggedTile || !rachacucaIsDragging || e.touches.length !== 1) return;
+    
+    const dx = e.touches[0].clientX - rachacucaDragStartX;
+    const dy = e.touches[0].clientY - rachacucaDragStartY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    rachacucaDraggedTile.style.transform = `translate(${dx}px, ${dy}px)`;
+    
+    if (distance > rachacucaDragThreshold) {
+        const index = parseInt(rachacucaDraggedTile.dataset.index);
+        rachacucaMoveTile(index);
+        rachacucaEndDragTouch();
+    }
+    
+    e.preventDefault();
+}
+
+// Finalizar arrastar (mouse) - Racha Cuca
+function rachacucaEndDrag() {
+    if (rachacucaDraggedTile) {
+        rachacucaDraggedTile.classList.remove('dragging');
+        rachacucaDraggedTile.style.transform = '';
+        rachacucaDraggedTile.style.zIndex = '';
+        rachacucaDraggedTile = null;
+    }
+    rachacucaIsDragging = false;
+    
+    document.removeEventListener('mousemove', rachacucaDrag);
+    document.removeEventListener('mouseup', rachacucaEndDrag);
+}
+
+// Finalizar arrastar (touch) - Racha Cuca
+function rachacucaEndDragTouch() {
+    if (rachacucaDraggedTile) {
+        rachacucaDraggedTile.classList.remove('dragging');
+        rachacucaDraggedTile.style.transform = '';
+        rachacucaDraggedTile.style.zIndex = '';
+        rachacucaDraggedTile = null;
+    }
+    rachacucaIsDragging = false;
+    
+    document.removeEventListener('touchmove', rachacucaDragTouch);
+    document.removeEventListener('touchend', rachacucaEndDragTouch);
 }
 
 // Verificar se uma peça pode ser movida no Racha Cuca
@@ -2252,7 +2364,6 @@ function rachacucaShuffleBoard() {
     rachacucaGameCompleted = false;
     rachacucaUpdateMoveCounter();
     rachacucaResetTimer();
-    rachacucaAutoSaveAttempted = false;
     
     if (DOM.rachacucaCompletionMessage) {
         DOM.rachacucaCompletionMessage.style.display = 'none';
@@ -2365,7 +2476,7 @@ function rachacucaCheckWin() {
 }
 
 // Concluir o jogo Racha Cuca
-function rachacucaCompleteGame() {
+async function rachacucaCompleteGame() {
     rachacucaGameCompleted = true;
     
     if (rachacucaTimerInterval) {
@@ -2378,64 +2489,16 @@ function rachacucaCompleteGame() {
         DOM.rachacucaFinalTime.textContent = rachacucaFormatTime(rachacucaTimerSeconds);
         DOM.rachacucaCompletionMessage.style.display = 'block';
         
-        // Atualizar melhor tempo local
         const bestTime = localStorage.getItem('rachacuca_best_time');
         if (!bestTime || rachacucaTimerSeconds < parseInt(bestTime)) {
             localStorage.setItem('rachacuca_best_time', rachacucaTimerSeconds.toString());
         }
-        
-        // Salvar pontuação automaticamente
-        rachacucaAutoSaveScore();
     }
     
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos`, 'game');
-}
-
-// Salvar pontuação automaticamente
-async function rachacucaAutoSaveScore() {
-    if (!db || !currentUser || rachacucaAutoSaveAttempted) return;
     
-    rachacucaAutoSaveAttempted = true;
-    
-    const playerName = currentUser.name || 'Jogador';
-    
-    const scoreData = {
-        playerName: playerName,
-        moves: rachacucaMoves,
-        time: rachacucaTimerSeconds,
-        difficulty: rachacucaCurrentDifficulty,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        date: new Date().toISOString(),
-        userId: currentUser.id,
-        autoSaved: true
-    };
-    
-    try {
-        await db.collection('rachacuca_scores').add(scoreData);
-        
-        // Mostrar mensagem de sucesso
-        if (DOM.autoSaveNote) {
-            DOM.autoSaveNote.style.display = 'block';
-            DOM.autoSaveNote.innerHTML = '<i class="fas fa-check-circle"></i> Sua pontuação foi salva automaticamente!';
-        }
-        
-        console.log('✅ Pontuação do Racha Cuca salva automaticamente');
-        showToast('Pontuação salva automaticamente!', 'success');
-    } catch (error) {
-        console.error('❌ Erro ao salvar pontuação automaticamente:', error);
-        
-        // Mostrar mensagem de erro
-        if (DOM.autoSaveNote) {
-            DOM.autoSaveNote.style.display = 'block';
-            DOM.autoSaveNote.innerHTML = '<i class="fas fa-exclamation-circle"></i> Erro ao salvar pontuação automaticamente';
-            DOM.autoSaveNote.style.color = 'var(--danger-500)';
-        }
-        
-        // Mostrar botão para salvar manualmente em caso de erro
-        if (DOM.rachacucaSaveScoreBtn) {
-            DOM.rachacucaSaveScoreBtn.style.display = 'inline-block';
-        }
-    }
+    // Salvar pontuação automaticamente
+    await rachacucaAutoSaveScore();
 }
 
 // Atualizar contador de movimentos do Racha Cuca
@@ -2496,7 +2559,127 @@ function rachacucaCreateSolutionBoard() {
     }
 }
 
-// Abrir modal para salvar pontuação do Racha Cuca (fallback manual)
+// Salvar pontuação automaticamente do Racha Cuca
+async function rachacucaAutoSaveScore() {
+    if (rachacucaAutoSaveAttempted) return;
+    
+    rachacucaAutoSaveAttempted = true;
+    
+    if (!db || !currentUser) {
+        console.log('Firebase não configurado ou usuário não autenticado. Pontuação salva localmente.');
+        // Salvar localmente
+        const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+        const scoreData = {
+            playerName: currentUser?.name || 'Jogador',
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            date: new Date().toISOString(),
+            userId: currentUser?.id || 'anonymous',
+            autoSaved: true
+        };
+        
+        localScores.push(scoreData);
+        localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+        
+        showToast('Pontuação salva localmente!', 'success');
+        return;
+    }
+    
+    try {
+        // Verificar se a coleção existe e criar se necessário
+        await ensureRachacucaCollectionExists();
+        
+        const playerName = currentUser.name || 'Jogador';
+        const scoreData = {
+            playerName: playerName,
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            date: new Date().toISOString(),
+            userId: currentUser.id,
+            autoSaved: true
+        };
+        
+        await db.collection('rachacuca_scores').add(scoreData);
+        
+        showToast('Pontuação salva automaticamente!', 'success');
+        
+        console.log('✅ Pontuação do Racha Cuca salva automaticamente');
+        
+    } catch (error) {
+        console.error('❌ Erro ao salvar pontuação automaticamente:', error);
+        
+        // Tentar salvar localmente como fallback
+        try {
+            const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+            const scoreData = {
+                playerName: currentUser?.name || 'Jogador',
+                moves: rachacucaMoves,
+                time: rachacucaTimerSeconds,
+                difficulty: rachacucaCurrentDifficulty,
+                date: new Date().toISOString(),
+                userId: currentUser?.id || 'anonymous',
+                autoSaved: true,
+                error: error.message
+            };
+            
+            localScores.push(scoreData);
+            localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+            
+            showToast('Pontuação salva localmente (erro no servidor)', 'warning');
+        } catch (localError) {
+            console.error('❌ Erro ao salvar localmente:', localError);
+            showToast('Erro ao salvar pontuação', 'error');
+        }
+    }
+}
+
+// Verificar e criar coleção do Racha Cuca se necessário
+async function ensureRachacucaCollectionExists() {
+    if (!db) return;
+    
+    try {
+        // Tentar ler a coleção para verificar se existe
+        const snapshot = await db.collection('rachacuca_scores').limit(1).get();
+        console.log('✅ Coleção rachacuca_scores existe');
+        return true;
+    } catch (error) {
+        console.log('⚠️ Coleção não existe ou erro de permissão:', error);
+        
+        // Para corrigir o erro de permissões, o administrador precisa configurar as regras de segurança no Firebase Console
+        // Aqui apenas mostramos uma mensagem informativa
+        if (error.code === 'permission-denied') {
+            console.warn('⚠️ Permissões do Firebase precisam ser ajustadas no Console do Firebase');
+            console.warn('⚠️ Adicione estas regras de segurança:');
+            console.warn(`
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permissões para rachacuca_scores
+    match /rachacuca_scores/{document} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Permissões para users (existentes)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.token.role == 'admin';
+    }
+  }
+}
+            `);
+        }
+        
+        // Não podemos criar a coleção programaticamente devido a restrições de segurança
+        // O administrador precisa fazer isso manualmente no Console do Firebase
+        return false;
+    }
+}
+
+// Abrir modal para salvar pontuação do Racha Cuca
 function rachacucaOpenSaveScoreModal() {
     if (!rachacucaGameCompleted) {
         showToast('Complete o jogo primeiro para salvar sua pontuação!', 'error');
@@ -2512,7 +2695,7 @@ function rachacucaOpenSaveScoreModal() {
     }
     
     if (DOM.rachacucaPlayerName) {
-        const playerName = currentUser?.name || localStorage.getItem('rachacuca_player_name') || '';
+        const playerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
         DOM.rachacucaPlayerName.value = playerName;
     }
     
@@ -2521,9 +2704,9 @@ function rachacucaOpenSaveScoreModal() {
     }
 }
 
-// Salvar pontuação do Racha Cuca (fallback manual)
+// Salvar pontuação do Racha Cuca (manual)
 async function rachacucaSaveScore() {
-    if (!DOM.rachacucaPlayerName || !db) return;
+    if (!DOM.rachacucaPlayerName) return;
     
     const playerName = DOM.rachacucaPlayerName.value.trim();
     
@@ -2541,17 +2724,45 @@ async function rachacucaSaveScore() {
     
     localStorage.setItem('rachacuca_player_name', playerName);
     
-    const scoreData = {
-        playerName: playerName,
-        moves: rachacucaMoves,
-        time: rachacucaTimerSeconds,
-        difficulty: rachacucaCurrentDifficulty,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        date: new Date().toISOString(),
-        userId: currentUser?.id || 'anonymous'
-    };
-  
+    if (!db) {
+        // Modo demo - salvar localmente
+        const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+        const scoreData = {
+            playerName: playerName,
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            date: new Date().toISOString(),
+            userId: currentUser?.id || 'anonymous',
+            manuallySaved: true
+        };
+        
+        localScores.push(scoreData);
+        localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+        
+        showToast('Pontuação salva localmente (modo demo)!', 'success');
+        
+        if (DOM.rachacucaSaveScoreModal) {
+            DOM.rachacucaSaveScoreModal.classList.remove('active');
+        }
+        
+        return;
+    }
+    
     try {
+        await ensureRachacucaCollectionExists();
+        
+        const scoreData = {
+            playerName: playerName,
+            moves: rachacucaMoves,
+            time: rachacucaTimerSeconds,
+            difficulty: rachacucaCurrentDifficulty,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            date: new Date().toISOString(),
+            userId: currentUser?.id || 'anonymous',
+            manuallySaved: true
+        };
+        
         await db.collection('rachacuca_scores').add(scoreData);
         
         showToast('Pontuação salva com sucesso!', 'success');
@@ -2561,44 +2772,100 @@ async function rachacucaSaveScore() {
         }
         
         rachacucaLoadScores('global');
+        
     } catch (error) {
         console.error('Erro ao salvar pontuação:', error);
-        showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
+        
+        // Fallback para salvar localmente
+        try {
+            const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
+            const scoreData = {
+                playerName: playerName,
+                moves: rachacucaMoves,
+                time: rachacucaTimerSeconds,
+                difficulty: rachacucaCurrentDifficulty,
+                date: new Date().toISOString(),
+                userId: currentUser?.id || 'anonymous',
+                manuallySaved: true,
+                error: error.message
+            };
+            
+            localScores.push(scoreData);
+            localStorage.setItem('rachacuca_local_scores', JSON.stringify(localScores));
+            
+            showToast('Pontuação salva localmente (erro no servidor)', 'warning');
+            
+            if (DOM.rachacucaSaveScoreModal) {
+                DOM.rachacucaSaveScoreModal.classList.remove('active');
+            }
+        } catch (localError) {
+            console.error('❌ Erro ao salvar localmente:', localError);
+            showToast(`Erro ao salvar pontuação: ${error.message}`, 'error');
+        }
     }
 }
 
 // Carregar pontuações do Racha Cuca
 async function rachacucaLoadScores(difficulty = 'global') {
-    if (!DOM.rachacucaScoresList || !db) return;
+    if (!DOM.rachacucaScoresList) return;
     
     try {
-        let query = db.collection('rachacuca_scores');
-        
-        if (difficulty !== 'global') {
-            query = query.where('difficulty', '==', difficulty);
+        // Primeiro tentar carregar do Firebase
+        if (db) {
+            try {
+                let query = db.collection('rachacuca_scores');
+                
+                if (difficulty !== 'global') {
+                    query = query.where('difficulty', '==', difficulty);
+                }
+                
+                const snapshot = await query.orderBy('moves').orderBy('time').limit(10).get();
+                
+                if (!snapshot.empty) {
+                    const scores = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        scores.push({
+                            id: doc.id,
+                            playerName: data.playerName,
+                            moves: data.moves,
+                            time: data.time,
+                            difficulty: data.difficulty,
+                            date: data.date || data.timestamp?.toDate?.() || new Date(),
+                            source: 'firebase'
+                        });
+                    });
+                    
+                    rachacucaDisplayScores(scores);
+                    return;
+                }
+            } catch (firebaseError) {
+                console.log('⚠️ Erro ao carregar do Firebase, tentando local:', firebaseError);
+            }
         }
         
-        const snapshot = await query.orderBy('moves').orderBy('time').limit(10).get();
+        // Fallback para dados locais
+        const localScores = JSON.parse(localStorage.getItem('rachacuca_local_scores') || '[]');
         
-        if (snapshot.empty) {
+        // Filtrar por dificuldade
+        let filteredScores = localScores;
+        if (difficulty !== 'global') {
+            filteredScores = localScores.filter(score => score.difficulty === difficulty);
+        }
+        
+        // Ordenar por movimentos e tempo
+        filteredScores.sort((a, b) => {
+            if (a.moves !== b.moves) return a.moves - b.moves;
+            return a.time - b.time;
+        }).slice(0, 10);
+        
+        if (filteredScores.length === 0) {
             DOM.rachacucaScoresList.innerHTML = '<p class="no-scores">Nenhuma pontuação salva ainda.</p>';
             return;
         }
-
-        const scores = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            scores.push({
-                id: doc.id,
-                playerName: data.playerName,
-                moves: data.moves,
-                time: data.time,
-                difficulty: data.difficulty,
-                date: data.date || data.timestamp?.toDate?.() || new Date()
-            });
-        });
         
-        rachacucaDisplayScores(scores);
+        rachacucaDisplayScores(filteredScores);
+        
     } catch (error) {
         console.error('Erro ao carregar pontuações:', error);
         DOM.rachacucaScoresList.innerHTML = `<p class="no-scores">Erro ao carregar pontuações: ${error.message}</p>`;
@@ -2615,14 +2882,17 @@ function rachacucaDisplayScores(scores) {
         const scoreItem = document.createElement('div');
         scoreItem.className = 'score-item';
         
-        const currentPlayerName = currentUser?.name || localStorage.getItem('rachacuca_player_name') || '';
+        const currentPlayerName = localStorage.getItem('rachacuca_player_name') || currentUser?.name || '';
         if (score.playerName === currentPlayerName && score.difficulty === rachacucaCurrentDifficulty) {
             scoreItem.classList.add('highlight');
         }
         
+        // Adicionar badge para pontuações salvas localmente
+        const sourceBadge = score.source === 'firebase' ? '' : '<span class="local-badge" title="Salvo localmente">📱</span>';
+        
         scoreItem.innerHTML = `
             <div class="score-rank">${index + 1}</div>
-            <div class="score-name">${score.playerName}</div>
+            <div class="score-name">${score.playerName} ${sourceBadge}</div>
             <div class="score-details">
                 <span>${score.moves} movimentos</span>
                 <span>${rachacucaFormatTime(score.time)}</span>
@@ -4566,4 +4836,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-console.log('✅ MathKids Pro v3.1 carregado com sucesso!');
+console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
