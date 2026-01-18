@@ -61,9 +61,6 @@
                                 <p>Melhoria no Aprendizado</p>
                             </div>
                         </div>
-                        <div class="stat-card" id="rachacucaStats">
-                            <!-- Será preenchido dinamicamente -->
-                        </div>
                     </div>
                     
                     <div class="features-grid">
@@ -488,10 +485,6 @@
                             </div>
                         </div>
                         
-                        <div id="rachacucaDashboardStats">
-                            <!-- Será preenchido dinamicamente com estatísticas do Racha Cuca -->
-                        </div>
-                        
                         <div class="content-grid">
                             <div class="card recent-activities">
                                 <div class="card-header">
@@ -605,7 +598,7 @@
                                     </button>
                                 </div>
                                 <div class="lesson-content" id="lessonContent">
-                                    <p class="lesson-welcome">Escolha uma das lições acima para see a explicação detalhada e começar a aprender.</p>
+                                    <p class="lesson-welcome">Escolha uma das lições acima para ver a explicação detalhada e começar a aprender.</p>
                                 </div>
                             </div>
                         </div>
@@ -773,6 +766,35 @@
             </div>
         </div>
 
+        <!-- Modal para salvar pontuação do Racha Cuca -->
+        <div id="rachacucaSaveScoreModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-save"></i> Salvar Pontuação - Racha Cuca</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="score-summary">
+                        <p>Você completou o quebra-cabeça em <strong id="rachacucaSaveMoves">0</strong> movimentos e <strong id="rachacucaSaveTime">00:00</strong>!</p>
+                        <p>Dificuldade: <strong id="rachacucaSaveDifficulty">Normal</strong></p>
+                    </div>
+                    <div class="player-input">
+                        <label for="rachacucaPlayerName">Seu nome:</label>
+                        <input type="text" id="rachacucaPlayerName" placeholder="Digite seu nome" maxlength="20">
+                        <small>Máximo 20 caracteres</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="rachacucaConfirmSaveBtn" class="btn-auth btn-primary">
+                            <i class="fas fa-check"></i> Salvar Pontuação
+                        </button>
+                        <button id="rachacucaCancelSaveBtn" class="btn-auth btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Container do jogo Racha Cuca -->
         <div id="rachacucaGameContainer" class="rachacuca-container" style="display: none;">
             <div class="rachacuca-header">
@@ -839,12 +861,15 @@
                         <div class="completion-message" id="rachacucaCompletionMessage" style="display: none;">
                             <h3><i class="fas fa-trophy"></i> Parabéns!</h3>
                             <p>Você completou o quebra-cabeça em <span id="rachacucaFinalMoves">0</span> movimentos e <span id="rachacucaFinalTime">00:00</span>!</p>
-                            <div class="auto-save-notice" style="margin: 10px 0; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; color: #16a34a;">
+                            <div class="auto-save-notice" id="autoSaveNotice" style="display: none;">
                                 <i class="fas fa-save"></i>
-                                <span>Sua pontuação foi salva automaticamente!</span>
+                                <span>Pontuação salva automaticamente!</span>
                             </div>
                             <button id="rachacucaPlayAgainBtn" class="btn btn-primary">
                                 <i class="fas fa-play"></i> Jogar Novamente
+                            </button>
+                            <button id="rachacucaSaveScoreBtn" class="btn btn-secondary" style="margin-top: 10px;">
+                                <i class="fas fa-save"></i> Salvar Pontuação (Opcional)
                             </button>
                             <button id="rachacucaViewScoresBtn" class="btn btn-outline" style="margin-top: 10px;">
                                 <i class="fas fa-trophy"></i> Ver Ranking
