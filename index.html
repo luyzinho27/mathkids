@@ -61,6 +61,15 @@
                                 <p>Melhoria no Aprendizado</p>
                             </div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-puzzle-piece"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="statsRachacucaGames">0</h3>
+                                <p>Jogos Racha Cuca</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="features-grid">
@@ -242,7 +251,7 @@
                         <a href="#" id="privacyLinkFooter">Privacidade</a>
                         <a href="#" id="contactLink">Contato</a>
                     </div>
-                    <p class="version">Versão 3.2</p>
+                    <p class="version">Versão 3.3</p>
                 </div>
             </div>
         </div>
@@ -472,15 +481,15 @@
                             </div>
                             <div class="stat-card danger">
                                 <div class="stat-icon">
-                                    <i class="fas fa-trophy"></i>
+                                    <i class="fas fa-puzzle-piece"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <h3 id="statLevel">Iniciante</h3>
-                                    <p>Seu Nível</p>
+                                    <h3 id="statRachacucaGames">0</h3>
+                                    <p>Racha Cuca Concluídos</p>
                                 </div>
                                 <div class="stat-trend">
-                                    <i class="fas fa-star"></i>
-                                    <span>Próximo: 50xp</span>
+                                    <i class="fas fa-trophy"></i>
+                                    <span>Ver ranking</span>
                                 </div>
                             </div>
                         </div>
@@ -777,6 +786,7 @@
                     <div class="score-summary">
                         <p>Você completou o quebra-cabeça em <strong id="rachacucaSaveMoves">0</strong> movimentos e <strong id="rachacucaSaveTime">00:00</strong>!</p>
                         <p>Dificuldade: <strong id="rachacucaSaveDifficulty">Normal</strong></p>
+                        <p>Pontuação calculada: <strong id="rachacucaSaveScore">0</strong> pontos</p>
                     </div>
                     <div class="player-input">
                         <label for="rachacucaPlayerName">Seu nome:</label>
@@ -814,6 +824,10 @@
                     <div class="info-box">
                         <span class="info-label">Dificuldade</span>
                         <span id="rachacucaDifficulty" class="info-value">Normal</span>
+                    </div>
+                    <div class="info-box">
+                        <span class="info-label">Pontuação</span>
+                        <span id="rachacucaScore" class="info-value">0</span>
                     </div>
                 </div>
             </div>
@@ -861,6 +875,7 @@
                         <div class="completion-message" id="rachacucaCompletionMessage" style="display: none;">
                             <h3><i class="fas fa-trophy"></i> Parabéns!</h3>
                             <p>Você completou o quebra-cabeça em <span id="rachacucaFinalMoves">0</span> movimentos e <span id="rachacucaFinalTime">00:00</span>!</p>
+                            <p class="score-display">Pontuação: <strong id="rachacucaFinalScore">0</strong></p>
                             <div class="auto-save-notice" id="autoSaveNotice" style="display: none;">
                                 <i class="fas fa-save"></i>
                                 <span>Pontuação salva automaticamente!</span>
