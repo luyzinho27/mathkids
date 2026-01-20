@@ -1,5 +1,3 @@
-// script.js - MathKids Pro v3.4 (com pontos em vez de XP)
-
 // Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
@@ -58,8 +56,8 @@ let userProgress = {
     division: { correct: 0, total: 0 },
     lastActivities: [],
     level: 'Iniciante',
-    pontos: 0, // Alterado de xp para pontos
-    nextLevelPontos: 50, // Alterado de nextLevelXP para nextLevelPontos
+    xp: 0,
+    nextLevelXP: 50,
     badges: [],
     dailyProgress: {
         exercises: 0,
@@ -1280,13 +1278,13 @@ function updateProgressUI() {
         DOM.statGames.textContent = userProgress.gamesCompleted || 0;
     }
     
-    // Atualizar pontos no stat-trend
+    // Atualizar XP no stat-trend
     const statTrendElement = document.querySelector('.stat-card.danger .stat-trend');
     if (statTrendElement) {
-        const currentPontos = userProgress.pontos || 0;
-        const nextLevelPontos = userProgress.nextLevelPontos || 50;
-        const pontosNeeded = nextLevelPontos - currentPontos;
-        statTrendElement.innerHTML = `<i class="fas fa-star"></i><span>Próximo: ${pontosNeeded > 0 ? pontosNeeded : 0} pontos</span>`;
+        const currentXP = userProgress.xp || 0;
+        const nextLevelXP = userProgress.nextLevelXP || 50;
+        const xpNeeded = nextLevelXP - currentXP;
+        statTrendElement.innerHTML = `<i class="fas fa-star"></i><span>Próximo: ${xpNeeded > 0 ? xpNeeded : 0}xp</span>`;
     }
 }
 
@@ -1476,10 +1474,10 @@ function addPracticeTime(seconds) {
     userProgress.practiceTime += seconds;
     userProgress.dailyProgress.time += seconds;
     
-    // Adicionar pontos baseado no tempo (1 ponto por 30 segundos)
-    const pontosGanhos = Math.floor(seconds / 30);
-    if (pontosGanhos > 0) {
-        addPontos(pontosGanhos, 'Tempo de prática');
+    // Adicionar XP baseado no tempo (1 XP por 30 segundos)
+    const xpEarned = Math.floor(seconds / 30);
+    if (xpEarned > 0) {
+        addXP(xpEarned, 'Tempo de prática');
     }
     
     updateProgressUI();
@@ -1489,15 +1487,15 @@ function addPracticeTime(seconds) {
     saveSystemStatsCache();
 }
 
-// Adicionar pontos
-function addPontos(quantidade, fonte = 'Atividade') {
-    userProgress.pontos = (userProgress.pontos || 0) + quantidade;
+// Adicionar XP
+function addXP(amount, source = 'Atividade') {
+    userProgress.xp = (userProgress.xp || 0) + amount;
     
     // Verificar se subiu de nível
     checkLevelUp();
     
     // Adicionar atividade
-    addActivity(`Ganhou ${quantidade} pontos (${fonte})`, 'correct');
+    addActivity(`Ganhou ${amount}xp (${source})`, 'correct');
     
     updateProgressUI();
     saveUserProgress();
@@ -1505,31 +1503,31 @@ function addPontos(quantidade, fonte = 'Atividade') {
 
 // Verificar subida de nível
 function checkLevelUp() {
-    const pontos = userProgress.pontos || 0;
+    const xp = userProgress.xp || 0;
     const oldLevel = userProgress.level;
     
     let newLevel = 'Iniciante';
-    let nextLevelPontos = 50;
+    let nextLevelXP = 50;
     
-    if (pontos >= 500) {
+    if (xp >= 500) {
         newLevel = 'Mestre';
-        nextLevelPontos = 1000;
-    } else if (pontos >= 250) {
+        nextLevelXP = 1000;
+    } else if (xp >= 250) {
         newLevel = 'Avançado';
-        nextLevelPontos = 500;
-    } else if (pontos >= 100) {
+        nextLevelXP = 500;
+    } else if (xp >= 100) {
         newLevel = 'Intermediário';
-        nextLevelPontos = 250;
+        nextLevelXP = 250;
     }
     
     if (newLevel !== oldLevel) {
         userProgress.level = newLevel;
-        userProgress.nextLevelPontos = nextLevelPontos;
+        userProgress.nextLevelXP = nextLevelXP;
         
         showToast(`🎉 Parabéns! Você subiu para o nível ${newLevel}!`, 'success');
         addActivity(`Subiu para o nível ${newLevel}`, 'game');
     } else {
-        userProgress.nextLevelPontos = nextLevelPontos;
+        userProgress.nextLevelXP = nextLevelXP;
     }
 }
 
@@ -2137,8 +2135,8 @@ function checkPracticeAnswer() {
         userProgress.dailyProgress.exercises++;
         userProgress.dailyProgress.correct++;
         
-        // Adicionar pontos por resposta correta
-        addPontos(10, 'Exercício correto');
+        // Adicionar XP por resposta correta
+        addXP(10, 'Exercício correto');
         
         setTimeout(generateExercise, 1500);
         
@@ -2151,8 +2149,8 @@ function checkPracticeAnswer() {
         
         userProgress.dailyProgress.exercises++;
         
-        // Adicionar pontos mínimos mesmo com erro (para incentivar)
-        addPontos(2, 'Tentativa de exercício');
+        // Adicionar XP mínimo mesmo com erro (para incentivar)
+        addXP(2, 'Tentativa de exercício');
         
         showToast('Resposta incorreta. Tente novamente!', 'error');
     }
@@ -2790,9 +2788,9 @@ async function rachacucaCompleteGame() {
         gameStartTime = null;
     }
     
-    // Adicionar pontos por completar o jogo
-    const pontosGanhos = Math.max(20, Math.floor(rachacucaCurrentScore / 50));
-    addPontos(pontosGanhos, 'Racha Cuca completado');
+    // Adicionar XP por completar o jogo
+    const xpEarned = Math.max(20, Math.floor(rachacucaCurrentScore / 50));
+    addXP(xpEarned, 'Racha Cuca completado');
     
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos com pontuação ${rachacucaCurrentScore}`, 'puzzle');
     
@@ -3508,8 +3506,8 @@ function checkGameAnswer() {
             feedback.textContent += ' (+2s)';
         }
         
-        // Adicionar pontos por resposta correta no jogo
-        addPontos(5, 'Resposta correta no jogo');
+        // Adicionar XP por resposta correta no jogo
+        addXP(5, 'Resposta correta no jogo');
     } else {
         feedback.textContent = `❌ Errado! A resposta correta é ${currentExercise.answer}`;
         feedback.className = 'game-feedback error';
@@ -3517,8 +3515,8 @@ function checkGameAnswer() {
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
         
-        // Adicionar pontos mínimos mesmo com erro
-        addPontos(1, 'Tentativa no jogo');
+        // Adicionar XP mínimo mesmo com erro
+        addXP(1, 'Tentativa no jogo');
     }
     
     setTimeout(() => {
@@ -3593,9 +3591,9 @@ function endGame() {
         gameStartTime = null;
     }
     
-    // Adicionar pontos por completar o jogo
-    const pontosGanhos = Math.max(15, Math.floor(gameScore / 10));
-    addPontos(pontosGanhos, 'Jogo completado');
+    // Adicionar XP por completar o jogo
+    const xpEarned = Math.max(15, Math.floor(gameScore / 10));
+    addXP(xpEarned, 'Jogo completado');
     
     // Atualizar estatísticas
     userProgress.gamesCompleted = (userProgress.gamesCompleted || 0) + 1;
@@ -3615,10 +3613,10 @@ function loadProgressSection() {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
-    // Calcular pontos necessários para próximo nível
-    const currentPontos = userProgress.pontos || 0;
-    const nextLevelPontos = userProgress.nextLevelPontos || 50;
-    const pontosNeeded = nextLevelPontos - currentPontos;
+    // Calcular XP necessário para próximo nível
+    const currentXP = userProgress.xp || 0;
+    const nextLevelXP = userProgress.nextLevelXP || 50;
+    const xpNeeded = nextLevelXP - currentXP;
     
     const content = `
         <div class="section-header">
@@ -3648,8 +3646,8 @@ function loadProgressSection() {
                         <div class="stat-label">Seu Nível</div>
                     </div>
                     <div class="progress-stat">
-                        <div class="stat-value">${currentPontos} / ${nextLevelPontos}</div>
-                        <div class="stat-label">Pontos de Experiência</div>
+                        <div class="stat-value">${currentXP} / ${nextLevelXP}</div>
+                        <div class="stat-label">Pontos de Experiência (XP)</div>
                     </div>
                     <div class="progress-stat">
                         <div class="stat-value">${userProgress.puzzlesCompleted || 0}</div>
@@ -5405,9 +5403,9 @@ function loadProfileModal(container) {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
-    const currentPontos = userProgress.pontos || 0;
-    const nextLevelPontos = userProgress.nextLevelPontos || 50;
-    const pontosProgress = Math.min(100, (currentPontos / nextLevelPontos) * 100);
+    const currentXP = userProgress.xp || 0;
+    const nextLevelXP = userProgress.nextLevelXP || 50;
+    const xpProgress = Math.min(100, (currentXP / nextLevelXP) * 100);
     
     container.innerHTML = `
         <div class="profile-content">
@@ -5437,10 +5435,10 @@ function loadProfileModal(container) {
                 </div>
                 <div class="profile-stat">
                     <h5>Pontos de Experiência</h5>
-                    <p>${currentPontos} / ${nextLevelPontos}</p>
+                    <p>${currentXP} / ${nextLevelXP}</p>
                     <div class="xp-progress">
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${pontosProgress}%"></div>
+                            <div class="progress-fill" style="width: ${xpProgress}%"></div>
                         </div>
                     </div>
                 </div>
@@ -5836,8 +5834,8 @@ function setupDemoMode() {
             { id: 4, description: 'Racha Cuca completado com 850 pontos', type: 'puzzle', timestamp: new Date(Date.now() - 10800000).toISOString() }
         ],
         level: 'Iniciante',
-        pontos: 35, // Alterado de xp para pontos
-        nextLevelPontos: 50, // Alterado de nextLevelXP para nextLevelPontos
+        xp: 35,
+        nextLevelXP: 50,
         badges: [],
         dailyProgress: {
             exercises: 6,
@@ -5924,4 +5922,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-console.log('✅ MathKids Pro v3.4 carregado com sucesso! Sistema de tempo de prática e pontos implementado!');
+console.log('✅ MathKids Pro v3.3 carregado com sucesso! Sistema de tempo de prática e XP implementado!');
