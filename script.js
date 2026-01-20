@@ -1,3 +1,5 @@
+// script.js - MathKids Pro v3.4 (com pontos em vez de XP)
+
 // Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBwK58We6awwwCMuHThYZA8iXXji5MuVeI",
@@ -56,6 +58,8 @@ let userProgress = {
     division: { correct: 0, total: 0 },
     lastActivities: [],
     level: 'Iniciante',
+    pontos: 0, // Alterado de xp para pontos
+    nextLevelPontos: 50, // Alterado de nextLevelXP para nextLevelPontos
     badges: [],
     dailyProgress: {
         exercises: 0,
@@ -65,8 +69,16 @@ let userProgress = {
     }
 };
 
-// Variáveis globais para armazenamento de instâncias
+// Variáveis para rastreamento de tempo
+let practiceStartTime = null;
+let currentPracticeTime = 0;
+let practiceTimer = null;
+let gameStartTime = null;
+
+// Variáveis globais para armazenamento de instâncias de gráficos
 let operationsChartInstance = null;
+let gamesChartInstance = null;
+let rachacucaPerformanceChartInstance = null;
 
 // Inicialização do Firebase
 try {
@@ -1105,6 +1117,12 @@ function handleLogout() {
 }
 
 function logoutLocal() {
+    // Parar timers de prática
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+    }
+    
     if (statsListener) {
         statsListener();
         statsListener = null;
@@ -1261,6 +1279,15 @@ function updateProgressUI() {
     if (DOM.statGames) {
         DOM.statGames.textContent = userProgress.gamesCompleted || 0;
     }
+    
+    // Atualizar pontos no stat-trend
+    const statTrendElement = document.querySelector('.stat-card.danger .stat-trend');
+    if (statTrendElement) {
+        const currentPontos = userProgress.pontos || 0;
+        const nextLevelPontos = userProgress.nextLevelPontos || 50;
+        const pontosNeeded = nextLevelPontos - currentPontos;
+        statTrendElement.innerHTML = `<i class="fas fa-star"></i><span>Próximo: ${pontosNeeded > 0 ? pontosNeeded : 0} pontos</span>`;
+    }
 }
 
 // Mostrar aplicação
@@ -1303,6 +1330,19 @@ function clearAllNotifications() {
 
 // Alternar seção
 function switchSection(sectionId) {
+    // Parar timers de prática se estiverem rodando
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+        if (practiceStartTime) {
+            const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
+            if (timeSpent > 0) {
+                addPracticeTime(timeSpent);
+            }
+            practiceStartTime = null;
+        }
+    }
+    
     if (currentSection === 'admin' && sectionId !== 'admin') {
         if (window.adminTabListener) {
             window.adminTabListener();
@@ -1322,6 +1362,11 @@ function switchSection(sectionId) {
         updateActiveNavigation(sectionId);
         
         loadSectionContent(sectionId);
+        
+        // Iniciar timer de prática para seções de prática
+        if (sectionId === 'practice') {
+            startPracticeTimer();
+        }
         
         if (sectionId === 'admin' && currentUser?.role === 'admin') {
             loadSystemStats(true);
@@ -1391,6 +1436,100 @@ function loadSectionContent(sectionId) {
         case 'admin':
             loadAdminSection();
             break;
+    }
+}
+
+// Iniciar timer de prática
+function startPracticeTimer() {
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+    }
+    
+    practiceStartTime = Date.now();
+    
+    practiceTimer = setInterval(() => {
+        const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
+        currentPracticeTime = timeSpent;
+        
+        // Atualizar UI do tempo de prática em tempo real (opcional)
+        if (currentSection === 'practice') {
+            const practiceHeader = document.querySelector('.practice-exercise .exercise-header');
+            if (practiceHeader) {
+                const timeElement = practiceHeader.querySelector('.practice-time');
+                if (!timeElement) {
+                    const timeElement = document.createElement('div');
+                    timeElement.className = 'practice-time';
+                    timeElement.innerHTML = `<i class="fas fa-clock"></i> Tempo: ${Math.floor(currentPracticeTime / 60)}:${(currentPracticeTime % 60).toString().padStart(2, '0')}`;
+                    practiceHeader.appendChild(timeElement);
+                } else {
+                    timeElement.innerHTML = `<i class="fas fa-clock"></i> Tempo: ${Math.floor(currentPracticeTime / 60)}:${(currentPracticeTime % 60).toString().padStart(2, '0')}`;
+                }
+            }
+        }
+    }, 1000);
+}
+
+// Adicionar tempo de prática
+function addPracticeTime(seconds) {
+    if (seconds <= 0) return;
+    
+    userProgress.practiceTime += seconds;
+    userProgress.dailyProgress.time += seconds;
+    
+    // Adicionar pontos baseado no tempo (1 ponto por 30 segundos)
+    const pontosGanhos = Math.floor(seconds / 30);
+    if (pontosGanhos > 0) {
+        addPontos(pontosGanhos, 'Tempo de prática');
+    }
+    
+    updateProgressUI();
+    saveUserProgress();
+    
+    // Atualizar estatísticas do sistema
+    saveSystemStatsCache();
+}
+
+// Adicionar pontos
+function addPontos(quantidade, fonte = 'Atividade') {
+    userProgress.pontos = (userProgress.pontos || 0) + quantidade;
+    
+    // Verificar se subiu de nível
+    checkLevelUp();
+    
+    // Adicionar atividade
+    addActivity(`Ganhou ${quantidade} pontos (${fonte})`, 'correct');
+    
+    updateProgressUI();
+    saveUserProgress();
+}
+
+// Verificar subida de nível
+function checkLevelUp() {
+    const pontos = userProgress.pontos || 0;
+    const oldLevel = userProgress.level;
+    
+    let newLevel = 'Iniciante';
+    let nextLevelPontos = 50;
+    
+    if (pontos >= 500) {
+        newLevel = 'Mestre';
+        nextLevelPontos = 1000;
+    } else if (pontos >= 250) {
+        newLevel = 'Avançado';
+        nextLevelPontos = 500;
+    } else if (pontos >= 100) {
+        newLevel = 'Intermediário';
+        nextLevelPontos = 250;
+    }
+    
+    if (newLevel !== oldLevel) {
+        userProgress.level = newLevel;
+        userProgress.nextLevelPontos = nextLevelPontos;
+        
+        showToast(`🎉 Parabéns! Você subiu para o nível ${newLevel}!`, 'success');
+        addActivity(`Subiu para o nível ${newLevel}`, 'game');
+    } else {
+        userProgress.nextLevelPontos = nextLevelPontos;
     }
 }
 
@@ -1858,6 +1997,9 @@ function loadPracticeSection(operation = null) {
             loadPracticeSection(operation);
         });
     });
+    
+    // Iniciar timer de prática
+    startPracticeTimer();
 }
 
 // Configurar eventos da prática
@@ -1975,6 +2117,15 @@ function checkPracticeAnswer() {
     userProgress.totalAnswers++;
     userProgress[currentExercise.operation].total++;
     
+    // Adicionar tempo de prática gasto
+    if (practiceStartTime) {
+        const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
+        if (timeSpent > 0) {
+            addPracticeTime(timeSpent);
+            practiceStartTime = Date.now(); // Resetar para o próximo exercício
+        }
+    }
+    
     if (userAnswer === currentExercise.answer) {
         feedback.textContent = `🎉 Correto! ${currentExercise.num1} ${currentExercise.symbol} ${currentExercise.num2} = ${currentExercise.answer}`;
         feedback.className = 'exercise-feedback correct';
@@ -1986,6 +2137,9 @@ function checkPracticeAnswer() {
         userProgress.dailyProgress.exercises++;
         userProgress.dailyProgress.correct++;
         
+        // Adicionar pontos por resposta correta
+        addPontos(10, 'Exercício correto');
+        
         setTimeout(generateExercise, 1500);
         
         showToast('Resposta correta! +10 pontos', 'success');
@@ -1996,6 +2150,9 @@ function checkPracticeAnswer() {
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} errado`, 'wrong');
         
         userProgress.dailyProgress.exercises++;
+        
+        // Adicionar pontos mínimos mesmo com erro (para incentivar)
+        addPontos(2, 'Tentativa de exercício');
         
         showToast('Resposta incorreta. Tente novamente!', 'error');
     }
@@ -2174,6 +2331,9 @@ function startRachacucaGame() {
         DOM.rachacucaGameContainer.style.display = 'block';
         rachacucaInitGame();
     }
+    
+    // Iniciar rastreamento de tempo para o jogo
+    gameStartTime = Date.now();
 }
 
 // Voltar para a seção de jogos
@@ -2184,6 +2344,15 @@ function rachacucaBackToGames() {
         if (rachacucaTimerInterval) {
             clearInterval(rachacucaTimerInterval);
             rachacucaTimerInterval = null;
+        }
+        
+        // Adicionar tempo gasto no jogo
+        if (gameStartTime) {
+            const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+            if (timeSpent > 0) {
+                addPracticeTime(timeSpent);
+            }
+            gameStartTime = null;
         }
     }
 
@@ -2611,6 +2780,19 @@ async function rachacucaCompleteGame() {
     if (userProgress.rachacucaScores.length > 10) {
         userProgress.rachacucaScores = userProgress.rachacucaScores.slice(-10);
     }
+    
+    // Adicionar tempo de prática gasto no jogo
+    if (gameStartTime) {
+        const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+        if (timeSpent > 0) {
+            addPracticeTime(timeSpent);
+        }
+        gameStartTime = null;
+    }
+    
+    // Adicionar pontos por completar o jogo
+    const pontosGanhos = Math.max(20, Math.floor(rachacucaCurrentScore / 50));
+    addPontos(pontosGanhos, 'Racha Cuca completado');
     
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos com pontuação ${rachacucaCurrentScore}`, 'puzzle');
     
@@ -3078,6 +3260,9 @@ function startGame(gameId) {
     gameActive = true;
     gameHighScore = localStorage.getItem(`mathkids_highscore_${gameId}`) || 0;
     
+    // Iniciar rastreamento de tempo para o jogo
+    gameStartTime = Date.now();
+    
     gameContainer.innerHTML = `
         <div class="game-header">
             <h3><i class="fas fa-${gameId === 'lightningGame' ? 'bolt' : gameId === 'divisionPuzzle' ? 'puzzle-piece' : 'trophy'}"></i> ${game.title}</h3>
@@ -3322,12 +3507,18 @@ function checkGameAnswer() {
             gameTimeLeft += 2;
             feedback.textContent += ' (+2s)';
         }
+        
+        // Adicionar pontos por resposta correta no jogo
+        addPontos(5, 'Resposta correta no jogo');
     } else {
         feedback.textContent = `❌ Errado! A resposta correta é ${currentExercise.answer}`;
         feedback.className = 'game-feedback error';
         
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
+        
+        // Adicionar pontos mínimos mesmo com erro
+        addPontos(1, 'Tentativa no jogo');
     }
     
     setTimeout(() => {
@@ -3393,6 +3584,19 @@ function endGame() {
         showToast(`🎉 Novo recorde! ${gameHighScore} pontos`, 'success');
     }
     
+    // Adicionar tempo de prática gasto no jogo
+    if (gameStartTime) {
+        const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+        if (timeSpent > 0) {
+            addPracticeTime(timeSpent);
+        }
+        gameStartTime = null;
+    }
+    
+    // Adicionar pontos por completar o jogo
+    const pontosGanhos = Math.max(15, Math.floor(gameScore / 10));
+    addPontos(pontosGanhos, 'Jogo completado');
+    
     // Atualizar estatísticas
     userProgress.gamesCompleted = (userProgress.gamesCompleted || 0) + 1;
     systemStats.totalGames++;
@@ -3410,6 +3614,11 @@ function loadProgressSection() {
     const accuracy = userProgress.totalAnswers > 0 
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
+    
+    // Calcular pontos necessários para próximo nível
+    const currentPontos = userProgress.pontos || 0;
+    const nextLevelPontos = userProgress.nextLevelPontos || 50;
+    const pontosNeeded = nextLevelPontos - currentPontos;
     
     const content = `
         <div class="section-header">
@@ -3439,6 +3648,10 @@ function loadProgressSection() {
                         <div class="stat-label">Seu Nível</div>
                     </div>
                     <div class="progress-stat">
+                        <div class="stat-value">${currentPontos} / ${nextLevelPontos}</div>
+                        <div class="stat-label">Pontos de Experiência</div>
+                    </div>
+                    <div class="progress-stat">
                         <div class="stat-value">${userProgress.puzzlesCompleted || 0}</div>
                         <div class="stat-label">Quebra-cabeças</div>
                     </div>
@@ -3457,11 +3670,18 @@ function loadProgressSection() {
                     </div>
                 </div>
                 
-                <div class="progress-history">
-                    <h3><i class="fas fa-history"></i> Histórico de Atividades</h3>
-                    <div class="activities-timeline" id="activitiesTimeline">
-                        ${generateActivitiesTimeline()}
+                <div class="progress-chart">
+                    <h3><i class="fas fa-gamepad"></i> Desempenho em Jogos</h3>
+                    <div class="chart-container">
+                        <canvas id="gamesChart"></canvas>
                     </div>
+                </div>
+            </div>
+            
+            <div class="progress-history">
+                <h3><i class="fas fa-history"></i> Histórico de Atividades</h3>
+                <div class="activities-timeline" id="activitiesTimeline">
+                    ${generateActivitiesTimeline()}
                 </div>
             </div>
             
@@ -3482,6 +3702,14 @@ function loadProgressSection() {
                         <p class="stat-number">${getBestRachacucaTime()}</p>
                     </div>
                 </div>
+                
+                <div class="progress-chart">
+                    <h3><i class="fas fa-chart-line"></i> Evolução no Racha Cuca</h3>
+                    <div class="chart-container">
+                        <canvas id="rachacucaPerformanceChart"></canvas>
+                    </div>
+                </div>
+                
                 ${userProgress.rachacucaScores && userProgress.rachacucaScores.length > 0 ? `
                 <div class="recent-scores">
                     <h4>Últimas Pontuações</h4>
@@ -3511,7 +3739,13 @@ function loadProgressSection() {
     
     section.innerHTML = content;
     
-    setTimeout(initializeOperationsChart, 100);
+    setTimeout(() => {
+        initializeOperationsChart();
+        initializeGamesChart();
+        if (userProgress.puzzlesCompleted > 0) {
+            initializeRachacucaPerformanceChart();
+        }
+    }, 100);
 }
 
 // Obter melhor pontuação do Racha Cuca
@@ -3647,7 +3881,237 @@ function initializeOperationsChart() {
             }
         });
     } catch (error) {
-        console.error('❌ Erro ao criar gráfico:', error);
+        console.error('❌ Erro ao criar gráfico de operações:', error);
+    }
+}
+
+// Gráfico de desempenho em jogos
+function initializeGamesChart() {
+    const ctx = document.getElementById('gamesChart');
+    if (!ctx) return;
+    
+    if (gamesChartInstance) {
+        gamesChartInstance.destroy();
+    }
+    
+    // Dados fictícios para demonstração (poderia ser expandido com dados reais)
+    const games = ['Racha Cuca', 'Desafio Relâmpago', 'Quebra-cabeça Divisão', 'Campeonato'];
+    const gamesCompleted = [
+        userProgress.puzzlesCompleted || 0,
+        Math.floor((userProgress.gamesCompleted || 0) * 0.4),
+        Math.floor((userProgress.gamesCompleted || 0) * 0.3),
+        Math.floor((userProgress.gamesCompleted || 0) * 0.3)
+    ];
+    
+    const gameScores = [
+        getBestRachacucaScore() !== '--' ? getBestRachacucaScore() : 0,
+        localStorage.getItem('mathkids_highscore_lightning') || 0,
+        localStorage.getItem('mathkids_division_level') ? parseInt(localStorage.getItem('mathkids_division_level')) * 100 : 0,
+        localStorage.getItem('mathkids_ranking') ? 1000 - (parseInt(localStorage.getItem('mathkids_ranking')) * 10) : 0
+    ];
+    
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js não carregado');
+        return;
+    }
+    
+    try {
+        gamesChartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: games,
+                datasets: [
+                    {
+                        label: 'Jogos Completos',
+                        data: gamesCompleted,
+                        backgroundColor: 'rgba(14, 165, 233, 0.2)',
+                        borderColor: 'rgb(14, 165, 233)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgb(14, 165, 233)'
+                    },
+                    {
+                        label: 'Melhores Pontuações',
+                        data: gameScores,
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        borderColor: 'rgb(34, 197, 94)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgb(34, 197, 94)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        ticks: {
+                            display: false
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        pointLabels: {
+                            font: {
+                                size: 12,
+                                family: 'Inter'
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                family: 'Inter'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: {
+                            family: 'Inter'
+                        },
+                        bodyFont: {
+                            family: 'Inter'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao criar gráfico de jogos:', error);
+    }
+}
+
+// Gráfico de desempenho no Racha Cuca
+function initializeRachacucaPerformanceChart() {
+    const ctx = document.getElementById('rachacucaPerformanceChart');
+    if (!ctx || !userProgress.rachacucaScores || userProgress.rachacucaScores.length === 0) return;
+    
+    if (rachacucaPerformanceChartInstance) {
+        rachacucaPerformanceChartInstance.destroy();
+    }
+    
+    // Preparar dados para o gráfico
+    const scores = userProgress.rachacucaScores.slice(-10); // Últimas 10 pontuações
+    const scoreValues = scores.map(s => s.score);
+    const movesValues = scores.map(s => s.moves);
+    const timeValues = scores.map(s => s.time);
+    const labels = scores.map((s, i) => `Jogo ${i + 1}`);
+    
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js não carregado');
+        return;
+    }
+    
+    try {
+        rachacucaPerformanceChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Pontuação',
+                        data: scoreValues,
+                        borderColor: 'rgb(14, 165, 233)',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Movimentos',
+                        data: movesValues,
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Tempo (segundos)',
+                        data: timeValues,
+                        borderColor: 'rgb(234, 179, 8)',
+                        backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y2'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Pontuação'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Movimentos'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Tempo (s)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        },
+                        offset: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                family: 'Inter'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: {
+                            family: 'Inter'
+                        },
+                        bodyFont: {
+                            family: 'Inter'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao criar gráfico de desempenho do Racha Cuca:', error);
     }
 }
 
@@ -3821,6 +4285,10 @@ function loadAdminSection() {
                                             <span>Tempo Médio:</span>
                                             <span>${systemStats.totalPuzzles > 0 ? '3:45' : '--'}</span>
                                         </div>
+                                        <div class="stat-item">
+                                            <span>Pontuação Média:</span>
+                                            <span>${systemStats.totalPuzzles > 0 ? '750' : '0'}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="game-stat-card">
@@ -3848,6 +4316,17 @@ function loadAdminSection() {
                                             <span>${systemStats.totalGames > 0 ? '850' : '0'}</span>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <div class="admin-charts">
+                                <div class="chart-container">
+                                    <h4><i class="fas fa-chart-bar"></i> Distribuição de Jogos</h4>
+                                    <canvas id="adminGamesDistributionChart" height="200"></canvas>
+                                </div>
+                                <div class="chart-container">
+                                    <h4><i class="fas fa-chart-line"></i> Desempenho no Racha Cuca</h4>
+                                    <canvas id="adminRachacucaChart" height="200"></canvas>
                                 </div>
                             </div>
                             
@@ -3965,6 +4444,12 @@ function loadAdminSection() {
     
     setupAdminEvents();
     loadRachacucaTopPlayers();
+    
+    // Inicializar gráficos do admin após um pequeno delay
+    setTimeout(() => {
+        initializeAdminGamesDistributionChart();
+        initializeAdminRachacucaChart();
+    }, 500);
 }
 
 // Configurar eventos de administração
@@ -3981,6 +4466,10 @@ function setupAdminEvents() {
             
             if (tabId === 'gamesStats') {
                 loadRachacucaTopPlayers();
+                setTimeout(() => {
+                    initializeAdminGamesDistributionChart();
+                    initializeAdminRachacucaChart();
+                }, 100);
             }
         });
     });
@@ -4000,6 +4489,170 @@ function setupAdminEvents() {
     loadUsersTable();
     
     setupUserModal();
+}
+
+// Gráfico de distribuição de jogos (Admin)
+function initializeAdminGamesDistributionChart() {
+    const ctx = document.getElementById('adminGamesDistributionChart');
+    if (!ctx) return;
+    
+    const gameNames = ['Racha Cuca', 'Desafio Relâmpago', 'Quebra-cabeça Divisão', 'Campeonato MathKids'];
+    const gameCounts = [
+        systemStats.totalPuzzles,
+        Math.floor(systemStats.totalGames * 0.4),
+        Math.floor(systemStats.totalGames * 0.3),
+        Math.floor(systemStats.totalGames * 0.3)
+    ];
+    
+    const colors = [
+        'rgba(14, 165, 233, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+        'rgba(234, 179, 8, 0.8)',
+        'rgba(239, 68, 68, 0.8)'
+    ];
+    
+    if (typeof Chart === 'undefined') return;
+    
+    try {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: gameNames,
+                datasets: [{
+                    data: gameCounts,
+                    backgroundColor: colors,
+                    borderColor: colors.map(c => c.replace('0.8', '1')),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = gameCounts.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao criar gráfico de distribuição de jogos:', error);
+    }
+}
+
+// Gráfico de desempenho no Racha Cuca (Admin)
+function initializeAdminRachacucaChart() {
+    const ctx = document.getElementById('adminRachacucaChart');
+    if (!ctx) return;
+    
+    // Dados fictícios para demonstração
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+    const avgScores = [650, 720, 780, 810, 790, 850];
+    const completionRate = [85, 88, 90, 92, 91, 95];
+    
+    if (typeof Chart === 'undefined') return;
+    
+    try {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'Pontuação Média',
+                        data: avgScores,
+                        borderColor: 'rgb(14, 165, 233)',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Taxa de Conclusão (%)',
+                        data: completionRate,
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Pontuação Média'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Taxa de Conclusão (%)'
+                        },
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: {
+                                family: 'Inter'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: {
+                            family: 'Inter'
+                        },
+                        bodyFont: {
+                            family: 'Inter'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao criar gráfico de desempenho do Racha Cuca (Admin):', error);
+    }
 }
 
 // Carregar top jogadores do Racha Cuca
@@ -4694,7 +5347,8 @@ function generateBadges() {
         { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true },
         { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 },
         { id: 'puzzleMaster', name: 'Mestre do Quebra-cabeça', description: '5 jogos do Racha Cuca concluídos', earned: (userProgress.puzzlesCompleted || 0) >= 5 },
-        { id: 'gameChampion', name: 'Campeão dos Jogos', description: '10 jogos concluídos', earned: (userProgress.gamesCompleted || 0) >= 10 }
+        { id: 'gameChampion', name: 'Campeão dos Jogos', description: '10 jogos concluídos', earned: (userProgress.gamesCompleted || 0) >= 10 },
+        { id: 'levelMaster', name: 'Mestre', description: 'Alcançou o nível Mestre', earned: userProgress.level === 'Mestre' }
     ];
     
     let html = '';
@@ -4751,6 +5405,10 @@ function loadProfileModal(container) {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
+    const currentPontos = userProgress.pontos || 0;
+    const nextLevelPontos = userProgress.nextLevelPontos || 50;
+    const pontosProgress = Math.min(100, (currentPontos / nextLevelPontos) * 100);
+    
     container.innerHTML = `
         <div class="profile-content">
             <div class="profile-header">
@@ -4776,6 +5434,15 @@ function loadProfileModal(container) {
                 <div class="profile-stat">
                     <h5>Tempo de Prática</h5>
                     <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
+                </div>
+                <div class="profile-stat">
+                    <h5>Pontos de Experiência</h5>
+                    <p>${currentPontos} / ${nextLevelPontos}</p>
+                    <div class="xp-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${pontosProgress}%"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="profile-stat">
                     <h5>Quebra-cabeças</h5>
@@ -4995,16 +5662,6 @@ function addActivity(description, type = 'info') {
 function saveUserProgress() {
     if (!currentUser) return;
     
-    // Calcular nível baseado no progresso total
-    const totalProgress = userProgress.exercisesCompleted + 
-                         (userProgress.puzzlesCompleted || 0) * 10 + 
-                         (userProgress.gamesCompleted || 0) * 5;
-    
-    if (totalProgress >= 500) userProgress.level = 'Mestre';
-    else if (totalProgress >= 250) userProgress.level = 'Avançado';
-    else if (totalProgress >= 100) userProgress.level = 'Intermediário';
-    else userProgress.level = 'Iniciante';
-    
     if (currentUser.id) {
         const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
         user.progress = userProgress;
@@ -5161,7 +5818,7 @@ function setupDemoMode() {
         exercisesCompleted: 15,
         correctAnswers: 12,
         totalAnswers: 15,
-        practiceTime: 45,
+        practiceTime: 125, // 2 minutos e 5 segundos
         gamesCompleted: 3,
         puzzlesCompleted: 2,
         rachacucaScores: [
@@ -5179,6 +5836,8 @@ function setupDemoMode() {
             { id: 4, description: 'Racha Cuca completado com 850 pontos', type: 'puzzle', timestamp: new Date(Date.now() - 10800000).toISOString() }
         ],
         level: 'Iniciante',
+        pontos: 35, // Alterado de xp para pontos
+        nextLevelPontos: 50, // Alterado de nextLevelXP para nextLevelPontos
         badges: [],
         dailyProgress: {
             exercises: 6,
@@ -5265,4 +5924,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-console.log('✅ MathKids Pro v3.2 carregado com sucesso!');
+console.log('✅ MathKids Pro v3.4 carregado com sucesso! Sistema de tempo de prática e pontos implementado!');
