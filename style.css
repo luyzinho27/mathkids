@@ -1420,7 +1420,7 @@ input, select, textarea {
 }
 
 .stat-info h3 {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     color: var(--text-primary);
     margin-bottom: 0.25rem;
     font-weight: 700;
@@ -5615,3 +5615,4 @@ transform: translateX(0);
 opacity: 1;
 }
 }
+
