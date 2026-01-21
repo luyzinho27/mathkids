@@ -29,6 +29,18 @@ let gameTimer = null;
 let gameTimeLeft = 60;
 let gameScore = 0;
 let gameHighScore = 0;
+
+// Variáveis para rastreamento de tempo de prática
+let practiceStartTime = 0;
+let practiceTimerInterval = null;
+let accumulatedPracticeTime = 0;
+let gameStartTime = 0;
+
+// Sistema de XP
+let userXP = 0;
+let xpToNextLevel = 50;
+let userLevel = 1;
+
 let systemStats = {
     totalStudents: 0,
     averageRating: 4.8,
@@ -56,22 +68,16 @@ let userProgress = {
     division: { correct: 0, total: 0 },
     lastActivities: [],
     level: 'Iniciante',
-    xp: 0,
-    nextLevelXP: 50,
     badges: [],
     dailyProgress: {
         exercises: 0,
         correct: 0,
         time: 0,
         games: 0
-    }
+    },
+    xp: 0,
+    level: 1
 };
-
-// Variáveis para rastreamento de tempo
-let practiceStartTime = null;
-let currentPracticeTime = 0;
-let practiceTimer = null;
-let gameStartTime = null;
 
 // Variáveis globais para armazenamento de instâncias de gráficos
 let operationsChartInstance = null;
@@ -1102,6 +1108,9 @@ async function handlePasswordRecovery(e) {
 
 // Manipular logout
 function handleLogout() {
+    // Parar qualquer timer de prática em execução
+    stopPracticeTimer();
+    
     if (auth) {
         auth.signOut().then(() => {
             logoutLocal();
@@ -1115,11 +1124,8 @@ function handleLogout() {
 }
 
 function logoutLocal() {
-    // Parar timers de prática
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-        practiceTimer = null;
-    }
+    // Parar qualquer timer de prática em execução
+    stopPracticeTimer();
     
     if (statsListener) {
         statsListener();
@@ -1263,11 +1269,48 @@ function updateProgressUI() {
     }
     
     if (DOM.statTime) {
-        DOM.statTime.textContent = Math.floor(userProgress.practiceTime / 60) + ' min';
+    const totalSeconds = userProgress.practiceTime || 0;
+
+    // Cálculo das grandezas
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    // Formatação de saída
+    let timeString = "";
+
+    if (hours > 0) {
+        timeString += `${hours}h `;
     }
     
+    if (minutes > 0 || hours > 0) {
+        timeString += `${minutes}min `;
+    }
+
+    timeString += `${seconds}s`;
+
+    DOM.statTime.textContent = timeString.trim();
+}
+    
+    // Atualizar nível e XP
+    const { level, xp, nextLevelXP } = calculateUserLevel();
+    userProgress.level = level;
+    userProgress.xp = xp;
+    
     if (DOM.statLevel) {
-        DOM.statLevel.textContent = userProgress.level || 'Iniciante';
+        DOM.statLevel.textContent = level;
+        
+        // Atualizar o texto de "Próximo: X xp" se houver elemento de tendência
+        const trendElement = DOM.statLevel.closest('.stat-card').querySelector('.stat-trend');
+        if (trendElement) {
+            const currentXP = userProgress.xp || 0;
+            const xpNeeded = nextLevelXP - currentXP;
+            if (xpNeeded > 0) {
+                trendElement.querySelector('span').textContent = `Próximo: ${xpNeeded} pontos de experiência`;
+            } else {
+                trendElement.querySelector('span').textContent = `Nível máximo!`;
+            }
+        }
     }
     
     if (DOM.statPuzzles) {
@@ -1277,15 +1320,75 @@ function updateProgressUI() {
     if (DOM.statGames) {
         DOM.statGames.textContent = userProgress.gamesCompleted || 0;
     }
+}
+
+// Calcular nível do usuário baseado em XP
+function calculateUserLevel() {
+    const totalXP = userProgress.xp || 0;
+    const levelThresholds = [
+        0,      // Nível 1
+        50,     // Nível 2
+        150,    // Nível 3
+        300,    // Nível 4
+        500,    // Nível 5
+        750,    // Nível 6
+        1050,   // Nível 7
+        1400,   // Nível 8
+        1800,   // Nível 9
+        2250    // Nível 10
+    ];
     
-    // Atualizar XP no stat-trend
-    const statTrendElement = document.querySelector('.stat-card.danger .stat-trend');
-    if (statTrendElement) {
-        const currentXP = userProgress.xp || 0;
-        const nextLevelXP = userProgress.nextLevelXP || 50;
-        const xpNeeded = nextLevelXP - currentXP;
-        statTrendElement.innerHTML = `<i class="fas fa-star"></i><span>Próximo: ${xpNeeded > 0 ? xpNeeded : 0}xp</span>`;
+    let level = 1;
+    let nextLevelXP = levelThresholds[1];
+    
+    for (let i = levelThresholds.length - 1; i >= 0; i--) {
+        if (totalXP >= levelThresholds[i]) {
+            level = i + 1;
+            nextLevelXP = i < levelThresholds.length - 1 ? levelThresholds[i + 1] : levelThresholds[i];
+            break;
+        }
     }
+    
+    // Converter nível numérico para texto
+    const levelNames = {
+        1: 'Iniciante',
+        2: 'Aprendiz',
+        3: 'Estudante',
+        4: 'Intermediário',
+        5: 'Avançado',
+        6: 'Especialista',
+        7: 'Mestre',
+        8: 'Lenda',
+        9: 'Ídolo',
+        10: 'Lenda Suprema'
+    };
+    
+    return {
+        level: levelNames[level] || levelNames[1],
+        levelNumber: level,
+        xp: totalXP,
+        nextLevelXP: nextLevelXP
+    };
+}
+
+// Adicionar XP ao usuário
+function addXP(amount, reason = '') {
+    userProgress.xp = (userProgress.xp || 0) + amount;
+    
+    // Verificar se subiu de nível
+    const oldLevel = userProgress.level;
+    updateProgressUI();
+    const newLevel = userProgress.level;
+    
+    if (oldLevel !== newLevel) {
+        showToast(`🎉 Parabéns! Você alcançou o nível ${newLevel}!`, 'success');
+        addActivity(`Subiu para o nível ${newLevel}!`, 'level-up');
+    }
+    
+    // Salvar progresso
+    saveUserProgress();
+    
+    console.log(`+${amount} XP adicionados${reason ? ` (${reason})` : ''}`);
 }
 
 // Mostrar aplicação
@@ -1328,16 +1431,16 @@ function clearAllNotifications() {
 
 // Alternar seção
 function switchSection(sectionId) {
-    // Parar timers de prática se estiverem rodando
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-        practiceTimer = null;
-        if (practiceStartTime) {
-            const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
-            if (timeSpent > 0) {
-                addPracticeTime(timeSpent);
-            }
-            practiceStartTime = null;
+    // Parar timer de prática quando sair da seção de prática
+    if (currentSection === 'practice' && sectionId !== 'practice') {
+        stopPracticeTimer();
+    }
+    
+    // Parar timer de jogo quando sair da seção de jogos
+    if (currentSection === 'games' && sectionId !== 'games') {
+        if (gameTimer) {
+            clearInterval(gameTimer);
+            gameTimer = null;
         }
     }
     
@@ -1360,11 +1463,6 @@ function switchSection(sectionId) {
         updateActiveNavigation(sectionId);
         
         loadSectionContent(sectionId);
-        
-        // Iniciar timer de prática para seções de prática
-        if (sectionId === 'practice') {
-            startPracticeTimer();
-        }
         
         if (sectionId === 'admin' && currentUser?.role === 'admin') {
             loadSystemStats(true);
@@ -1424,6 +1522,8 @@ function loadSectionContent(sectionId) {
             break;
         case 'practice':
             loadPracticeSection();
+            // Iniciar timer de prática quando entrar na seção
+            startPracticeTimer();
             break;
         case 'games':
             loadGamesSection();
@@ -1437,105 +1537,12 @@ function loadSectionContent(sectionId) {
     }
 }
 
-// Iniciar timer de prática
-function startPracticeTimer() {
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-    }
-    
-    practiceStartTime = Date.now();
-    
-    practiceTimer = setInterval(() => {
-        const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
-        currentPracticeTime = timeSpent;
-        
-        // Atualizar UI do tempo de prática em tempo real (opcional)
-        if (currentSection === 'practice') {
-            const practiceHeader = document.querySelector('.practice-exercise .exercise-header');
-            if (practiceHeader) {
-                const timeElement = practiceHeader.querySelector('.practice-time');
-                if (!timeElement) {
-                    const timeElement = document.createElement('div');
-                    timeElement.className = 'practice-time';
-                    timeElement.innerHTML = `<i class="fas fa-clock"></i> Tempo: ${Math.floor(currentPracticeTime / 60)}:${(currentPracticeTime % 60).toString().padStart(2, '0')}`;
-                    practiceHeader.appendChild(timeElement);
-                } else {
-                    timeElement.innerHTML = `<i class="fas fa-clock"></i> Tempo: ${Math.floor(currentPracticeTime / 60)}:${(currentPracticeTime % 60).toString().padStart(2, '0')}`;
-                }
-            }
-        }
-    }, 1000);
-}
-
-// Adicionar tempo de prática
-function addPracticeTime(seconds) {
-    if (seconds <= 0) return;
-    
-    userProgress.practiceTime += seconds;
-    userProgress.dailyProgress.time += seconds;
-    
-    // Adicionar XP baseado no tempo (1 XP por 30 segundos)
-    const xpEarned = Math.floor(seconds / 30);
-    if (xpEarned > 0) {
-        addXP(xpEarned, 'Tempo de prática');
-    }
-    
-    updateProgressUI();
-    saveUserProgress();
-    
-    // Atualizar estatísticas do sistema
-    saveSystemStatsCache();
-}
-
-// Adicionar XP
-function addXP(amount, source = 'Atividade') {
-    userProgress.xp = (userProgress.xp || 0) + amount;
-    
-    // Verificar se subiu de nível
-    checkLevelUp();
-    
-    // Adicionar atividade
-    addActivity(`Ganhou ${amount}xp (${source})`, 'correct');
-    
-    updateProgressUI();
-    saveUserProgress();
-}
-
-// Verificar subida de nível
-function checkLevelUp() {
-    const xp = userProgress.xp || 0;
-    const oldLevel = userProgress.level;
-    
-    let newLevel = 'Iniciante';
-    let nextLevelXP = 50;
-    
-    if (xp >= 500) {
-        newLevel = 'Mestre';
-        nextLevelXP = 1000;
-    } else if (xp >= 250) {
-        newLevel = 'Avançado';
-        nextLevelXP = 500;
-    } else if (xp >= 100) {
-        newLevel = 'Intermediário';
-        nextLevelXP = 250;
-    }
-    
-    if (newLevel !== oldLevel) {
-        userProgress.level = newLevel;
-        userProgress.nextLevelXP = nextLevelXP;
-        
-        showToast(`🎉 Parabéns! Você subiu para o nível ${newLevel}!`, 'success');
-        addActivity(`Subiu para o nível ${newLevel}`, 'game');
-    } else {
-        userProgress.nextLevelXP = nextLevelXP;
-    }
-}
-
 // Carregar conteúdo do dashboard
 function loadDashboardContent() {
     loadRecentActivities();
     loadChallenges();
     loadLessons();
+    updateProgressUI(); // Garantir que os dados estejam atualizados
 }
 
 // Carregar atividades recentes
@@ -1552,13 +1559,16 @@ function loadRecentActivities() {
             const icon = activity.type === 'correct' ? 'fa-check-circle' :
                         activity.type === 'wrong' ? 'fa-times-circle' :
                         activity.type === 'game' ? 'fa-gamepad' : 
-                        activity.type === 'puzzle' ? 'fa-puzzle-piece' : 'fa-info-circle';
+                        activity.type === 'puzzle' ? 'fa-puzzle-piece' : 
+                        activity.type === 'level-up' ? 'fa-trophy' : 'fa-info-circle';
             
             const scoreClass = activity.type === 'correct' ? 'correct' :
-                              activity.type === 'wrong' ? 'wrong' : '';
+                              activity.type === 'wrong' ? 'wrong' :
+                              activity.type === 'level-up' ? 'level-up' : '';
             
-            const score = activity.type === 'correct' ? '+10' :
-                         activity.type === 'wrong' ? '-5' : '';
+            const score = activity.type === 'correct' ? '+10xp' :
+                         activity.type === 'wrong' ? '-5xp' :
+                         activity.type === 'level-up' ? '🎉' : '';
             
             html += `
                 <div class="activity-item ${activity.type}">
@@ -1587,29 +1597,33 @@ function loadChallenges() {
             icon: 'fa-star',
             title: 'Domine a Tabuada do 7',
             description: 'Complete 20 multiplicações com o número 7',
-            progress: 9,
-            total: 20
+            progress: userProgress.multiplication?.correct || 0,
+            total: 20,
+            xpReward: 50
         },
         {
             icon: 'fa-bolt',
             title: 'Desafio de Velocidade',
             description: 'Resolva 50 operações em menos de 5 minutos',
-            progress: 15,
-            total: 50
+            progress: userProgress.exercisesCompleted || 0,
+            total: 50,
+            xpReward: 75
         },
         {
             icon: 'fa-trophy',
             title: 'Campeão da Divisão',
             description: 'Resolva 30 divisões sem erros',
-            progress: 12,
-            total: 30
+            progress: userProgress.division?.correct || 0,
+            total: 30,
+            xpReward: 60
         },
         {
             icon: 'fa-puzzle-piece',
             title: 'Mestre do Quebra-cabeça',
             description: 'Complete 5 jogos do Racha Cuca',
             progress: userProgress.puzzlesCompleted || 0,
-            total: 5
+            total: 5,
+            xpReward: 100
         }
     ];
     
@@ -1630,6 +1644,10 @@ function loadChallenges() {
                         </div>
                         <span>${challenge.progress}/${challenge.total}</span>
                     </div>
+                    ${challenge.progress >= challenge.total ? 
+                        `<span class="challenge-completed">🎉 Concluído! +${challenge.xpReward}xp</span>` : 
+                        `<small class="challenge-xp">Recompensa: ${challenge.xpReward}xp</small>`
+                    }
                 </div>
             </div>
         `;
@@ -1976,6 +1994,12 @@ function loadPracticeSection(operation = null) {
                         <button class="btn-exercise secondary" id="newExercise">Novo Exercício</button>
                         <button class="btn-exercise outline" id="showHint">Mostrar Dica</button>
                     </div>
+                    
+                    <div class="practice-timer">
+                        <i class="fas fa-clock"></i>
+                        <span id="practiceTimerDisplay">Tempo ativo: 0:00</span>
+                        <small>O tempo é contado automaticamente enquanto você pratica</small>
+                    </div>
                 </div>
             </div>
             ` : '<p class="text-center">Selecione uma operação para começar a praticar.</p>'}
@@ -1987,6 +2011,7 @@ function loadPracticeSection(operation = null) {
     if (currentOperation) {
         setupPracticeEvents();
         generateExercise();
+        startPracticeTimer();
     }
     
     document.querySelectorAll('.operation-selector').forEach(selector => {
@@ -1995,9 +2020,6 @@ function loadPracticeSection(operation = null) {
             loadPracticeSection(operation);
         });
     });
-    
-    // Iniciar timer de prática
-    startPracticeTimer();
 }
 
 // Configurar eventos da prática
@@ -2020,6 +2042,58 @@ function setupPracticeEvents() {
             checkPracticeAnswer();
         }
     });
+}
+
+// Iniciar timer de prática
+function startPracticeTimer() {
+    // Parar timer anterior se existir
+    if (practiceTimerInterval) {
+        clearInterval(practiceTimerInterval);
+    }
+    
+    practiceStartTime = Date.now();
+    accumulatedPracticeTime = 0;
+    
+    // Iniciar novo timer
+    practiceTimerInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - practiceStartTime) / 1000);
+        const displayMinutes = Math.floor(elapsedSeconds / 60);
+        const displaySeconds = elapsedSeconds % 60;
+        
+        const timerDisplay = document.getElementById('practiceTimerDisplay');
+        if (timerDisplay) {
+            timerDisplay.textContent = `Tempo ativo: ${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`;
+        }
+        
+        // A cada minuto de prática, adicionar XP
+        if (elapsedSeconds % 60 === 0 && elapsedSeconds > 0) {
+            const minutes = elapsedSeconds / 60;
+            addXP(5 * minutes, `Prática contínua (${minutes} min)`);
+        }
+    }, 1000);
+}
+
+// Parar timer de prática
+function stopPracticeTimer() {
+    if (practiceTimerInterval) {
+        clearInterval(practiceTimerInterval);
+        practiceTimerInterval = null;
+        
+        // Salvar tempo acumulado
+        if (practiceStartTime > 0) {
+            const elapsedMinutes = Math.floor((Date.now() - practiceStartTime) / (1000 * 60));
+            if (elapsedMinutes > 0) {
+                userProgress.practiceTime = (userProgress.practiceTime || 0) + elapsedMinutes;
+                userProgress.dailyProgress.time += elapsedMinutes;
+                
+                // Adicionar XP baseado no tempo de prática
+                addXP(elapsedMinutes * 2, `Tempo de prática (${elapsedMinutes} min)`);
+                
+                saveUserProgress();
+                updateProgressUI();
+            }
+        }
+    }
 }
 
 // Gerar exercício
@@ -2115,44 +2189,36 @@ function checkPracticeAnswer() {
     userProgress.totalAnswers++;
     userProgress[currentExercise.operation].total++;
     
-    // Adicionar tempo de prática gasto
-    if (practiceStartTime) {
-        const timeSpent = Math.floor((Date.now() - practiceStartTime) / 1000);
-        if (timeSpent > 0) {
-            addPracticeTime(timeSpent);
-            practiceStartTime = Date.now(); // Resetar para o próximo exercício
-        }
-    }
-    
     if (userAnswer === currentExercise.answer) {
         feedback.textContent = `🎉 Correto! ${currentExercise.num1} ${currentExercise.symbol} ${currentExercise.num2} = ${currentExercise.answer}`;
         feedback.className = 'exercise-feedback correct';
         userProgress.correctAnswers++;
         userProgress[currentExercise.operation].correct++;
         
+        // Adicionar XP por resposta correta
+        const xpAmount = currentDifficulty === 'easy' ? 5 : currentDifficulty === 'medium' ? 10 : 15;
+        addXP(xpAmount, `Exercício ${getOperationName(currentExercise.operation)} correto`);
+        
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} concluído`, 'correct');
         
         userProgress.dailyProgress.exercises++;
         userProgress.dailyProgress.correct++;
         
-        // Adicionar XP por resposta correta
-        addXP(10, 'Exercício correto');
-        
         setTimeout(generateExercise, 1500);
         
-        showToast('Resposta correta! +10 pontos', 'success');
+        showToast(`Resposta correta! +${xpAmount}xp`, 'success');
     } else {
         feedback.textContent = `❌ Ops! A resposta correta é ${currentExercise.answer}. Tente novamente!`;
         feedback.className = 'exercise-feedback error';
+        
+        // Adicionar XP mesmo por erro (para incentivar a tentativa)
+        addXP(1, `Tentativa de exercício ${getOperationName(currentExercise.operation)}`);
         
         addActivity(`Exercício de ${getOperationName(currentExercise.operation)} errado`, 'wrong');
         
         userProgress.dailyProgress.exercises++;
         
-        // Adicionar XP mínimo mesmo com erro (para incentivar)
-        addXP(2, 'Tentativa de exercício');
-        
-        showToast('Resposta incorreta. Tente novamente!', 'error');
+        showToast('Resposta incorreta. Tente novamente! +1xp pela tentativa', 'error');
     }
     
     updateProgressUI();
@@ -2329,9 +2395,6 @@ function startRachacucaGame() {
         DOM.rachacucaGameContainer.style.display = 'block';
         rachacucaInitGame();
     }
-    
-    // Iniciar rastreamento de tempo para o jogo
-    gameStartTime = Date.now();
 }
 
 // Voltar para a seção de jogos
@@ -2342,15 +2405,6 @@ function rachacucaBackToGames() {
         if (rachacucaTimerInterval) {
             clearInterval(rachacucaTimerInterval);
             rachacucaTimerInterval = null;
-        }
-        
-        // Adicionar tempo gasto no jogo
-        if (gameStartTime) {
-            const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-            if (timeSpent > 0) {
-                addPracticeTime(timeSpent);
-            }
-            gameStartTime = null;
         }
     }
 
@@ -2779,18 +2833,10 @@ async function rachacucaCompleteGame() {
         userProgress.rachacucaScores = userProgress.rachacucaScores.slice(-10);
     }
     
-    // Adicionar tempo de prática gasto no jogo
-    if (gameStartTime) {
-        const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-        if (timeSpent > 0) {
-            addPracticeTime(timeSpent);
-        }
-        gameStartTime = null;
-    }
-    
-    // Adicionar XP por completar o jogo
-    const xpEarned = Math.max(20, Math.floor(rachacucaCurrentScore / 50));
-    addXP(xpEarned, 'Racha Cuca completado');
+    // Adicionar XP pela conclusão do jogo
+    const xpMultiplier = rachacucaCurrentDifficulty === 'easy' ? 1 : rachacucaCurrentDifficulty === 'normal' ? 2 : 3;
+    const xpAmount = Math.floor(rachacucaCurrentScore / 10) * xpMultiplier;
+    addXP(xpAmount, `Racha Cuca concluído (${rachacucaCurrentScore} pontos)`);
     
     addActivity(`Racha Cuca concluído em ${rachacucaMoves} movimentos com pontuação ${rachacucaCurrentScore}`, 'puzzle');
     
@@ -3258,9 +3304,6 @@ function startGame(gameId) {
     gameActive = true;
     gameHighScore = localStorage.getItem(`mathkids_highscore_${gameId}`) || 0;
     
-    // Iniciar rastreamento de tempo para o jogo
-    gameStartTime = Date.now();
-    
     gameContainer.innerHTML = `
         <div class="game-header">
             <h3><i class="fas fa-${gameId === 'lightningGame' ? 'bolt' : gameId === 'divisionPuzzle' ? 'puzzle-piece' : 'trophy'}"></i> ${game.title}</h3>
@@ -3515,7 +3558,7 @@ function checkGameAnswer() {
         gameTimeLeft = Math.max(0, gameTimeLeft - 5);
         feedback.textContent += ' (-5s)';
         
-        // Adicionar XP mínimo mesmo com erro
+        // Adicionar XP mesmo por erro (para incentivar a tentativa)
         addXP(1, 'Tentativa no jogo');
     }
     
@@ -3579,26 +3622,23 @@ function endGame() {
         localStorage.setItem(`mathkids_highscore_${currentGame}`, gameHighScore);
         const highScoreElement = document.getElementById('gameHighScore');
         if (highScoreElement) highScoreElement.textContent = gameHighScore;
-        showToast(`🎉 Novo recorde! ${gameHighScore} pontos`, 'success');
+        
+        // Adicionar XP por recorde
+        addXP(25, 'Novo recorde no jogo');
+        showToast(`🎉 Novo recorde! ${gameHighScore} pontos +25xp`, 'success');
+    } else {
+        showToast(`Jogo finalizado! ${gameScore} pontos`, 'success');
     }
-    
-    // Adicionar tempo de prática gasto no jogo
-    if (gameStartTime) {
-        const timeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-        if (timeSpent > 0) {
-            addPracticeTime(timeSpent);
-        }
-        gameStartTime = null;
-    }
-    
-    // Adicionar XP por completar o jogo
-    const xpEarned = Math.max(15, Math.floor(gameScore / 10));
-    addXP(xpEarned, 'Jogo completado');
     
     // Atualizar estatísticas
     userProgress.gamesCompleted = (userProgress.gamesCompleted || 0) + 1;
     systemStats.totalGames++;
     saveSystemStatsCache();
+    
+    // Adicionar XP por conclusão do jogo
+    const timeBonus = Math.floor(gameTimeLeft / 10);
+    addXP(10 + timeBonus, `Conclusão do jogo (${timeBonus} bonus)`);
+    
     updateProgressUI();
     saveUserProgress();
     
@@ -3613,10 +3653,10 @@ function loadProgressSection() {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
-    // Calcular XP necessário para próximo nível
-    const currentXP = userProgress.xp || 0;
-    const nextLevelXP = userProgress.nextLevelXP || 50;
-    const xpNeeded = nextLevelXP - currentXP;
+    // Calcular nível e XP
+    const { level, xp, nextLevelXP } = calculateUserLevel();
+    const xpNeeded = nextLevelXP - xp;
+    const xpPercentage = nextLevelXP > 0 ? Math.round((xp / nextLevelXP) * 100) : 0;
     
     const content = `
         <div class="section-header">
@@ -3638,16 +3678,12 @@ function loadProgressSection() {
                         <div class="stat-label">Taxa de Acerto</div>
                     </div>
                     <div class="progress-stat">
-                        <div class="stat-value">${Math.floor(userProgress.practiceTime / 60)}</div>
-                        <div class="stat-label">Minutos de Prática</div>
+                        <div class="stat-value">${Math.floor(userProgress.practiceTime / 60)}h ${userProgress.practiceTime % 60}m</div>
+                        <div class="stat-label">Tempo de Prática</div>
                     </div>
                     <div class="progress-stat">
-                        <div class="stat-value">${userProgress.level}</div>
+                        <div class="stat-value">${level}</div>
                         <div class="stat-label">Seu Nível</div>
-                    </div>
-                    <div class="progress-stat">
-                        <div class="stat-value">${currentXP} / ${nextLevelXP}</div>
-                        <div class="stat-label">Pontos de Experiência (XP)</div>
                     </div>
                     <div class="progress-stat">
                         <div class="stat-value">${userProgress.puzzlesCompleted || 0}</div>
@@ -3656,6 +3692,27 @@ function loadProgressSection() {
                     <div class="progress-stat">
                         <div class="stat-value">${userProgress.gamesCompleted || 0}</div>
                         <div class="stat-label">Jogos Concluídos</div>
+                    </div>
+                </div>
+                
+                <div class="xp-progress">
+                    <h3><i class="fas fa-trophy"></i> Progresso de XP</h3>
+                    <div class="xp-info">
+                        <div class="xp-current">
+                            <span class="xp-label">XP Atual:</span>
+                            <span class="xp-value">${xp}</span>
+                        </div>
+                        <div class="xp-next">
+                            <span class="xp-label">Próximo Nível:</span>
+                            <span class="xp-value">${nextLevelXP} XP</span>
+                        </div>
+                    </div>
+                    <div class="xp-bar">
+                        <div class="xp-fill" style="width: ${xpPercentage}%"></div>
+                    </div>
+                    <div class="xp-details">
+                        <span>Nível ${level}</span>
+                        <span>${xpNeeded > 0 ? `${xpNeeded} XP para o próximo nível` : 'Nível máximo!'}</span>
                     </div>
                 </div>
             </div>
@@ -5099,7 +5156,7 @@ function generateReport() {
                     </div>
                     <div class="report-stat">
                         <span class="stat-label">Tempo Médio de Prática:</span>
-                        <span class="stat-value">45 min/aluno</span>
+                        <span class="stat-value">${Math.floor(systemStats.totalExercises * 0.5)} min/aluno</span>
                     </div>
                     <div class="report-stat">
                         <span class="stat-label">Quebra-cabeças Resolvidos:</span>
@@ -5314,10 +5371,12 @@ function generateActivitiesTimeline() {
             const icon = activity.type === 'correct' ? 'fa-check' :
                         activity.type === 'wrong' ? 'fa-times' :
                         activity.type === 'game' ? 'fa-gamepad' : 
-                        activity.type === 'puzzle' ? 'fa-puzzle-piece' : 'fa-info';
+                        activity.type === 'puzzle' ? 'fa-puzzle-piece' :
+                        activity.type === 'level-up' ? 'fa-trophy' : 'fa-info';
             
             const iconClass = activity.type === 'correct' ? 'success' :
-                             activity.type === 'wrong' ? 'error' : 'info';
+                             activity.type === 'wrong' ? 'error' :
+                             activity.type === 'level-up' ? 'level-up' : 'info';
             
             html += `
                 <div class="timeline-item">
@@ -5338,15 +5397,14 @@ function generateActivitiesTimeline() {
 
 function generateBadges() {
     const badges = [
-        { id: 'beginner', name: 'Iniciante', description: 'Primeiro login', earned: true },
-        { id: 'exercises10', name: 'Aprendiz', description: '10 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 10 },
-        { id: 'exercises50', name: 'Estudante', description: '50 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 50 },
-        { id: 'accuracy80', name: 'Preciso', description: '80% de acertos', earned: ((userProgress.correctAnswers / userProgress.totalAnswers) || 0) >= 0.8 },
-        { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true },
-        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60 },
-        { id: 'puzzleMaster', name: 'Mestre do Quebra-cabeça', description: '5 jogos do Racha Cuca concluídos', earned: (userProgress.puzzlesCompleted || 0) >= 5 },
-        { id: 'gameChampion', name: 'Campeão dos Jogos', description: '10 jogos concluídos', earned: (userProgress.gamesCompleted || 0) >= 10 },
-        { id: 'levelMaster', name: 'Mestre', description: 'Alcançou o nível Mestre', earned: userProgress.level === 'Mestre' }
+        { id: 'beginner', name: 'Iniciante', description: 'Primeiro login', earned: true, xp: 10 },
+        { id: 'exercises10', name: 'Aprendiz', description: '10 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 10, xp: 25 },
+        { id: 'exercises50', name: 'Estudante', description: '50 exercícios concluídos', earned: (userProgress.exercisesCompleted || 0) >= 50, xp: 50 },
+        { id: 'accuracy80', name: 'Preciso', description: '80% de acertos', earned: ((userProgress.correctAnswers / userProgress.totalAnswers) || 0) >= 0.8, xp: 30 },
+        { id: 'allOperations', name: 'Completo', description: 'Praticou todas operações', earned: true, xp: 20 },
+        { id: 'time60', name: 'Dedicado', description: '60 minutos de prática', earned: (userProgress.practiceTime || 0) >= 60, xp: 40 },
+        { id: 'puzzleMaster', name: 'Mestre do Quebra-cabeça', description: '5 jogos do Racha Cuca concluídos', earned: (userProgress.puzzlesCompleted || 0) >= 5, xp: 75 },
+        { id: 'gameChampion', name: 'Campeão dos Jogos', description: '10 jogos concluídos', earned: (userProgress.gamesCompleted || 0) >= 10, xp: 100 }
     ];
     
     let html = '';
@@ -5359,6 +5417,7 @@ function generateBadges() {
                 <div class="badge-info">
                     <h4>${badge.name}</h4>
                     <p>${badge.description}</p>
+                    ${badge.earned ? `<small class="badge-xp">+${badge.xp} XP</small>` : ''}
                 </div>
             </div>
         `;
@@ -5403,9 +5462,8 @@ function loadProfileModal(container) {
         ? Math.round((userProgress.correctAnswers / userProgress.totalAnswers) * 100) 
         : 0;
     
-    const currentXP = userProgress.xp || 0;
-    const nextLevelXP = userProgress.nextLevelXP || 50;
-    const xpProgress = Math.min(100, (currentXP / nextLevelXP) * 100);
+    const { level, xp, nextLevelXP } = calculateUserLevel();
+    const xpNeeded = nextLevelXP - xp;
     
     container.innerHTML = `
         <div class="profile-content">
@@ -5431,16 +5489,7 @@ function loadProfileModal(container) {
                 </div>
                 <div class="profile-stat">
                     <h5>Tempo de Prática</h5>
-                    <p>${Math.floor(userProgress.practiceTime / 60)} min</p>
-                </div>
-                <div class="profile-stat">
-                    <h5>Pontos de Experiência</h5>
-                    <p>${currentXP} / ${nextLevelXP}</p>
-                    <div class="xp-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${xpProgress}%"></div>
-                        </div>
-                    </div>
+                    <p>${Math.floor(userProgress.practiceTime / 60)}h ${userProgress.practiceTime % 60}m</p>
                 </div>
                 <div class="profile-stat">
                     <h5>Quebra-cabeças</h5>
@@ -5450,6 +5499,24 @@ function loadProfileModal(container) {
                     <h5>Jogos Concluídos</h5>
                     <p>${userProgress.gamesCompleted || 0}</p>
                 </div>
+            </div>
+            
+            <div class="profile-level">
+                <h4><i class="fas fa-trophy"></i> Nível e XP</h4>
+                <div class="level-info">
+                    <div class="level-display">
+                        <span class="level-label">Nível:</span>
+                        <span class="level-value">${level}</span>
+                    </div>
+                    <div class="xp-display">
+                        <span class="xp-label">XP Atual:</span>
+                        <span class="xp-value">${xp}</span>
+                    </div>
+                </div>
+                <div class="xp-progress-bar">
+                    <div class="xp-progress-fill" style="width: ${nextLevelXP > 0 ? Math.round((xp / nextLevelXP) * 100) : 100}%"></div>
+                </div>
+                <p class="xp-next">${xpNeeded > 0 ? `Próximo nível em ${xpNeeded} XP` : 'Nível máximo alcançado!'}</p>
             </div>
             
             <div class="profile-actions">
@@ -5816,7 +5883,7 @@ function setupDemoMode() {
         exercisesCompleted: 15,
         correctAnswers: 12,
         totalAnswers: 15,
-        practiceTime: 125, // 2 minutos e 5 segundos
+        practiceTime: 45,
         gamesCompleted: 3,
         puzzlesCompleted: 2,
         rachacucaScores: [
@@ -5831,18 +5898,19 @@ function setupDemoMode() {
             { id: 1, description: 'Exercício de Multiplicação concluído', type: 'correct', timestamp: new Date().toISOString() },
             { id: 2, description: 'Desafio Relâmpago', type: 'game', timestamp: new Date(Date.now() - 3600000).toISOString() },
             { id: 3, description: 'Exercício de Divisão errado', type: 'wrong', timestamp: new Date(Date.now() - 7200000).toISOString() },
-            { id: 4, description: 'Racha Cuca completado com 850 pontos', type: 'puzzle', timestamp: new Date(Date.now() - 10800000).toISOString() }
+            { id: 4, description: 'Racha Cuca completado com 850 pontos', type: 'puzzle', timestamp: new Date(Date.now() - 10800000).toISOString() },
+            { id: 5, description: 'Ganhou 10xp por resposta correta', type: 'correct', timestamp: new Date(Date.now() - 14400000).toISOString() }
         ],
         level: 'Iniciante',
-        xp: 35,
-        nextLevelXP: 50,
         badges: [],
         dailyProgress: {
             exercises: 6,
             correct: 5,
             time: 27,
             games: 2
-        }
+        },
+        xp: 75,
+        level: 2
     };
     
     adminExists = localStorage.getItem('mathkids_admin_exists') === 'true';
@@ -5922,4 +5990,4 @@ window.addEventListener('focus', function() {
     }
 });
 
-console.log('✅ MathKids Pro v3.3 carregado com sucesso! Sistema de tempo de prática e XP implementado!');
+console.log('✅ MathKids Pro v3.3 carregado com sucesso! Sistema de XP e Tempo de Prática implementados!');
