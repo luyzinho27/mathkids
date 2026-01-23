@@ -1,5 +1,4 @@
 /* style.css - MathKids Pro - Versão 3.0 */
-
 /* ===== VARIÁVEIS CSS ===== */
 :root {
     /* Cores Principais - Tema Moderno */
@@ -5616,3 +5615,11 @@ opacity: 1;
 }
 }
 
+/* para garantir que os elementos sejam exibidos corretamente */
+.rachacuca-game-container {
+    display: none;
+}
+
+.rachacuca-game-container.active {
+    display: block;
+}
