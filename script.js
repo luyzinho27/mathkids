@@ -1306,7 +1306,7 @@ function updateProgressUI() {
             const currentXP = userProgress.xp || 0;
             const xpNeeded = nextLevelXP - currentXP;
             if (xpNeeded > 0) {
-                trendElement.querySelector('span').textContent = `Próximo: ${xpNeeded} pontos de experiência`;
+                trendElement.querySelector('span').textContent = `Próximo: ${xpNeeded} pontos de experiência (XP)`;
             } else {
                 trendElement.querySelector('span').textContent = `Nível máximo!`;
             }
@@ -2071,6 +2071,30 @@ function startPracticeTimer() {
             addXP(5 * minutes, `Prática contínua (${minutes} min)`);
         }
     }, 1000);
+    
+    // Iniciar salvamento periódico
+    startPeriodicSave();
+}
+
+// Função para forçar o salvamento periódico
+function startPeriodicSave() {
+    // Limpar intervalo anterior se existir
+    if (window.periodicSaveInterval) {
+        clearInterval(window.periodicSaveInterval);
+    }
+    
+    // Salvar progresso a cada 30 segundos durante a prática
+    window.periodicSaveInterval = setInterval(() => {
+        if (practiceStartTime > 0) {
+            const elapsedSeconds = Math.floor((Date.now() - practiceStartTime) / 1000);
+            if (elapsedSeconds > 30) { // Salvar apenas se tiver pelo menos 30 segundos
+                console.log('💾 Salvamento periódico automático');
+                stopPracticeTimer(); // Isso salvará o tempo acumulado
+                practiceStartTime = Date.now(); // Reiniciar contagem
+                startPracticeTimer(); // Continuar contando
+            }
+        }
+    }, 30000); // A cada 30 segundos
 }
 
 // Parar timer de prática
@@ -2079,21 +2103,130 @@ function stopPracticeTimer() {
         clearInterval(practiceTimerInterval);
         practiceTimerInterval = null;
         
+        // Parar também o salvamento periódico
+        if (window.periodicSaveInterval) {
+            clearInterval(window.periodicSaveInterval);
+            window.periodicSaveInterval = null;
+        }
+        
         // Salvar tempo acumulado
         if (practiceStartTime > 0) {
-            const elapsedMinutes = Math.floor((Date.now() - practiceStartTime) / (1000 * 60));
-            if (elapsedMinutes > 0) {
-                userProgress.practiceTime = (userProgress.practiceTime || 0) + elapsedMinutes;
-                userProgress.dailyProgress.time += elapsedMinutes;
+            // Calcular tempo decorrido em SEGUNDOS (não minutos)
+            const elapsedSeconds = Math.floor((Date.now() - practiceStartTime) / 1000);
+            
+            if (elapsedSeconds > 0) {
+                // Converter practiceTime atual para segundos se necessário
+                const currentPracticeTime = userProgress.practiceTime || 0;
                 
-                // Adicionar XP baseado no tempo de prática
-                addXP(elapsedMinutes * 2, `Tempo de prática (${elapsedMinutes} min)`);
+                // Se practiceTime for muito grande (> 10000), provavelmente está em minutos
+                // Converter para segundos se necessário
+                let currentTimeInSeconds = currentPracticeTime;
+                if (currentPracticeTime > 0 && currentPracticeTime < 10000) {
+                    // Parece estar em segundos
+                    currentTimeInSeconds = currentPracticeTime;
+                } else if (currentPracticeTime >= 10000) {
+                    // Parece estar em minutos, converter para segundos
+                    currentTimeInSeconds = currentPracticeTime * 60;
+                }
                 
-                saveUserProgress();
+                // Adicionar novos segundos
+                const newTotalSeconds = currentTimeInSeconds + elapsedSeconds;
+                
+                // Salvar em segundos para consistência com a UI
+                userProgress.practiceTime = newTotalSeconds;
+                userProgress.dailyProgress.time = (userProgress.dailyProgress.time || 0) + elapsedSeconds;
+                
+                // Adicionar XP baseado no tempo de prática (em minutos)
+                const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+                if (elapsedMinutes > 0) {
+                    addXP(elapsedMinutes * 2, `Tempo de prática (${elapsedMinutes} min)`);
+                }
+                
+                // Resetar o tempo de início
+                practiceStartTime = 0;
+                
+                // Salvar progresso com tratamento de erro mais detalhado
+                saveUserProgressWithRetry();
+                
+                // Atualizar UI
                 updateProgressUI();
+                
+                console.log('⏱️ Tempo salvo:', {
+                    elapsedSeconds,
+                    elapsedMinutes,
+                    totalPracticeTime: newTotalSeconds,
+                    totalPracticeTimeFormatted: `${Math.floor(newTotalSeconds / 60)}m ${newTotalSeconds % 60}s`
+                });
             }
         }
     }
+}
+
+// Função melhorada para salvar progresso com retry
+async function saveUserProgressWithRetry(maxRetries = 3) {
+    if (!currentUser || !currentUser.id) {
+        console.warn('⚠️ Não foi possível salvar: usuário não autenticado');
+        return;
+    }
+    
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+        try {
+            // Primeiro salvar no localStorage para persistência imediata
+            const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
+            user.progress = userProgress;
+            localStorage.setItem('mathkids_user', JSON.stringify(user));
+            
+            // Tentar salvar no Firebase se disponível
+            if (db) {
+                // Garantir que a estrutura do progresso está completa
+                const progressToSave = {
+                    ...userProgress,
+                    // Garantir que todos os sub-objetos existam
+                    addition: userProgress.addition || { correct: 0, total: 0 },
+                    subtraction: userProgress.subtraction || { correct: 0, total: 0 },
+                    multiplication: userProgress.multiplication || { correct: 0, total: 0 },
+                    division: userProgress.division || { correct: 0, total: 0 },
+                    lastActivities: userProgress.lastActivities || [],
+                    dailyProgress: userProgress.dailyProgress || { exercises: 0, correct: 0, time: 0, games: 0 },
+                    rachacucaScores: userProgress.rachacucaScores || [],
+                    badges: userProgress.badges || [],
+                    xp: userProgress.xp || 0,
+                    level: userProgress.level || 1
+                };
+                
+                await db.collection('users').doc(currentUser.id).update({
+                    progress: progressToSave,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ Progresso salvo no Firebase com sucesso');
+                return; // Sucesso, sair da função
+            } else {
+                console.log('💾 Progresso salvo apenas localmente (modo demo)');
+                return;
+            }
+            
+        } catch (error) {
+            attempts++;
+            console.error(`❌ Tentativa ${attempts}/${maxRetries} falhou:`, error);
+            
+            if (attempts < maxRetries) {
+                // Esperar um pouco antes de tentar novamente
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+            } else {
+                // Última tentativa falhou, salvar apenas localmente
+                console.warn('⚠️ Não foi possível salvar no Firebase. Salvando apenas localmente.');
+                showToast('Progresso salvo localmente (sem conexão)', 'warning');
+            }
+        }
+    }
+}
+
+// Função saveUserProgress existente (para compatibilidade)
+function saveUserProgress() {
+    saveUserProgressWithRetry(1); // Usar apenas 1 tentativa para compatibilidade
 }
 
 // Gerar exercício
@@ -2386,9 +2519,16 @@ function loadGamesSection() {
 
 // Iniciar jogo Racha Cuca
 function startRachacucaGame() {
-    const gamesSection = document.getElementById('games');
-    if (gamesSection) {
-        gamesSection.style.display = 'none';
+    // Primeiro, garantir que estamos na seção de jogos
+    switchSection('games');
+    
+    // Ocultar a grade de jogos e mostrar o container do Racha Cuca
+    if (DOM.gamesGrid) {
+        DOM.gamesGrid.style.display = 'none';
+    }
+    
+    if (DOM.gameContainer) {
+        DOM.gameContainer.style.display = 'none';
     }
     
     if (DOM.rachacucaGameContainer) {
@@ -2399,19 +2539,32 @@ function startRachacucaGame() {
 
 // Voltar para a seção de jogos
 function rachacucaBackToGames() {
+    // Parar o timer do Racha Cuca
+    if (rachacucaTimerInterval) {
+        clearInterval(rachacucaTimerInterval);
+        rachacucaTimerInterval = null;
+    }
+    
+    // Resetar variáveis do Racha Cuca
+    rachacucaGameStarted = false;
+    rachacucaGameCompleted = false;
+    
+    // Ocultar o container do Racha Cuca
     if (DOM.rachacucaGameContainer) {
         DOM.rachacucaGameContainer.style.display = 'none';
-        
-        if (rachacucaTimerInterval) {
-            clearInterval(rachacucaTimerInterval);
-            rachacucaTimerInterval = null;
-        }
     }
-
-    const gamesSection = document.getElementById('games');
-    if (gamesSection) {
-        gamesSection.style.display = 'block';
-        loadGamesSection();
+    
+    // Usar a função switchSection para voltar para a seção de jogos
+    // Isso garante que todo o estado seja atualizado corretamente
+    switchSection('games');
+    
+    // Fechar qualquer modal do Racha Cuca que esteja aberto
+    if (DOM.rachacucaScoresModal) {
+        DOM.rachacucaScoresModal.classList.remove('active');
+    }
+    
+    if (DOM.rachacucaSaveScoreModal) {
+        DOM.rachacucaSaveScoreModal.classList.remove('active');
     }
 }
 
@@ -3696,7 +3849,7 @@ function loadProgressSection() {
                 </div>
                 
                 <div class="xp-progress">
-                    <h3><i class="fas fa-trophy"></i> Progresso de XP</h3>
+                    <h3><i class="fas fa-trophy"></i> Progresso de Pontos de Experiência (XP)</h3>
                     <div class="xp-info">
                         <div class="xp-current">
                             <span class="xp-label">XP Atual:</span>
@@ -5725,21 +5878,7 @@ function addActivity(description, type = 'info') {
 }
 
 function saveUserProgress() {
-    if (!currentUser) return;
-    
-    if (currentUser.id) {
-        const user = JSON.parse(localStorage.getItem('mathkids_user') || '{}');
-        user.progress = userProgress;
-        localStorage.setItem('mathkids_user', JSON.stringify(user));
-    }
-    
-    if (db && currentUser.id) {
-        db.collection('users').doc(currentUser.id).update({
-            progress: userProgress
-        }).catch(error => {
-            console.error('❌ Error saving progress:', error);
-        });
-    }
+    saveUserProgressWithRetry(1); // Usar apenas 1 tentativa para compatibilidade
 }
 
 function showToast(message, type = 'info') {
